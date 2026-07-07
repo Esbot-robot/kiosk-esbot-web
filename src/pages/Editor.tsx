@@ -418,7 +418,7 @@ export function Editor() {
         <DialogTexto
           titulo="Editar subtitulo"
           valor={ini.subtitulo}
-          maxCaracteres={LIMITES.TITULO_MAX}
+          maxCaracteres={LIMITES.SUBTITULO_MAX}
           onGuardar={(subtitulo) => setInicial({ subtitulo })}
           onCerrar={() => setDialogo(null)}
         />

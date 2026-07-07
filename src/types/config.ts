@@ -66,7 +66,9 @@ export interface EventConfig {
 export const LIMITES = {
   TTS_MAX: 300,
   PREGUNTA_MAX: 120,
-  TITULO_MAX: 80,
+  /** medidos con el texto de Colombia Más: el máximo que se ve bien en el robot */
+  TITULO_MAX: 45,
+  SUBTITULO_MAX: 70,
   BOTON_MAX: 20,
   OPCIONES_MIN: 2,
   OPCIONES_MAX: 3,
