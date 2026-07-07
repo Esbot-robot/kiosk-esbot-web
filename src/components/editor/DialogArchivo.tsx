@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Modal } from '../Modal'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
+import { IconoNube } from '../iconos'
 
 interface DialogArchivoProps {
   titulo: string
@@ -84,8 +85,8 @@ export function DialogArchivo({ titulo, tipo, projectId, onSubido, onCerrar }: D
           arrastrando ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400'
         }`}
       >
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-2xl">
-          ☁️
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100">
+          <IconoNube />
         </div>
         {archivo ? (
           <p className="mt-4 font-medium text-slate-800">

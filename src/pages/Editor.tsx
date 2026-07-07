@@ -7,6 +7,7 @@ import { LIMITES, type EventConfig, type Pregunta, type Project } from '../types
 import { DialogBoton, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
+import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 
 type Pestana = 'inicial' | 'ruleta'
 
@@ -48,9 +49,9 @@ function Lapiz({ onClick, title }: { onClick: () => void; title?: string }) {
     <button
       onClick={onClick}
       title={title ?? 'Editar'}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800/80 text-sm text-white shadow transition-transform hover:scale-110"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#2f3b52] shadow-md ring-2 ring-slate-400/70 transition-transform hover:scale-110"
     >
-      ✏️
+      <IconoLapiz />
     </button>
   )
 }
@@ -61,7 +62,7 @@ function ItemPanel({
   detalle,
   onClick,
 }: {
-  icono: string
+  icono: React.ReactNode
   label: string
   detalle: string
   onClick: () => void
@@ -71,7 +72,7 @@ function ItemPanel({
       onClick={onClick}
       className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-indigo-50"
     >
-      <span className="mt-0.5 text-indigo-600">{icono}</span>
+      <span className="mt-0.5 shrink-0 text-blue-700">{icono}</span>
       <span className="min-w-0">
         <span className="block truncate font-semibold text-slate-800">{label}</span>
         <span className="block truncate text-sm text-slate-500">{detalle}</span>
@@ -291,8 +292,8 @@ export function Editor() {
         {/* ─── Panel derecho ─── */}
         <aside className="flex w-96 flex-col border-l border-slate-200 bg-white">
           <div className="flex-1 overflow-y-auto p-6">
-            <h3 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-              <span className="text-indigo-600">🎙</span> Configuración de voces (TTS)
+            <h3 className="flex items-center gap-3 text-xl font-bold text-slate-900">
+              <IconoOnda /> Configuración de voces (TTS)
             </h3>
 
             <div className="mt-4 space-y-1">
@@ -300,7 +301,7 @@ export function Editor() {
                 ? TTS_INICIAL.map(({ campo, label }) => (
                     <ItemPanel
                       key={campo}
-                      icono="🔊"
+                      icono={<IconoVolumen />}
                       label={label}
                       detalle={ini[campo] ? `Trigger: ${ini[campo]}` : 'Vacío'}
                       onClick={() => setDialogo({ tipo: 'tts-inicial', campo, titulo: `Tts: ${label.toLowerCase()}` })}
@@ -309,7 +310,7 @@ export function Editor() {
                 : TTS_RULETA.map(({ campo, label }) => (
                     <ItemPanel
                       key={campo}
-                      icono="🔊"
+                      icono={<IconoVolumen />}
                       label={label}
                       detalle={rul[campo] ? `Trigger: ${rul[campo]}` : 'Vacío'}
                       onClick={() => setDialogo({ tipo: 'tts-ruleta', campo, titulo: `Tts: ${label.toLowerCase()}` })}
@@ -322,13 +323,13 @@ export function Editor() {
             {pestana === 'inicial' ? (
               <div className="space-y-1">
                 <ItemPanel
-                  icono="▶"
+                  icono={<IconoPlay />}
                   label="Video para patrullaje"
                   detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
                   onClick={() => setDialogo({ tipo: 'video' })}
                 />
                 <ItemPanel
-                  icono="▶"
+                  icono={<IconoPlay />}
                   label="Secuencia para guía"
                   detalle={ini.secuencia_guia || 'Vacío'}
                   onClick={() => setDialogo({ tipo: 'secuencia' })}
@@ -340,17 +341,17 @@ export function Editor() {
                   <p className="font-semibold text-slate-800">Preguntas</p>
                   <button
                     onClick={() => setDialogo({ tipo: 'pregunta', index: null })}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-xl text-indigo-600 transition-colors hover:bg-indigo-50"
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-indigo-50"
                     title="Agregar pregunta"
                   >
-                    +
+                    <IconoMas />
                   </button>
                 </div>
                 <div className="mt-2 space-y-1">
                   {rul.preguntas.map((pregunta, i) => (
                     <ItemPanel
                       key={i}
-                      icono="🔊"
+                      icono={<IconoVolumen />}
                       label={`${i + 1} pregunta`}
                       detalle={`Preg: ${pregunta.texto}`}
                       onClick={() => setDialogo({ tipo: 'pregunta', index: i })}
@@ -373,9 +374,10 @@ export function Editor() {
             <button
               onClick={() => guardar.mutate()}
               disabled={guardar.isPending}
-              className="w-full rounded-lg bg-indigo-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
             >
-              {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : '⬇ Guardar'}
+              <IconoGuardar />
+              {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
             </button>
             {guardar.isError && (
               <p className="mt-2 text-sm text-red-600">Error al guardar. Intenta de nuevo.</p>

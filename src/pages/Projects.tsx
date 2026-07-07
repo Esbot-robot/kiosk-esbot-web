@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { configVacia, type Project } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
+import { IconoReloj } from '../components/iconos'
 
 async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -117,8 +118,8 @@ export function Projects() {
               </div>
               <h3 className="mt-4 text-xl font-bold text-slate-900">{proyecto.nombre}</h3>
               <div className="mt-1 flex items-center justify-between">
-                <p className="flex items-center gap-1 text-sm text-slate-500">
-                  🕐 {tiempoRelativo(proyecto.updated_at)}
+                <p className="flex items-center gap-1.5 text-sm text-slate-500">
+                  <IconoReloj /> {tiempoRelativo(proyecto.updated_at)}
                 </p>
                 <button
                   onClick={(e) => {
