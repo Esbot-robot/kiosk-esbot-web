@@ -5,6 +5,7 @@ import masPng from '../assets/icons/mas.png'
 import menosPng from '../assets/icons/menos.png'
 import volumenPng from '../assets/icons/volumen.png'
 import ondaPng from '../assets/icons/onda.png'
+import fijarPng from '../assets/icons/fijar.png'
 
 type IconoProps = { className?: string }
 
@@ -28,6 +29,9 @@ export const IconoVolumen = ({ className = 'h-5 w-5' }: IconoProps) => (
 )
 export const IconoOnda = ({ className = 'h-6 w-6' }: IconoProps) => (
   <img src={ondaPng} className={className} alt="" draggable={false} />
+)
+export const IconoFijar = ({ className = 'h-5 w-5' }: IconoProps) => (
+  <img src={fijarPng} className={className} alt="" draggable={false} />
 )
 
 /* Iconos de línea (SVG) para sidebar y cards, estilo del mockup */

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { configVacia, type Project } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
-import { IconoReloj } from '../components/iconos'
+import { IconoFijar, IconoReloj } from '../components/iconos'
 
 async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -127,9 +127,9 @@ export function Projects() {
                     setProyectoAFijar(proyecto)
                   }}
                   title="Fijar proyecto a robot"
-                  className="rounded-lg px-2 py-1 text-lg transition-colors hover:bg-indigo-50"
+                  className="rounded-lg px-2 py-1 transition-colors hover:bg-indigo-50"
                 >
-                  📌
+                  <IconoFijar />
                 </button>
               </div>
             </div>
