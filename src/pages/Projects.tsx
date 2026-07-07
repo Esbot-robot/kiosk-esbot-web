@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { configVacia, type Project } from '../types/config'
+import { DialogFijarRobot } from '../components/DialogFijarRobot'
 
 async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -22,6 +23,7 @@ function tiempoRelativo(iso: string): string {
 
 export function Projects() {
   const [busqueda, setBusqueda] = useState('')
+  const [proyectoAFijar, setProyectoAFijar] = useState<Project | null>(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -89,15 +91,15 @@ export function Projects() {
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           {filtrados.map((proyecto) => (
-            <button
+            <div
               key={proyecto.id}
               onClick={() => navigate(`/editor/${proyecto.id}`)}
-              className={`relative rounded-xl border bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md ${
+              className={`relative cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md ${
                 proyecto.activo ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'
               }`}
             >
               {proyecto.activo && (
-                <span className="absolute right-3 top-3 rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
+                <span className="absolute right-3 top-3 z-10 rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
                   ACTIVO
                 </span>
               )}
@@ -114,10 +116,22 @@ export function Projects() {
                 )}
               </div>
               <h3 className="mt-4 text-xl font-bold text-slate-900">{proyecto.nombre}</h3>
-              <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
-                🕐 {tiempoRelativo(proyecto.updated_at)}
-              </p>
-            </button>
+              <div className="mt-1 flex items-center justify-between">
+                <p className="flex items-center gap-1 text-sm text-slate-500">
+                  🕐 {tiempoRelativo(proyecto.updated_at)}
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setProyectoAFijar(proyecto)
+                  }}
+                  title="Fijar proyecto a robot"
+                  className="rounded-lg px-2 py-1 text-lg transition-colors hover:bg-indigo-50"
+                >
+                  📌
+                </button>
+              </div>
+            </div>
           ))}
         </div>
 
@@ -127,6 +141,10 @@ export function Projects() {
           </p>
         )}
       </div>
+
+      {proyectoAFijar && (
+        <DialogFijarRobot proyecto={proyectoAFijar} onCerrar={() => setProyectoAFijar(null)} />
+      )}
     </div>
   )
 }
