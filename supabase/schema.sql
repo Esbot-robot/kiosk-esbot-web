@@ -58,4 +58,20 @@ create policy "lectura publica robots" on public.robots
 --      al "Fijar proyecto a robot", el panel sube configs/{serial}.json
 --      y la app del robot lo descarga con un GET simple sin headers:
 --      https://TU-PROYECTO.supabase.co/storage/v1/object/public/configs/{serial}.json
+--
+-- OJO: "public" en el bucket solo permite LEER. Para que el panel
+-- pueda SUBIR archivos hay que crear estas politicas:
 -- ============================================================
+
+create policy "panel sube archivos" on storage.objects
+  for insert to authenticated
+  with check (bucket_id in ('media', 'configs'));
+
+create policy "panel reemplaza archivos" on storage.objects
+  for update to authenticated
+  using (bucket_id in ('media', 'configs'))
+  with check (bucket_id in ('media', 'configs'));
+
+create policy "panel elimina archivos" on storage.objects
+  for delete to authenticated
+  using (bucket_id in ('media', 'configs'));
