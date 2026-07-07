@@ -54,7 +54,8 @@ export function DialogArchivo({ titulo, tipo, projectId, onSubido, onCerrar }: D
       onSubido(url)
       onCerrar()
     } catch (e) {
-      setError('Error subiendo el archivo. ¿Existe el bucket "media" (público) en Supabase?')
+      const detalle = e instanceof Error ? e.message : JSON.stringify(e)
+      setError(`Error subiendo el archivo: ${detalle}`)
       console.error(e)
     } finally {
       setSubiendo(false)

@@ -15,6 +15,7 @@ type Dialogo =
   | { tipo: 'titulo' }
   | { tipo: 'subtitulo' }
   | { tipo: 'boton' }
+  | { tipo: 'logo' }
   | { tipo: 'tts-inicial'; campo: CampoTtsInicial; titulo: string }
   | { tipo: 'tts-ruleta'; campo: CampoTtsRuleta; titulo: string }
   | { tipo: 'fondo'; pantalla: Pestana }
@@ -209,10 +210,23 @@ export function Editor() {
                   onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'inicial' })}
                 />
               </div>
-              <div className="flex h-full flex-col items-center justify-center gap-4 px-10">
-                <div className="flex w-full items-center justify-center gap-2">
+              <div className="flex h-full flex-col items-center pt-8">
+                {/* Logo de la empresa (imgLogo en el robot) */}
+                <div className="flex items-center gap-2">
+                  {ini.logo_url ? (
+                    <img src={ini.logo_url} alt="" className="h-20 max-w-72 object-contain" />
+                  ) : (
+                    <div className="flex h-20 w-56 items-center justify-center rounded-lg border-2 border-dashed border-white/50 text-sm text-white/70">
+                      Logo de la empresa
+                    </div>
+                  )}
+                  <Lapiz title="Cambiar logo" onClick={() => setDialogo({ tipo: 'logo' })} />
+                </div>
+
+                {/* Título y subtítulo: franjas de lado a lado, como en el robot */}
+                <div className="relative mt-6 w-full">
                   <p
-                    className="rounded px-4 py-2 text-center text-2xl font-bold"
+                    className="w-full px-16 py-2 text-center text-2xl font-bold"
                     style={{
                       color: ini.titulo.color_texto || '#1e2a4a',
                       backgroundColor: ini.titulo.color_fondo || '#ffffff',
@@ -220,12 +234,14 @@ export function Editor() {
                   >
                     {ini.titulo.texto || 'Título (clic en el lápiz)'}
                   </p>
-                  <Lapiz title="Editar título" onClick={() => setDialogo({ tipo: 'titulo' })} />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Lapiz title="Editar título" onClick={() => setDialogo({ tipo: 'titulo' })} />
+                  </div>
                 </div>
 
-                <div className="flex w-full items-center justify-center gap-2">
+                <div className="relative w-full">
                   <p
-                    className="rounded px-4 py-2 text-center text-xl font-semibold"
+                    className="w-full px-16 py-2 text-center text-xl font-semibold"
                     style={{
                       color: ini.subtitulo.color_texto || '#1e2a4a',
                       backgroundColor: ini.subtitulo.color_fondo || '#ffffff',
@@ -233,10 +249,12 @@ export function Editor() {
                   >
                     {ini.subtitulo.texto || 'Subtítulo'}
                   </p>
-                  <Lapiz title="Editar subtítulo" onClick={() => setDialogo({ tipo: 'subtitulo' })} />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Lapiz title="Editar subtítulo" onClick={() => setDialogo({ tipo: 'subtitulo' })} />
+                  </div>
                 </div>
 
-                <div className="mt-6 flex items-center gap-2">
+                <div className="mt-10 flex items-center gap-2">
                   <span
                     className="rounded-full px-12 py-4 text-xl font-bold"
                     style={{
@@ -428,6 +446,15 @@ export function Editor() {
           valor={rul[dialogo.campo]}
           maxCaracteres={LIMITES.TTS_MAX}
           onGuardar={(texto) => setRuleta({ [dialogo.campo]: texto })}
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'logo' && (
+        <DialogArchivo
+          titulo="Cambiar logo de la empresa"
+          tipo="imagen"
+          projectId={projectId!}
+          onSubido={(url) => setInicial({ logo_url: url })}
           onCerrar={() => setDialogo(null)}
         />
       )}

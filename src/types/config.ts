@@ -25,6 +25,8 @@ export interface Pregunta {
 
 export interface PantallaInicial {
   fondo_url: string
+  /** logo de la empresa, arriba centrado (imgLogo en el robot) */
+  logo_url: string
   titulo: TextoEstilo
   subtitulo: TextoEstilo
   boton: BotonEstilo
@@ -78,6 +80,7 @@ export function configVacia(): EventConfig {
     empresa: '',
     pantalla_inicial: {
       fondo_url: '',
+      logo_url: '',
       titulo: { texto: '', color_texto: '', color_fondo: '' },
       subtitulo: { texto: '', color_texto: '', color_fondo: '' },
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '' },
