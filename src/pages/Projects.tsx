@@ -16,8 +16,12 @@ async function fetchProjects(): Promise<Project[]> {
 }
 
 function tiempoRelativo(iso: string): string {
-  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  if (dias === 0) return 'Editado hoy'
+  const minutos = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
+  if (minutos < 1) return 'Editado justo ahora'
+  if (minutos < 60) return `Editado hace ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) return `Editado hace ${horas} ${horas === 1 ? 'hora' : 'horas'}`
+  const dias = Math.floor(horas / 24)
   if (dias === 1) return 'Editado ayer'
   return `Editado hace ${dias} días`
 }
