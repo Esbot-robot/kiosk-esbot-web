@@ -127,6 +127,47 @@ export function DialogTts({ titulo, valor, maxCaracteres, onGuardar, onCerrar }:
   )
 }
 
+interface DialogColoresOpcionesProps {
+  valores: string[]
+  onGuardar: (nuevos: string[]) => void
+  onCerrar: () => void
+}
+
+/** Colores de fondo de los 3 botones de respuesta del quiz */
+export function DialogColoresOpciones({ valores, onGuardar, onCerrar }: DialogColoresOpcionesProps) {
+  const [colores, setColores] = useState<string[]>([
+    valores[0] ?? '',
+    valores[1] ?? '',
+    valores[2] ?? '',
+  ])
+
+  return (
+    <Modal
+      titulo="Colores de las opciones de respuesta"
+      onCancelar={onCerrar}
+      onAceptar={() => {
+        onGuardar(colores)
+        onCerrar()
+      }}
+    >
+      <p className="mb-4 text-sm text-slate-500">
+        Cada posición tiene su color en la pantalla del robot. Deja vacío para usar el color
+        original.
+      </p>
+      <div className="space-y-4">
+        {colores.map((color, i) => (
+          <CampoColor
+            key={i}
+            label={`Botón opción ${i + 1}`}
+            value={color}
+            onChange={(hex) => setColores(colores.map((c, k) => (k === i ? hex : c)))}
+          />
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
 interface DialogTextoSimpleProps {
   titulo: string
   etiqueta: string

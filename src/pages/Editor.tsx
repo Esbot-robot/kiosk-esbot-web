@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { publicarConfigRobot } from '../lib/storage'
-import { LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
-import { DialogBoton, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
+import { COLORES_OPCIONES_DEFAULT, LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
+import { DialogBoton, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
@@ -22,6 +22,7 @@ type Dialogo =
   | { tipo: 'video' }
   | { tipo: 'secuencia' }
   | { tipo: 'pregunta'; index: number | null }
+  | { tipo: 'colores-opciones' }
 
 type CampoTtsInicial =
   | 'tts_toca_pantalla'
@@ -116,6 +117,9 @@ export function Editor() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           secuencia_guia: (cfg.pantalla_inicial as any).secuencia_guia ?? '',
         }
+      }
+      if (!cfg.pantalla_ruleta.colores_opciones) {
+        cfg.pantalla_ruleta.colores_opciones = ['', '', '']
       }
       setConfig(cfg)
     }
@@ -289,10 +293,10 @@ export function Editor() {
                   onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'ruleta' })}
                 />
               </div>
-              <div className="flex h-full flex-col items-center justify-center gap-5">
+              <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
                 {/* Ruleta simulada (el diseño real vive en la app) */}
                 <div
-                  className="h-48 w-48 rounded-full border-8 border-yellow-500 shadow-xl"
+                  className="h-44 w-44 rounded-full border-8 border-yellow-500 shadow-xl"
                   style={{
                     background:
                       'conic-gradient(#4648d4 0deg 120deg, #2196f3 120deg 240deg, #f44336 240deg 360deg)',
@@ -301,16 +305,46 @@ export function Editor() {
                 <p className="px-10 text-center text-xl font-bold text-white">
                   {rul.preguntas[0]?.texto || 'Aquí aparecerá la pregunta'}
                 </p>
-                <div className="flex flex-wrap justify-center gap-3 px-10">
-                  {(rul.preguntas[0]?.opciones ?? ['Opción 1', 'Opción 2']).map((op, i) => (
-                    <span
-                      key={i}
-                      className="rounded-lg bg-indigo-700 px-6 py-3 font-semibold text-white"
-                    >
-                      {op}
-                    </span>
-                  ))}
-                </div>
+
+                {/* Botones como en el robot: 2 arriba, el 3ro centrado abajo */}
+                {(() => {
+                  const opciones = rul.preguntas[0]?.opciones ?? ['Opción 1', 'Opción 2', 'Opción 3']
+                  const colorDe = (i: number) =>
+                    rul.colores_opciones?.[i] || COLORES_OPCIONES_DEFAULT[i]
+                  const botonClase =
+                    'rounded px-4 py-3 text-center font-bold text-white shadow-md text-sm'
+                  return (
+                    <div className="relative w-full max-w-xl">
+                      <div className="flex w-full gap-2">
+                        {opciones.slice(0, 2).map((op, i) => (
+                          <span
+                            key={i}
+                            className={`${botonClase} flex-1`}
+                            style={{ backgroundColor: colorDe(i) }}
+                          >
+                            {op}
+                          </span>
+                        ))}
+                      </div>
+                      {opciones[2] !== undefined && (
+                        <div className="mt-2 flex justify-center">
+                          <span
+                            className={`${botonClase} w-[calc(50%-4px)]`}
+                            style={{ backgroundColor: colorDe(2) }}
+                          >
+                            {opciones[2]}
+                          </span>
+                        </div>
+                      )}
+                      <div className="absolute -right-12 top-1/2 -translate-y-1/2">
+                        <Lapiz
+                          title="Colores de las opciones"
+                          onClick={() => setDialogo({ tipo: 'colores-opciones' })}
+                        />
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )}
@@ -536,6 +570,13 @@ export function Editor() {
           onGuardar={(secuencia_guia) =>
             setRuleta({ despues_quiz: { ...rul.despues_quiz, secuencia_guia } })
           }
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'colores-opciones' && (
+        <DialogColoresOpciones
+          valores={rul.colores_opciones ?? ['', '', '']}
+          onGuardar={(colores_opciones) => setRuleta({ colores_opciones })}
           onCerrar={() => setDialogo(null)}
         />
       )}
