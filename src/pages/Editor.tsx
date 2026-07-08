@@ -259,8 +259,8 @@ export function Editor() {
                     className="rounded-full px-12 py-4 text-xl font-bold"
                     style={{
                       color: ini.boton.color_texto || '#ffffff',
-                      backgroundColor: ini.boton.color_fondo || '#3b4a8f',
-                      border: `3px solid ${ini.boton.color_contorno || '#d4c646'}`,
+                      backgroundColor: ini.boton.color_fondo || '#031046',
+                      border: `4px solid ${ini.boton.color_contorno || '#FFD700'}`,
                     }}
                   >
                     {ini.boton.texto || 'JUGAR AHORA'}
