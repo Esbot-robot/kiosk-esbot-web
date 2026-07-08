@@ -7,6 +7,8 @@ interface DialogArchivoProps {
   titulo: string
   tipo: 'imagen' | 'video'
   projectId: string
+  /** texto de ayuda bajo la zona de subida; si no se pasa, usa el del tipo */
+  nota?: string
   onSubido: (urlPublica: string) => void
   onCerrar: () => void
 }
@@ -27,7 +29,7 @@ const CONFIG_TIPO = {
 } as const
 
 /** Diálogo "Cambiar imagen de fondo" / "Cargar video para patrullaje" del mockup */
-export function DialogArchivo({ titulo, tipo, projectId, onSubido, onCerrar }: DialogArchivoProps) {
+export function DialogArchivo({ titulo, tipo, projectId, nota, onSubido, onCerrar }: DialogArchivoProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [archivo, setArchivo] = useState<File | null>(null)
   const [error, setError] = useState('')
@@ -102,7 +104,7 @@ export function DialogArchivo({ titulo, tipo, projectId, onSubido, onCerrar }: D
         )}
         <p className="mt-1 text-sm text-slate-400">{cfg.ayuda}</p>
       </div>
-      <p className="mt-3 text-sm text-slate-500">{cfg.extra}</p>
+      <p className="mt-3 text-sm text-slate-500">{nota ?? cfg.extra}</p>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <input

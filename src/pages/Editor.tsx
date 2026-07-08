@@ -454,6 +454,7 @@ export function Editor() {
           titulo="Cambiar logo de la empresa"
           tipo="imagen"
           projectId={projectId!}
+          nota="Resolución recomendada: 512 × 512 px, PNG con fondo transparente"
           onSubido={(url) => setInicial({ logo_url: url })}
           onCerrar={() => setDialogo(null)}
         />
