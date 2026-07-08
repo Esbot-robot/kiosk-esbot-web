@@ -108,7 +108,16 @@ export function Editor() {
   useEffect(() => {
     if (proyecto) {
       setNombre(proyecto.nombre)
-      setConfig(proyecto.config)
+      // Migración: proyectos guardados antes de existir "despues_quiz"
+      const cfg = structuredClone(proyecto.config)
+      if (!cfg.pantalla_ruleta.despues_quiz) {
+        cfg.pantalla_ruleta.despues_quiz = {
+          modo: 'guiar_al_stand',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          secuencia_guia: (cfg.pantalla_inicial as any).secuencia_guia ?? '',
+        }
+      }
+      setConfig(cfg)
     }
   }, [proyecto])
 
@@ -346,15 +355,55 @@ export function Editor() {
                   detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
                   onClick={() => setDialogo({ tipo: 'video' })}
                 />
-                <ItemPanel
-                  icono={<IconoPlay />}
-                  label="Secuencia para guía"
-                  detalle={ini.secuencia_guia || 'Vacío'}
-                  onClick={() => setDialogo({ tipo: 'secuencia' })}
-                />
               </div>
             ) : (
               <div>
+                {/* Qué hace el robot al terminar el quiz */}
+                <p className="font-semibold text-slate-800">Después del quiz</p>
+                <div className="mt-2 space-y-2">
+                  {(
+                    [
+                      { valor: 'guiar_al_stand', label: 'Guiar al stand', detalle: 'Dice "sígueme" y reproduce la secuencia de Temi' },
+                      { valor: 'seguir_patrulla', label: 'Continuar patrullaje', detalle: 'Solo responde y retoma su ruta' },
+                    ] as const
+                  ).map((opcion) => (
+                    <label
+                      key={opcion.valor}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors ${
+                        rul.despues_quiz.modo === opcion.valor
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-slate-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="despues_quiz"
+                        checked={rul.despues_quiz.modo === opcion.valor}
+                        onChange={() =>
+                          setRuleta({ despues_quiz: { ...rul.despues_quiz, modo: opcion.valor } })
+                        }
+                        className="mt-1 accent-indigo-600"
+                      />
+                      <span>
+                        <span className="block font-medium text-slate-800">{opcion.label}</span>
+                        <span className="block text-sm text-slate-500">{opcion.detalle}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {rul.despues_quiz.modo === 'guiar_al_stand' && (
+                  <div className="mt-1">
+                    <ItemPanel
+                      icono={<IconoPlay />}
+                      label="Secuencia para guía"
+                      detalle={rul.despues_quiz.secuencia_guia || 'Vacío — escribe el nombre de Temi Center'}
+                      onClick={() => setDialogo({ tipo: 'secuencia' })}
+                    />
+                  </div>
+                )}
+
+                <hr className="my-5 border-slate-200" />
+
                 <div className="flex items-center justify-between">
                   <p className="font-semibold text-slate-800">Preguntas</p>
                   <button
@@ -483,8 +532,10 @@ export function Editor() {
         <DialogTextoSimple
           titulo="Secuencia para guía"
           etiqueta="Escribe el nombre de la secuencia creada en Temi center"
-          valor={ini.secuencia_guia}
-          onGuardar={(secuencia_guia) => setInicial({ secuencia_guia })}
+          valor={rul.despues_quiz.secuencia_guia}
+          onGuardar={(secuencia_guia) =>
+            setRuleta({ despues_quiz: { ...rul.despues_quiz, secuencia_guia } })
+          }
           onCerrar={() => setDialogo(null)}
         />
       )}

@@ -36,7 +36,14 @@ export interface PantallaInicial {
   tts_reanuda_patrulla: string
   tts_sigueme: string
   video_patrullaje_url: string
-  /** nombre de la secuencia creada en Temi Center */
+}
+
+/** Qué hace el robot cuando el visitante termina el quiz */
+export interface DespuesQuiz {
+  /** "guiar_al_stand": dice tts_sigueme y reproduce la secuencia (que incluye
+   *  video y movimiento). "seguir_patrulla": retoma la ruta directamente. */
+  modo: 'guiar_al_stand' | 'seguir_patrulla'
+  /** nombre de la secuencia creada en Temi Center (solo modo guiar_al_stand) */
   secuencia_guia: string
 }
 
@@ -45,6 +52,7 @@ export interface PantallaRuleta {
   tts_acierta: string
   tts_no_acierta: string
   tts_sin_respuesta: string
+  despues_quiz: DespuesQuiz
   preguntas: Pregunta[]
 }
 
@@ -92,13 +100,13 @@ export function configVacia(): EventConfig {
       tts_reanuda_patrulla: '',
       tts_sigueme: '¡Sígueme!',
       video_patrullaje_url: '',
-      secuencia_guia: '',
     },
     pantalla_ruleta: {
       fondo_url: '',
       tts_acierta: '',
       tts_no_acierta: '',
       tts_sin_respuesta: '¡No hubo respuesta!',
+      despues_quiz: { modo: 'guiar_al_stand', secuencia_guia: '' },
       preguntas: [],
     },
     tiempos: {
