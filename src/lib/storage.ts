@@ -30,3 +30,8 @@ export async function publicarConfigRobot(serial: string, config: EventConfig): 
   const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
   return subirArchivo('configs', `${serial}.json`, blob, 'application/json')
 }
+
+/** Borra el JSON de un robot al desfijarlo (para que no siga descargando config vieja) */
+export async function eliminarConfigRobot(serial: string): Promise<void> {
+  await supabase.storage.from('configs').remove([`${serial}.json`])
+}

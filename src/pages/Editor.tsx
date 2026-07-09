@@ -186,12 +186,15 @@ export function Editor() {
     <div className="flex h-full flex-col">
       {/* Barra superior: nombre + pestañas */}
       <div className="flex items-center justify-between border-b border-slate-200 bg-white pl-10">
-        <input
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          className="w-96 rounded px-2 py-4 text-2xl font-bold text-indigo-600 focus:bg-slate-50 focus:outline-none"
-          title="Nombre del proyecto (clic para editar)"
-        />
+        <div className="py-2">
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            className="w-96 rounded px-2 text-2xl font-bold text-indigo-600 focus:bg-slate-50 focus:outline-none"
+            title="Nombre del proyecto (clic para editar)"
+          />
+          <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
+        </div>
         <div className="flex">
           {(['inicial', 'ruleta'] as Pestana[]).map((p) => (
             <button

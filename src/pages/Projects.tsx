@@ -37,6 +37,24 @@ export function Projects() {
     queryFn: fetchProjects,
   })
 
+  // Asignaciones robot → proyecto para saber a qué robot está fijado cada uno
+  const { data: robots } = useQuery({
+    queryKey: ['robots'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('robots').select('serial, project_id')
+      if (error) throw error
+      return data as { serial: string; project_id: string | null }[]
+    },
+  })
+
+  const robotsPorProyecto = new Map<string, string[]>()
+  for (const r of robots ?? []) {
+    if (!r.project_id) continue
+    const lista = robotsPorProyecto.get(r.project_id) ?? []
+    lista.push(r.serial)
+    robotsPorProyecto.set(r.project_id, lista)
+  }
+
   const crearProyecto = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase
@@ -95,17 +113,20 @@ export function Projects() {
         )}
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {filtrados.map((proyecto) => (
+          {filtrados.map((proyecto) => {
+            const serials = robotsPorProyecto.get(proyecto.id) ?? []
+            const fijado = serials.length > 0
+            return (
             <div
               key={proyecto.id}
               onClick={() => navigate(`/editor/${proyecto.id}`)}
               className={`relative cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md ${
-                proyecto.activo ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'
+                fijado ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'
               }`}
             >
-              {proyecto.activo && (
+              {fijado && (
                 <span className="absolute right-3 top-3 z-10 rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
-                  ACTIVO
+                  {serials.length === 1 ? 'FIJADO' : `${serials.length} ROBOTS`}
                 </span>
               )}
               {/* Miniatura: fondo de la pantalla inicial si existe */}
@@ -121,6 +142,11 @@ export function Projects() {
                 )}
               </div>
               <h3 className="mt-4 text-xl font-bold text-slate-900">{proyecto.nombre}</h3>
+              {fijado && (
+                <p className="mt-1 truncate text-sm text-indigo-600" title={serials.join(', ')}>
+                  🤖 {serials.join(', ')}
+                </p>
+              )}
               <div className="mt-1 flex items-center justify-between">
                 <p className="flex items-center gap-1.5 text-sm text-slate-500">
                   <IconoReloj /> {tiempoRelativo(proyecto.updated_at)}
@@ -137,7 +163,8 @@ export function Projects() {
                 </button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         {!isLoading && filtrados.length === 0 && (
