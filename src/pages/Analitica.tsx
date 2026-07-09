@@ -118,7 +118,59 @@ export function Analitica() {
 
   // Tabla de detalle: paginada — el navegador recibe 100 filas por página.
   const [pagina, setPagina] = useState(0)
+  const [exportando, setExportando] = useState(false)
   useEffect(() => setPagina(0), [desde, hasta, robot])
+
+  /** Descarga TODOS los eventos del rango filtrado como CSV (en tandas de 1000) */
+  async function exportarCsv(total: number) {
+    if (total === 0 || exportando) return
+    setExportando(true)
+    try {
+      const filas: Evento[] = []
+      for (let offset = 0; offset < total; offset += 1000) {
+        let q = supabase
+          .from('events')
+          .select('*')
+          .gte('creado_at', `${desde}:00`)
+          .lte('creado_at', `${hasta}:59`)
+          .order('creado_at', { ascending: false })
+          .range(offset, Math.min(offset + 999, total - 1))
+        if (robot !== 'todos') q = q.eq('serial', robot)
+        const { data, error } = await q
+        if (error) throw error
+        filas.push(...(data as Evento[]))
+        if (!data || data.length < 1000) break
+      }
+
+      const lineas = ['Evento;Robot;Fecha;Hora;Seg. del video']
+      for (const e of filas) {
+        lineas.push(
+          [
+            NOMBRE_TIPO[e.tipo] ?? e.tipo,
+            e.serial,
+            e.creado_at.slice(0, 10),
+            e.creado_at.slice(11, 19),
+            e.video_seg != null ? e.video_seg : '',
+          ].join(';')
+        )
+      }
+
+      // BOM para que Excel abra las tildes bien; ";" como separador (Excel ES)
+      const blob = new Blob(['﻿' + lineas.join('\r\n')], {
+        type: 'text/csv;charset=utf-8',
+      })
+      const enlace = document.createElement('a')
+      enlace.href = URL.createObjectURL(blob)
+      enlace.download = `Interacciones_kioskEsbot_${desde.slice(0, 10)}_a_${hasta.slice(0, 10)}.csv`
+      enlace.click()
+      URL.revokeObjectURL(enlace.href)
+    } catch (e) {
+      console.error('Error exportando CSV', e)
+      alert('No se pudo exportar el CSV. Intenta de nuevo.')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const { data: detalle } = useQuery({
     queryKey: ['events-detalle', desde, hasta, robot, pagina],
@@ -350,6 +402,24 @@ export function Analitica() {
             </div>
           </div>
         )}
+
+        {/* Exportar todo el rango filtrado como CSV */}
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={() => exportarCsv(detalle?.total ?? 0)}
+            disabled={exportando || (detalle?.total ?? 0) === 0}
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-40"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {exportando
+              ? 'Exportando...'
+              : `Exportar CSV (${(detalle?.total ?? 0).toLocaleString('es-CO')})`}
+          </button>
+        </div>
       </div>
     </div>
   )
