@@ -103,3 +103,26 @@ create policy "panel registra eventos" on public.events
   for insert to authenticated with check (true);
 create policy "panel lee eventos" on public.events
   for select to authenticated using (true);
+
+-- Agregación en el servidor: la gráfica pide totales por hora/día en vez de
+-- descargar todos los eventos (escala a millones de filas sin mover datos).
+create or replace function public.eventos_agrupados(
+  p_desde timestamptz,
+  p_hasta timestamptz,
+  p_serial text default null,
+  p_gran text default 'dia'
+) returns table (bucket text, tipo text, total bigint)
+language sql stable as $$
+  select
+    to_char(
+      date_trunc(case when p_gran = 'hora' then 'hour' else 'day' end, creado_at),
+      case when p_gran = 'hora' then 'YYYY-MM-DD"T"HH24' else 'YYYY-MM-DD' end
+    ) as bucket,
+    tipo,
+    count(*) as total
+  from public.events
+  where creado_at >= p_desde
+    and creado_at <= p_hasta
+    and (p_serial is null or serial = p_serial)
+  group by 1, 2
+$$;

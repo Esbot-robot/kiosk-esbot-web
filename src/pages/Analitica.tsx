@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+
+const FILAS_POR_PAGINA = 100
 
 /* Paleta validada (dataviz): 2 series, CVD-safe */
 const COLOR_TOQUE = '#2a78d6' // azul — toques de pantalla
@@ -94,45 +96,66 @@ export function Analitica() {
     },
   })
 
-  const { data: eventos, isLoading } = useQuery({
-    queryKey: ['events', desde, hasta, robot],
-    queryFn: async (): Promise<Evento[]> => {
-      let q = supabase
-        .from('events')
-        .select('*')
-        .gte('creado_at', `${desde}:00`)
-        .lte('creado_at', `${hasta}:59`)
-        .order('creado_at', { ascending: false })
-        .limit(50_000)
-      if (robot !== 'todos') q = q.eq('serial', robot)
-      const { data, error } = await q
-      if (error) throw error
-      return data as Evento[]
-    },
-  })
-
   // ≤ 48 horas de rango → agrupar por hora; más → por día
   const granularidad: Granularidad =
     new Date(hasta).getTime() - new Date(desde).getTime() <= 48 * 3600_000 ? 'hora' : 'dia'
 
+  // Gráfica y tarjetas: Postgres agrupa y cuenta — al navegador solo
+  // viajan los totales por bucket, sin importar cuántos eventos haya.
+  const { data: agregados, isLoading } = useQuery({
+    queryKey: ['events-agg', desde, hasta, robot, granularidad],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('eventos_agrupados', {
+        p_desde: `${desde}:00`,
+        p_hasta: `${hasta}:59`,
+        p_serial: robot === 'todos' ? null : robot,
+        p_gran: granularidad,
+      })
+      if (error) throw error
+      return data as { bucket: string; tipo: string; total: number }[]
+    },
+  })
+
+  // Tabla de detalle: paginada — el navegador recibe 100 filas por página.
+  const [pagina, setPagina] = useState(0)
+  useEffect(() => setPagina(0), [desde, hasta, robot])
+
+  const { data: detalle } = useQuery({
+    queryKey: ['events-detalle', desde, hasta, robot, pagina],
+    queryFn: async () => {
+      let q = supabase
+        .from('events')
+        .select('*', { count: 'exact' })
+        .gte('creado_at', `${desde}:00`)
+        .lte('creado_at', `${hasta}:59`)
+        .order('creado_at', { ascending: false })
+        .range(pagina * FILAS_POR_PAGINA, pagina * FILAS_POR_PAGINA + FILAS_POR_PAGINA - 1)
+      if (robot !== 'todos') q = q.eq('serial', robot)
+      const { data, count, error } = await q
+      if (error) throw error
+      return { eventos: data as Evento[], total: count ?? 0 }
+    },
+  })
+
   const { buckets, serieToques, serieJugar, totalToques, totalJugar } = useMemo(() => {
     const buckets = generarBuckets(desde, hasta, granularidad)
     const idx = new Map(buckets.map((b, i) => [b, i]))
-    const corte = granularidad === 'hora' ? 13 : 10
     const serieToques = buckets.map(() => 0)
     const serieJugar = buckets.map(() => 0)
     let totalToques = 0
     let totalJugar = 0
-    for (const e of eventos ?? []) {
-      if (e.tipo === 'toque_pantalla') totalToques++
-      else if (e.tipo === 'boton_jugar') totalJugar++
-      const i = idx.get(e.creado_at.slice(0, corte))
-      if (i === undefined) continue
-      if (e.tipo === 'toque_pantalla') serieToques[i]++
-      else if (e.tipo === 'boton_jugar') serieJugar[i]++
+    for (const fila of agregados ?? []) {
+      const i = idx.get(fila.bucket)
+      if (fila.tipo === 'toque_pantalla') {
+        totalToques += fila.total
+        if (i !== undefined) serieToques[i] = fila.total
+      } else if (fila.tipo === 'boton_jugar') {
+        totalJugar += fila.total
+        if (i !== undefined) serieJugar[i] = fila.total
+      }
     }
     return { buckets, serieToques, serieJugar, totalToques, totalJugar }
-  }, [eventos, desde, hasta, granularidad])
+  }, [agregados, desde, hasta, granularidad])
 
   return (
     <div className="px-12 py-10">
@@ -250,7 +273,7 @@ export function Analitica() {
         <h3 className="font-semibold text-slate-900">
           Detalle de eventos{' '}
           <span className="font-normal text-slate-400">
-            ({(eventos ?? []).length.toLocaleString('es-CO')})
+            ({(detalle?.total ?? 0).toLocaleString('es-CO')})
           </span>
         </h3>
         <p className="text-sm text-slate-500">Cada toque individual con su fecha y hora exacta.</p>
@@ -267,7 +290,7 @@ export function Analitica() {
               </tr>
             </thead>
             <tbody>
-              {(eventos ?? []).map((e) => (
+              {(detalle?.eventos ?? []).map((e) => (
                 <tr key={e.id} className="border-t border-slate-100 hover:bg-indigo-50/40">
                   <td className="flex items-center gap-2 px-4 py-2 text-slate-800">
                     <span
@@ -290,7 +313,7 @@ export function Analitica() {
                   </td>
                 </tr>
               ))}
-              {(eventos ?? []).length === 0 && (
+              {(detalle?.eventos ?? []).length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
                     Sin eventos en este rango.
@@ -300,6 +323,33 @@ export function Analitica() {
             </tbody>
           </table>
         </div>
+
+        {/* Paginación: 100 filas por página, cargadas del servidor */}
+        {(detalle?.total ?? 0) > FILAS_POR_PAGINA && (
+          <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <span>
+              Mostrando {(pagina * FILAS_POR_PAGINA + 1).toLocaleString('es-CO')}–
+              {Math.min((pagina + 1) * FILAS_POR_PAGINA, detalle!.total).toLocaleString('es-CO')} de{' '}
+              {detalle!.total.toLocaleString('es-CO')}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPagina((p) => p - 1)}
+                disabled={pagina === 0}
+                className="rounded-lg border border-slate-300 px-4 py-2 transition-colors hover:bg-slate-50 disabled:opacity-40"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setPagina((p) => p + 1)}
+                disabled={(pagina + 1) * FILAS_POR_PAGINA >= detalle!.total}
+                className="rounded-lg border border-slate-300 px-4 py-2 transition-colors hover:bg-slate-50 disabled:opacity-40"
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
