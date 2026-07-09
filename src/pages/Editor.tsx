@@ -312,7 +312,7 @@ export function Editor() {
                   const colorDe = (i: number) =>
                     rul.colores_opciones?.[i] || COLORES_OPCIONES_DEFAULT[i]
                   const botonClase =
-                    'rounded px-4 py-3 text-center font-bold text-white shadow-md text-sm'
+                    'rounded-full px-4 py-3 text-center font-bold text-white shadow-md text-sm'
                   return (
                     <div className="relative w-full max-w-xl">
                       <div className="flex w-full gap-2">
