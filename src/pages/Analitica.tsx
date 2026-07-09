@@ -16,32 +16,73 @@ interface Evento {
   creado_at: string
 }
 
-function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
+/* Fechas manejadas como texto plano (sin zonas horarias):
+   los eventos se guardan tal cual y se comparan/agrupan por string. */
 
-function inicioDeMesISO(): string {
+function ahoraLocal(): string {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-function diasEntre(desde: string, hasta: string): string[] {
-  const dias: string[] = []
-  const fin = new Date(hasta + 'T00:00:00')
-  for (let d = new Date(desde + 'T00:00:00'); d <= fin; d.setDate(d.getDate() + 1)) {
-    dias.push(d.toISOString().slice(0, 10))
+function inicioDeMes(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01T00:00`
+}
+
+type Granularidad = 'hora' | 'dia'
+
+/** claves de agrupación entre desde y hasta (ambos "YYYY-MM-DDTHH:mm") */
+function generarBuckets(desde: string, hasta: string, gran: Granularidad): string[] {
+  const p = (n: number) => String(n).padStart(2, '0')
+  const claves: string[] = []
+  const d = new Date(desde)
+  const fin = new Date(hasta)
+  if (gran === 'hora') {
+    d.setMinutes(0, 0, 0)
+    while (d <= fin) {
+      claves.push(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}`)
+      d.setHours(d.getHours() + 1)
+    }
+  } else {
+    d.setHours(0, 0, 0, 0)
+    while (d <= fin) {
+      claves.push(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`)
+      d.setDate(d.getDate() + 1)
+    }
   }
-  return dias
+  return claves
 }
 
-function etiquetaDia(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
+function etiquetaBucket(clave: string, gran: Granularidad): string {
+  if (gran === 'hora') {
+    const [fecha, hora] = clave.split('T')
+    const d = new Date(fecha + 'T00:00:00')
+    return `${d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })} ${hora}h`
+  }
+  const d = new Date(clave + 'T00:00:00')
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
 
+function etiquetaLarga(clave: string, gran: Granularidad): string {
+  if (gran === 'hora') {
+    const [fecha, hora] = clave.split('T')
+    const d = new Date(fecha + 'T00:00:00')
+    const dia = d.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
+    return `${dia} · ${hora}:00 – ${hora}:59`
+  }
+  const d = new Date(clave + 'T00:00:00')
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+
+const NOMBRE_TIPO: Record<string, string> = {
+  toque_pantalla: 'Toque pantalla',
+  boton_jugar: 'Botón jugar',
+}
+
 export function Analitica() {
-  const [desde, setDesde] = useState(inicioDeMesISO())
-  const [hasta, setHasta] = useState(hoyISO())
+  const [desde, setDesde] = useState(inicioDeMes())
+  const [hasta, setHasta] = useState(ahoraLocal())
   const [robot, setRobot] = useState('todos')
 
   const { data: robots } = useQuery({
@@ -59,9 +100,9 @@ export function Analitica() {
       let q = supabase
         .from('events')
         .select('*')
-        .gte('creado_at', `${desde}T00:00:00`)
-        .lte('creado_at', `${hasta}T23:59:59`)
-        .order('creado_at')
+        .gte('creado_at', `${desde}:00`)
+        .lte('creado_at', `${hasta}:59`)
+        .order('creado_at', { ascending: false })
         .limit(50_000)
       if (robot !== 'todos') q = q.eq('serial', robot)
       const { data, error } = await q
@@ -70,25 +111,28 @@ export function Analitica() {
     },
   })
 
-  const { dias, serieToques, serieJugar, totalToques, totalJugar } = useMemo(() => {
-    const dias = diasEntre(desde, hasta)
-    const idx = new Map(dias.map((d, i) => [d, i]))
-    const serieToques = dias.map(() => 0)
-    const serieJugar = dias.map(() => 0)
+  // ≤ 48 horas de rango → agrupar por hora; más → por día
+  const granularidad: Granularidad =
+    new Date(hasta).getTime() - new Date(desde).getTime() <= 48 * 3600_000 ? 'hora' : 'dia'
+
+  const { buckets, serieToques, serieJugar, totalToques, totalJugar } = useMemo(() => {
+    const buckets = generarBuckets(desde, hasta, granularidad)
+    const idx = new Map(buckets.map((b, i) => [b, i]))
+    const corte = granularidad === 'hora' ? 13 : 10
+    const serieToques = buckets.map(() => 0)
+    const serieJugar = buckets.map(() => 0)
+    let totalToques = 0
+    let totalJugar = 0
     for (const e of eventos ?? []) {
-      const i = idx.get(e.creado_at.slice(0, 10))
+      if (e.tipo === 'toque_pantalla') totalToques++
+      else if (e.tipo === 'boton_jugar') totalJugar++
+      const i = idx.get(e.creado_at.slice(0, corte))
       if (i === undefined) continue
       if (e.tipo === 'toque_pantalla') serieToques[i]++
       else if (e.tipo === 'boton_jugar') serieJugar[i]++
     }
-    return {
-      dias,
-      serieToques,
-      serieJugar,
-      totalToques: serieToques.reduce((a, b) => a + b, 0),
-      totalJugar: serieJugar.reduce((a, b) => a + b, 0),
-    }
-  }, [eventos, desde, hasta])
+    return { buckets, serieToques, serieJugar, totalToques, totalJugar }
+  }, [eventos, desde, hasta, granularidad])
 
   return (
     <div className="px-12 py-10">
@@ -120,7 +164,7 @@ export function Analitica() {
           <label className="text-sm text-slate-600">
             Desde
             <input
-              type="date"
+              type="datetime-local"
               value={desde}
               max={hasta}
               onChange={(e) => setDesde(e.target.value)}
@@ -130,10 +174,9 @@ export function Analitica() {
           <label className="text-sm text-slate-600">
             Hasta
             <input
-              type="date"
+              type="datetime-local"
               value={hasta}
               min={desde}
-              max={hoyISO()}
               onChange={(e) => setHasta(e.target.value)}
               className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800"
             />
@@ -167,9 +210,12 @@ export function Analitica() {
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-slate-900">Frecuencia de toques por día</h3>
+            <h3 className="font-semibold text-slate-900">
+              Frecuencia de toques por {granularidad === 'hora' ? 'hora' : 'día'}
+            </h3>
             <p className="text-sm text-slate-500">
               Interacción directa vs. intención de juego
+              {granularidad === 'hora' && ' — rango corto: agrupado por hora'}
             </p>
           </div>
           <div className="flex items-center gap-5 text-sm text-slate-600">
@@ -191,8 +237,69 @@ export function Analitica() {
             Sin eventos en este rango. Los robots registran toques automáticamente.
           </p>
         ) : (
-          <GraficaLineas dias={dias} series={[serieToques, serieJugar]} />
+          <GraficaLineas
+            buckets={buckets}
+            granularidad={granularidad}
+            series={[serieToques, serieJugar]}
+          />
         )}
+      </div>
+
+      {/* Detalle de cada evento individual */}
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="font-semibold text-slate-900">
+          Detalle de eventos{' '}
+          <span className="font-normal text-slate-400">
+            ({(eventos ?? []).length.toLocaleString('es-CO')})
+          </span>
+        </h3>
+        <p className="text-sm text-slate-500">Cada toque individual con su fecha y hora exacta.</p>
+
+        <div className="mt-4 max-h-96 overflow-y-auto rounded-lg border border-slate-100">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-4 py-2 font-medium">Evento</th>
+                <th className="px-4 py-2 font-medium">Robot</th>
+                <th className="px-4 py-2 font-medium">Fecha</th>
+                <th className="px-4 py-2 font-medium">Hora</th>
+                <th className="px-4 py-2 font-medium">Seg. del video</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(eventos ?? []).map((e) => (
+                <tr key={e.id} className="border-t border-slate-100 hover:bg-indigo-50/40">
+                  <td className="flex items-center gap-2 px-4 py-2 text-slate-800">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor: e.tipo === 'toque_pantalla' ? COLOR_TOQUE : COLOR_JUGAR,
+                      }}
+                    />
+                    {NOMBRE_TIPO[e.tipo] ?? e.tipo}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">{e.serial}</td>
+                  <td className="px-4 py-2 text-slate-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {e.creado_at.slice(0, 10)}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {e.creado_at.slice(11, 19)}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {e.video_seg != null ? `${e.video_seg.toFixed(1)}s` : '—'}
+                  </td>
+                </tr>
+              ))}
+              {(eventos ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                    Sin eventos en este rango.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -204,7 +311,15 @@ const ANCHO = 900
 const ALTO = 300
 const M = { top: 16, right: 24, bottom: 28, left: 40 }
 
-function GraficaLineas({ dias, series }: { dias: string[]; series: number[][] }) {
+function GraficaLineas({
+  buckets,
+  granularidad,
+  series,
+}: {
+  buckets: string[]
+  granularidad: Granularidad
+  series: number[][]
+}) {
   const [hover, setHover] = useState<number | null>(null)
   const colores = [COLOR_TOQUE, COLOR_JUGAR]
   const nombres = ['Toques de pantalla', 'Botón jugar']
@@ -212,18 +327,18 @@ function GraficaLineas({ dias, series }: { dias: string[]; series: number[][] })
   const plotW = ANCHO - M.left - M.right
   const plotH = ALTO - M.top - M.bottom
   const maxY = Math.max(1, ...series.flat())
-  const x = (i: number) => M.left + (dias.length === 1 ? plotW / 2 : (i / (dias.length - 1)) * plotW)
+  const x = (i: number) =>
+    M.left + (buckets.length === 1 ? plotW / 2 : (i / (buckets.length - 1)) * plotW)
   const y = (v: number) => M.top + plotH - (v / maxY) * plotH
 
   const ticksY = [0, Math.round(maxY / 2), maxY]
-  // etiquetas del eje x: máx ~8 para no amontonar
-  const paso = Math.max(1, Math.ceil(dias.length / 8))
+  const paso = Math.max(1, Math.ceil(buckets.length / 8))
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     const px = ((e.clientX - rect.left) / rect.width) * ANCHO
-    const i = Math.round(((px - M.left) / plotW) * (dias.length - 1))
-    setHover(Math.max(0, Math.min(dias.length - 1, i)))
+    const i = Math.round(((px - M.left) / plotW) * (buckets.length - 1))
+    setHover(Math.max(0, Math.min(buckets.length - 1, i)))
   }
 
   return (
@@ -245,10 +360,10 @@ function GraficaLineas({ dias, series }: { dias: string[]; series: number[][] })
         ))}
 
         {/* etiquetas eje x */}
-        {dias.map((d, i) =>
+        {buckets.map((b, i) =>
           i % paso === 0 ? (
-            <text key={d} x={x(i)} y={ALTO - 8} textAnchor="middle" fontSize="11" fill={INK_MUTED}>
-              {etiquetaDia(d)}
+            <text key={b} x={x(i)} y={ALTO - 8} textAnchor="middle" fontSize="11" fill={INK_MUTED}>
+              {etiquetaBucket(b, granularidad)}
             </text>
           ) : null
         )}
@@ -294,7 +409,7 @@ function GraficaLineas({ dias, series }: { dias: string[]; series: number[][] })
           ))}
       </svg>
 
-      {/* tooltip como el mockup */}
+      {/* tooltip */}
       {hover !== null && (
         <div
           className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-lg"
@@ -304,11 +419,7 @@ function GraficaLineas({ dias, series }: { dias: string[]; series: number[][] })
           }}
         >
           <p className="text-sm font-bold whitespace-nowrap text-slate-900">
-            {new Date(dias[hover] + 'T00:00:00').toLocaleDateString('es-CO', {
-              day: '2-digit',
-              month: 'long',
-              year: 'numeric',
-            })}
+            {etiquetaLarga(buckets[hover], granularidad)}
           </p>
           {series.map((serie, s) => (
             <p key={s} className="mt-1 flex items-center gap-2 text-sm whitespace-nowrap text-slate-600">
