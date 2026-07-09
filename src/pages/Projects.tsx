@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { configVacia, type Project } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
 import { IconoFijar, IconoReloj } from '../components/iconos'
+import robotPng from '../assets/icons/robot.png'
 
 async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -138,7 +139,7 @@ export function Projects() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span className="text-4xl">🤖</span>
+                  <img src={robotPng} alt="" className="h-24 w-auto object-contain opacity-80" />
                 )}
               </div>
               <h3 className="mt-4 text-xl font-bold text-slate-900">{proyecto.nombre}</h3>
