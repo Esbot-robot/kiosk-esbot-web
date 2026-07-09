@@ -57,6 +57,13 @@ export const IconoReloj = ({ className = 'h-4 w-4' }: IconoProps) => (
   </svg>
 )
 
+export const IconoGrafica = ({ className = 'h-5 w-5' }: IconoProps) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="20" x2="20" y2="20" />
+    <polyline points="4 14 9 9 13 12 20 5" />
+  </svg>
+)
+
 export const IconoPlay = ({ className = 'h-5 w-5' }: IconoProps) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
     <circle cx="12" cy="12" r="11" opacity="0.15" />

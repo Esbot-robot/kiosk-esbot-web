@@ -79,3 +79,27 @@ create policy "panel elimina archivos" on storage.objects
 create policy "panel lee archivos" on storage.objects
   for select to authenticated
   using (bucket_id in ('media', 'configs'));
+
+-- ============================================================
+-- Analítica: eventos de interacción que envían los robots
+-- (toque de pantalla en patrullaje, botón jugar, etc.)
+-- El robot inserta como anónimo; solo el panel puede leerlos.
+-- ============================================================
+create table public.events (
+  id bigint generated always as identity primary key,
+  serial text not null,
+  tipo text not null,
+  video_seg double precision,
+  creado_at timestamptz not null default now()
+);
+
+create index events_serial_creado_idx on public.events (serial, creado_at);
+
+alter table public.events enable row level security;
+
+create policy "robot registra eventos" on public.events
+  for insert to anon with check (true);
+create policy "panel registra eventos" on public.events
+  for insert to authenticated with check (true);
+create policy "panel lee eventos" on public.events
+  for select to authenticated using (true);
