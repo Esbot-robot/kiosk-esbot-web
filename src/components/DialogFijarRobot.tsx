@@ -36,6 +36,9 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
     queryClient.invalidateQueries({ queryKey: ['projects'] })
   }
 
+  const LARGO_SERIAL = 11
+  const serialValido = serial.trim().length === LARGO_SERIAL
+
   const fijar = useMutation({
     mutationFn: async () => {
       const s = serial.trim()
@@ -124,20 +127,25 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
             value={serial}
             onChange={(e) => setSerial(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && serial.trim().length >= 4) fijar.mutate()
+              if (e.key === 'Enter' && serialValido) fijar.mutate()
             }}
-            placeholder="Ej: 0016004060"
+            placeholder="Ej: 00125190031"
             className="w-full focus:outline-none"
           />
         </div>
         <button
           onClick={() => fijar.mutate()}
-          disabled={serial.trim().length < 4 || fijar.isPending}
+          disabled={!serialValido || fijar.isPending}
           className="rounded-lg bg-indigo-600 px-6 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
         >
           {fijar.isPending ? 'Fijando...' : 'Fijar'}
         </button>
       </div>
+      {serial.trim().length > 0 && !serialValido && (
+        <p className="mt-2 text-sm text-amber-600">
+          El ID del robot debe tener {LARGO_SERIAL} caracteres (tienes {serial.trim().length}).
+        </p>
+      )}
 
       <div className="mt-6 flex gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-sm text-slate-700">
         <span className="text-indigo-600">ⓘ</span>

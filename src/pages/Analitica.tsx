@@ -4,6 +4,10 @@ import { supabase } from '../lib/supabase'
 
 const FILAS_POR_PAGINA = 100
 
+// Un robot real de Temi tiene 11 caracteres; patrón LIKE de 11 comodines "_"
+// para excluir seriales de demo/prueba (ej. el "0016004060" del emulador).
+const PATRON_SERIAL_REAL = '_'.repeat(11)
+
 /* Paleta validada (dataviz): 2 series, CVD-safe */
 const COLOR_TOQUE = '#2a78d6' // azul — toques de pantalla
 const COLOR_JUGAR = '#1baf7a' // aqua — botón jugar
@@ -92,7 +96,8 @@ export function Analitica() {
     queryFn: async () => {
       const { data, error } = await supabase.from('robots').select('serial')
       if (error) throw error
-      return data as { serial: string }[]
+      // solo robots reales (11 caracteres), sin los de demo/prueba
+      return (data as { serial: string }[]).filter((r) => r.serial.length === 11)
     },
   })
 
@@ -136,6 +141,7 @@ export function Analitica() {
           .order('creado_at', { ascending: false })
           .range(offset, Math.min(offset + 999, total - 1))
         if (robot !== 'todos') q = q.eq('serial', robot)
+        else q = q.like('serial', PATRON_SERIAL_REAL)
         const { data, error } = await q
         if (error) throw error
         filas.push(...(data as Evento[]))
@@ -183,6 +189,7 @@ export function Analitica() {
         .order('creado_at', { ascending: false })
         .range(pagina * FILAS_POR_PAGINA, pagina * FILAS_POR_PAGINA + FILAS_POR_PAGINA - 1)
       if (robot !== 'todos') q = q.eq('serial', robot)
+      else q = q.like('serial', PATRON_SERIAL_REAL)
       const { data, count, error } = await q
       if (error) throw error
       return { eventos: data as Evento[], total: count ?? 0 }

@@ -123,6 +123,7 @@ language sql stable as $$
   from public.events
   where creado_at >= p_desde
     and creado_at <= p_hasta
-    and (p_serial is null or serial = p_serial)
+    -- "Todos": solo robots reales (serial de 11 caracteres), sin demo/prueba
+    and (case when p_serial is null then char_length(serial) = 11 else serial = p_serial end)
   group by 1, 2
 $$;
