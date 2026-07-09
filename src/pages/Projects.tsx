@@ -142,11 +142,6 @@ export function Projects() {
                 )}
               </div>
               <h3 className="mt-4 text-xl font-bold text-slate-900">{proyecto.nombre}</h3>
-              {fijado && (
-                <p className="mt-1 truncate text-sm text-indigo-600" title={serials.join(', ')}>
-                  🤖 {serials.join(', ')}
-                </p>
-              )}
               <div className="mt-1 flex items-center justify-between">
                 <p className="flex items-center gap-1.5 text-sm text-slate-500">
                   <IconoReloj /> {tiempoRelativo(proyecto.updated_at)}
