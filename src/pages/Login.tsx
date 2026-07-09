@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import loginBg from '../assets/login_bg.png'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -23,10 +24,14 @@ export function Login() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-800">
+    <div
+      className="flex h-screen items-center bg-slate-100 bg-cover bg-center px-6 md:px-20"
+      style={{ backgroundImage: `url(${loginBg})` }}
+    >
+      {/* Card a la izquierda, sobre el espacio libre del fondo */}
       <form
         onSubmit={entrar}
-        className="w-full max-w-md rounded-2xl bg-white p-10 shadow-xl"
+        className="w-full max-w-md rounded-2xl bg-white/90 p-10 shadow-2xl backdrop-blur-sm"
       >
         <h1 className="text-3xl font-bold text-slate-800">Kiosk Esbot</h1>
         <p className="mt-1 text-slate-500">Panel de administración</p>
@@ -38,7 +43,7 @@ export function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 focus:border-indigo-500 focus:outline-none"
           />
         </label>
 
@@ -49,7 +54,7 @@ export function Login() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 focus:border-indigo-500 focus:outline-none"
           />
         </label>
 
