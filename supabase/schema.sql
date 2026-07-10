@@ -90,6 +90,9 @@ create table public.events (
   serial text not null,
   tipo text not null,
   video_seg double precision,
+  -- Para el evento boton_jugar: la pregunta mostrada y la respuesta elegida
+  pregunta text,
+  respuesta text,
   creado_at timestamptz not null default now()
 );
 

@@ -19,8 +19,10 @@ export interface Pregunta {
   texto: string
   /** mínimo 2, máximo 3 (limitación de layout en el robot) */
   opciones: string[]
-  /** índice de la respuesta correcta (0-based) */
+  /** índice de la respuesta correcta (0-based); ignorado en 'calificacion' */
   correcta: number
+  /** 'trivia' = tiene respuesta correcta · 'calificacion' = opinión, sin correcta */
+  tipo: 'trivia' | 'calificacion'
 }
 
 export interface PantallaInicial {

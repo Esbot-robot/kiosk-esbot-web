@@ -121,6 +121,10 @@ export function Editor() {
       if (!cfg.pantalla_ruleta.colores_opciones) {
         cfg.pantalla_ruleta.colores_opciones = ['', '', '']
       }
+      // Preguntas viejas sin tipo → trivia por defecto
+      for (const preg of cfg.pantalla_ruleta.preguntas) {
+        if (!preg.tipo) preg.tipo = 'trivia'
+      }
       setConfig(cfg)
     }
   }, [proyecto])

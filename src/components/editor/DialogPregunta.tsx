@@ -23,6 +23,8 @@ export function DialogPregunta({
   const [texto, setTexto] = useState(valor?.texto ?? '')
   const [opciones, setOpciones] = useState<string[]>(valor?.opciones ?? ['', ''])
   const [correcta, setCorrecta] = useState(valor?.correcta ?? 0)
+  const [tipo, setTipo] = useState<'trivia' | 'calificacion'>(valor?.tipo ?? 'trivia')
+  const esCalificacion = tipo === 'calificacion'
 
   const valida =
     texto.trim().length > 0 &&
@@ -52,11 +54,35 @@ export function DialogPregunta({
         onGuardar({
           texto: texto.trim(),
           opciones: opciones.map((o) => o.trim()),
-          correcta,
+          correcta: esCalificacion ? 0 : correcta,
+          tipo,
         })
         onCerrar()
       }}
     >
+      {/* Tipo de pregunta */}
+      <p className="mb-2 font-medium text-slate-800">Tipo de pregunta</p>
+      <div className="mb-5 grid grid-cols-2 gap-3">
+        {(
+          [
+            { v: 'trivia', label: 'Trivia', detalle: 'Tiene respuesta correcta' },
+            { v: 'calificacion', label: 'Calificación', detalle: 'Opinión, sin respuesta correcta' },
+          ] as const
+        ).map((op) => (
+          <button
+            key={op.v}
+            type="button"
+            onClick={() => setTipo(op.v)}
+            className={`rounded-lg border px-4 py-3 text-left transition-colors ${
+              tipo === op.v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'
+            }`}
+          >
+            <span className="block font-semibold text-slate-800">{op.label}</span>
+            <span className="block text-sm text-slate-500">{op.detalle}</span>
+          </button>
+        ))}
+      </div>
+
       <p className="mb-2 font-medium text-slate-800">Pregunta</p>
       <textarea
         value={texto}
@@ -70,7 +96,7 @@ export function DialogPregunta({
 
       <div className="mt-4 flex items-center justify-between">
         <p className="font-medium text-slate-800">Opciones de respuesta</p>
-        <p className="text-sm text-indigo-600">Marcar respuesta correcta →</p>
+        {!esCalificacion && <p className="text-sm text-indigo-600">Marcar respuesta correcta →</p>}
       </div>
 
       <div className="mt-3 space-y-3">
@@ -78,7 +104,7 @@ export function DialogPregunta({
           <div key={i} className="flex items-center gap-3">
             <div
               className={`flex flex-1 items-center rounded-lg border px-4 py-3 ${
-                correcta === i ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-300'
+                !esCalificacion && correcta === i ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-300'
               }`}
             >
               <input
@@ -87,18 +113,20 @@ export function DialogPregunta({
                 placeholder={`Opción ${i + 1}`}
                 className="w-full focus:outline-none"
               />
-              <button
-                type="button"
-                onClick={() => setCorrecta(i)}
-                title="Marcar como correcta"
-                className={`ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
-                  correcta === i
-                    ? 'border-indigo-600 bg-indigo-600 text-white'
-                    : 'border-slate-300 text-transparent hover:border-indigo-400'
-                }`}
-              >
-                ✓
-              </button>
+              {!esCalificacion && (
+                <button
+                  type="button"
+                  onClick={() => setCorrecta(i)}
+                  title="Marcar como correcta"
+                  className={`ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+                    correcta === i
+                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                      : 'border-slate-300 text-transparent hover:border-indigo-400'
+                  }`}
+                >
+                  ✓
+                </button>
+              )}
             </div>
             {opciones.length > LIMITES.OPCIONES_MIN && (
               <button

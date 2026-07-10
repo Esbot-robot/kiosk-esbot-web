@@ -19,6 +19,8 @@ interface Evento {
   serial: string
   tipo: string
   video_seg: number | null
+  pregunta: string | null
+  respuesta: string | null
   creado_at: string
 }
 
@@ -148,7 +150,8 @@ export function Analitica() {
         if (!data || data.length < 1000) break
       }
 
-      const lineas = ['Evento;Robot;Fecha;Hora;Seg. del video']
+      const limpiar = (t: string | null) => (t ?? '').replace(/;/g, ',').replace(/\r?\n/g, ' ')
+      const lineas = ['Evento;Robot;Fecha;Hora;Seg. del video;Pregunta;Respuesta']
       for (const e of filas) {
         lineas.push(
           [
@@ -157,6 +160,8 @@ export function Analitica() {
             e.creado_at.slice(0, 10),
             e.creado_at.slice(11, 19),
             e.video_seg != null ? e.video_seg : '',
+            limpiar(e.pregunta),
+            limpiar(e.respuesta),
           ].join(';')
         )
       }
@@ -346,6 +351,8 @@ export function Analitica() {
                 <th className="px-4 py-2 font-medium">Fecha</th>
                 <th className="px-4 py-2 font-medium">Hora</th>
                 <th className="px-4 py-2 font-medium">Seg. del video</th>
+                <th className="px-4 py-2 font-medium">Pregunta</th>
+                <th className="px-4 py-2 font-medium">Respuesta</th>
               </tr>
             </thead>
             <tbody>
@@ -370,11 +377,13 @@ export function Analitica() {
                   <td className="px-4 py-2 text-slate-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {e.video_seg != null ? `${e.video_seg.toFixed(1)}s` : '—'}
                   </td>
+                  <td className="px-4 py-2 text-slate-700">{e.pregunta || '—'}</td>
+                  <td className="px-4 py-2 font-medium text-slate-800">{e.respuesta || '—'}</td>
                 </tr>
               ))}
               {(detalle?.eventos ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     Sin eventos en este rango.
                   </td>
                 </tr>
