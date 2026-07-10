@@ -37,7 +37,6 @@ const TTS_INICIAL: { campo: CampoTtsInicial; label: string }[] = [
   { campo: 'tts_llega_stand', label: 'Cuando robot llega al stand' },
   { campo: 'tts_despedida_stand', label: 'Despedida en el stand' },
   { campo: 'tts_reanuda_patrulla', label: 'Cuando el robot reanuda patrulla' },
-  { campo: 'tts_sigueme', label: 'Al invitar a seguirlo (quiz ganado)' },
 ]
 
 const TTS_RULETA: { campo: CampoTtsRuleta; label: string }[] = [
@@ -91,6 +90,7 @@ export function Editor() {
   const [nombre, setNombre] = useState('')
   const [config, setConfig] = useState<EventConfig | null>(null)
   const [guardadoOk, setGuardadoOk] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState('')
 
   const { data: proyecto, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -175,6 +175,17 @@ export function Editor() {
 
   function eliminarPregunta(index: number) {
     setRuleta({ preguntas: rul.preguntas.filter((_, i) => i !== index) })
+  }
+
+  /** Valida y guarda; bloquea si "guiar al stand" no tiene secuencia (rompería el robot) */
+  function intentarGuardar() {
+    if (rul.despues_quiz.modo === 'guiar_al_stand' && !rul.despues_quiz.secuencia_guia.trim()) {
+      setPestana('ruleta')
+      setErrorGuardar('Falta el nombre de la secuencia de Temi para "Guiar al stand". Escríbelo antes de guardar.')
+      return
+    }
+    setErrorGuardar('')
+    guardar.mutate()
   }
 
   const estiloFondo = (url: string) =>
@@ -400,7 +411,7 @@ export function Editor() {
                 <div className="mt-2 space-y-2">
                   {(
                     [
-                      { valor: 'guiar_al_stand', label: 'Guiar al stand', detalle: 'Dice "sígueme" y reproduce la secuencia de Temi' },
+                      { valor: 'guiar_al_stand', label: 'Guiar al stand', detalle: 'Reproduce la secuencia de Temi' },
                       { valor: 'seguir_patrulla', label: 'Continuar patrullaje', detalle: 'Solo responde y retoma su ruta' },
                     ] as const
                   ).map((opcion) => (
@@ -476,13 +487,14 @@ export function Editor() {
 
           <div className="border-t border-slate-200 p-6">
             <button
-              onClick={() => guardar.mutate()}
+              onClick={intentarGuardar}
               disabled={guardar.isPending}
               className="flex w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
             >
               <IconoGuardar />
               {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
             </button>
+            {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
             {guardar.isError && (
               <p className="mt-2 text-sm text-red-600">Error al guardar. Intenta de nuevo.</p>
             )}
