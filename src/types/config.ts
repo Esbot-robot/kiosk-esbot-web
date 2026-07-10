@@ -53,6 +53,8 @@ export interface PantallaRuleta {
   fondo_url: string
   tts_acierta: string
   tts_no_acierta: string
+  /** mensaje de agradecimiento para preguntas de calificación (sin correcta) */
+  tts_agradecimiento: string
   tts_sin_respuesta: string
   despues_quiz: DespuesQuiz
   /** color de fondo de cada botón de respuesta (posiciones 1-3);
@@ -113,6 +115,7 @@ export function configVacia(): EventConfig {
       fondo_url: '',
       tts_acierta: '',
       tts_no_acierta: '',
+      tts_agradecimiento: '¡Gracias por tu opinión!',
       tts_sin_respuesta: '¡No hubo respuesta!',
       despues_quiz: { modo: 'guiar_al_stand', secuencia_guia: '' },
       colores_opciones: ['', '', ''],

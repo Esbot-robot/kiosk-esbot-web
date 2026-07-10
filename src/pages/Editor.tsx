@@ -30,7 +30,7 @@ type CampoTtsInicial =
   | 'tts_despedida_stand'
   | 'tts_reanuda_patrulla'
   | 'tts_sigueme'
-type CampoTtsRuleta = 'tts_acierta' | 'tts_no_acierta' | 'tts_sin_respuesta'
+type CampoTtsRuleta = 'tts_acierta' | 'tts_no_acierta' | 'tts_agradecimiento' | 'tts_sin_respuesta'
 
 const TTS_INICIAL: { campo: CampoTtsInicial; label: string }[] = [
   { campo: 'tts_toca_pantalla', label: 'Cuando usuario toca la pantalla' },
@@ -39,11 +39,22 @@ const TTS_INICIAL: { campo: CampoTtsInicial; label: string }[] = [
   { campo: 'tts_reanuda_patrulla', label: 'Cuando el robot reanuda patrulla' },
 ]
 
-const TTS_RULETA: { campo: CampoTtsRuleta; label: string }[] = [
-  { campo: 'tts_acierta', label: 'Cuando usuario acierta pregunta' },
-  { campo: 'tts_no_acierta', label: 'Cuando usuario no acierta pregunta' },
-  { campo: 'tts_sin_respuesta', label: 'Cuando no hubo respuesta' },
-]
+/** Los TTS de la ruleta a mostrar dependen de los tipos de pregunta del proyecto */
+function ttsRuletaVisibles(preguntas: Pregunta[]): { campo: CampoTtsRuleta; label: string }[] {
+  const hayCalif = preguntas.some((p) => p.tipo === 'calificacion')
+  // "trivia" incluye el caso sin preguntas (comportamiento por defecto)
+  const hayTrivia = preguntas.length === 0 || preguntas.some((p) => p.tipo !== 'calificacion')
+  const lista: { campo: CampoTtsRuleta; label: string }[] = []
+  if (hayTrivia) {
+    lista.push({ campo: 'tts_acierta', label: 'Cuando el usuario acierta (trivia)' })
+    lista.push({ campo: 'tts_no_acierta', label: 'Cuando el usuario no acierta (trivia)' })
+  }
+  if (hayCalif) {
+    lista.push({ campo: 'tts_agradecimiento', label: 'Agradecimiento (calificación)' })
+  }
+  lista.push({ campo: 'tts_sin_respuesta', label: 'Cuando no hubo respuesta' })
+  return lista
+}
 
 function Lapiz({ onClick, title }: { onClick: () => void; title?: string }) {
   return (
@@ -124,6 +135,10 @@ export function Editor() {
       // Preguntas viejas sin tipo → trivia por defecto
       for (const preg of cfg.pantalla_ruleta.preguntas) {
         if (!preg.tipo) preg.tipo = 'trivia'
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((cfg.pantalla_ruleta as any).tts_agradecimiento === undefined) {
+        cfg.pantalla_ruleta.tts_agradecimiento = '¡Gracias por tu opinión!'
       }
       setConfig(cfg)
     }
@@ -386,7 +401,7 @@ export function Editor() {
                       onClick={() => setDialogo({ tipo: 'tts-inicial', campo, titulo: `Tts: ${label.toLowerCase()}` })}
                     />
                   ))
-                : TTS_RULETA.map(({ campo, label }) => (
+                : ttsRuletaVisibles(rul.preguntas).map(({ campo, label }) => (
                     <ItemPanel
                       key={campo}
                       icono={<IconoVolumen />}
