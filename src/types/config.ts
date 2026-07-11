@@ -60,11 +60,16 @@ export interface PantallaRuleta {
   /** color de fondo de cada botón de respuesta (posiciones 1-3);
    *  vacío = color original del robot */
   colores_opciones: string[]
+  /** color del texto de cada botón de respuesta (posiciones 1-3);
+   *  vacío = blanco (original del robot) */
+  colores_texto_opciones: string[]
   preguntas: Pregunta[]
 }
 
-/** Colores originales de los botones de respuesta en el robot */
+/** Colores de fondo originales de los botones de respuesta en el robot */
 export const COLORES_OPCIONES_DEFAULT = ['#0931D7', '#2196F3', '#F44336']
+/** Color de texto original de los botones de respuesta (blanco) */
+export const COLOR_TEXTO_OPCION_DEFAULT = '#FFFFFF'
 
 export interface Tiempos {
   countdown_pausa_seg: number
@@ -119,6 +124,7 @@ export function configVacia(): EventConfig {
       tts_sin_respuesta: '¡No hubo respuesta!',
       despues_quiz: { modo: 'guiar_al_stand', secuencia_guia: '' },
       colores_opciones: ['', '', ''],
+      colores_texto_opciones: ['', '', ''],
       preguntas: [],
     },
     tiempos: {

@@ -128,17 +128,28 @@ export function DialogTts({ titulo, valor, maxCaracteres, onGuardar, onCerrar }:
 }
 
 interface DialogColoresOpcionesProps {
-  valores: string[]
-  onGuardar: (nuevos: string[]) => void
+  valoresFondo: string[]
+  valoresTexto: string[]
+  onGuardar: (fondo: string[], texto: string[]) => void
   onCerrar: () => void
 }
 
-/** Colores de fondo de los 3 botones de respuesta del quiz */
-export function DialogColoresOpciones({ valores, onGuardar, onCerrar }: DialogColoresOpcionesProps) {
-  const [colores, setColores] = useState<string[]>([
-    valores[0] ?? '',
-    valores[1] ?? '',
-    valores[2] ?? '',
+/** Colores de fondo y de texto de los 3 botones de respuesta del quiz */
+export function DialogColoresOpciones({
+  valoresFondo,
+  valoresTexto,
+  onGuardar,
+  onCerrar,
+}: DialogColoresOpcionesProps) {
+  const [fondo, setFondo] = useState<string[]>([
+    valoresFondo[0] ?? '',
+    valoresFondo[1] ?? '',
+    valoresFondo[2] ?? '',
+  ])
+  const [texto, setTexto] = useState<string[]>([
+    valoresTexto[0] ?? '',
+    valoresTexto[1] ?? '',
+    valoresTexto[2] ?? '',
   ])
 
   return (
@@ -146,22 +157,31 @@ export function DialogColoresOpciones({ valores, onGuardar, onCerrar }: DialogCo
       titulo="Colores de las opciones de respuesta"
       onCancelar={onCerrar}
       onAceptar={() => {
-        onGuardar(colores)
+        onGuardar(fondo, texto)
         onCerrar()
       }}
     >
       <p className="mb-4 text-sm text-slate-500">
-        Cada posición tiene su color en la pantalla del robot. Deja vacío para usar el color
-        original.
+        Cada botón tiene su color de fondo y de texto en la pantalla del robot. Deja vacío para usar
+        el color original.
       </p>
-      <div className="space-y-4">
-        {colores.map((color, i) => (
-          <CampoColor
-            key={i}
-            label={`Botón opción ${i + 1}`}
-            value={color}
-            onChange={(hex) => setColores(colores.map((c, k) => (k === i ? hex : c)))}
-          />
+      <div className="space-y-5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-lg border border-slate-200 p-4">
+            <p className="mb-3 font-semibold text-slate-800">Botón opción {i + 1}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <CampoColor
+                label="Fondo"
+                value={fondo[i]}
+                onChange={(hex) => setFondo(fondo.map((c, k) => (k === i ? hex : c)))}
+              />
+              <CampoColor
+                label="Texto"
+                value={texto[i]}
+                onChange={(hex) => setTexto(texto.map((c, k) => (k === i ? hex : c)))}
+              />
+            </div>
+          </div>
         ))}
       </div>
     </Modal>

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { publicarConfigRobot } from '../lib/storage'
-import { COLORES_OPCIONES_DEFAULT, LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
+import { COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
 import { DialogBoton, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
@@ -131,6 +131,9 @@ export function Editor() {
       }
       if (!cfg.pantalla_ruleta.colores_opciones) {
         cfg.pantalla_ruleta.colores_opciones = ['', '', '']
+      }
+      if (!cfg.pantalla_ruleta.colores_texto_opciones) {
+        cfg.pantalla_ruleta.colores_texto_opciones = ['', '', '']
       }
       // Preguntas viejas sin tipo → trivia por defecto
       for (const preg of cfg.pantalla_ruleta.preguntas) {
@@ -344,8 +347,10 @@ export function Editor() {
                   const opciones = rul.preguntas[0]?.opciones ?? ['Opción 1', 'Opción 2', 'Opción 3']
                   const colorDe = (i: number) =>
                     rul.colores_opciones?.[i] || COLORES_OPCIONES_DEFAULT[i]
+                  const colorTextoDe = (i: number) =>
+                    rul.colores_texto_opciones?.[i] || COLOR_TEXTO_OPCION_DEFAULT
                   const botonClase =
-                    'rounded-full px-4 py-3 text-center font-bold text-white shadow-md text-sm'
+                    'rounded-full px-4 py-3 text-center font-bold shadow-md text-sm'
                   return (
                     <div className="relative w-full max-w-xl">
                       <div className="flex w-full gap-2">
@@ -353,7 +358,7 @@ export function Editor() {
                           <span
                             key={i}
                             className={`${botonClase} flex-1`}
-                            style={{ backgroundColor: colorDe(i) }}
+                            style={{ backgroundColor: colorDe(i), color: colorTextoDe(i) }}
                           >
                             {op}
                           </span>
@@ -363,7 +368,7 @@ export function Editor() {
                         <div className="mt-2 flex justify-center">
                           <span
                             className={`${botonClase} w-[calc(50%-4px)]`}
-                            style={{ backgroundColor: colorDe(2) }}
+                            style={{ backgroundColor: colorDe(2), color: colorTextoDe(2) }}
                           >
                             {opciones[2]}
                           </span>
@@ -609,8 +614,11 @@ export function Editor() {
       )}
       {dialogo?.tipo === 'colores-opciones' && (
         <DialogColoresOpciones
-          valores={rul.colores_opciones ?? ['', '', '']}
-          onGuardar={(colores_opciones) => setRuleta({ colores_opciones })}
+          valoresFondo={rul.colores_opciones ?? ['', '', '']}
+          valoresTexto={rul.colores_texto_opciones ?? ['', '', '']}
+          onGuardar={(colores_opciones, colores_texto_opciones) =>
+            setRuleta({ colores_opciones, colores_texto_opciones })
+          }
           onCerrar={() => setDialogo(null)}
         />
       )}
