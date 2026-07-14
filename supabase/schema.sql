@@ -132,6 +132,11 @@ create policy "robot inserta estado" on public.robot_status
   for insert to anon with check (true);
 create policy "robot actualiza estado" on public.robot_status
   for update to anon using (true) with check (true);
+-- OJO: el SELECT para anon es NECESARIO — el upsert (on_conflict) de PostgREST
+-- lee la fila existente para resolver el conflicto; sin esta política el
+-- latido falla con "new row violates row-level security policy".
+create policy "robot lee estado" on public.robot_status
+  for select to anon using (true);
 create policy "panel lee estado" on public.robot_status
   for select to authenticated using (true);
 
