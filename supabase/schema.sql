@@ -107,6 +107,34 @@ create policy "panel registra eventos" on public.events
 create policy "panel lee eventos" on public.events
   for select to authenticated using (true);
 
+-- ============================================================
+-- Estado de robots (latido): la app hace upsert cada pocos segundos
+-- con nombre y batería. Una fila por robot — la tabla nunca crece.
+-- "En servicio" = updated_at reciente; si deja de llegar, la app
+-- no está corriendo (cerrada, sin internet o robot apagado).
+-- ============================================================
+create table public.robot_status (
+  serial text primary key,
+  nombre text,
+  bateria int,
+  cargando boolean,
+  updated_at timestamptz not null default now()
+);
+
+-- el trigger pone la hora del servidor en cada latido (UTC, solo
+-- para calcular "hace cuánto" — no se muestra como hora local)
+create trigger robot_status_touch before update on public.robot_status
+  for each row execute function public.touch_updated_at();
+
+alter table public.robot_status enable row level security;
+
+create policy "robot inserta estado" on public.robot_status
+  for insert to anon with check (true);
+create policy "robot actualiza estado" on public.robot_status
+  for update to anon using (true) with check (true);
+create policy "panel lee estado" on public.robot_status
+  for select to authenticated using (true);
+
 -- Agregación en el servidor: la gráfica pide totales por hora/día en vez de
 -- descargar todos los eventos (escala a millones de filas sin mover datos).
 create or replace function public.eventos_agrupados(

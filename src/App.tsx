@@ -5,6 +5,7 @@ import { Login } from './pages/Login'
 import { Projects } from './pages/Projects'
 import { Editor } from './pages/Editor'
 import { Analitica } from './pages/Analitica'
+import { Robots } from './pages/Robots'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
       >
         <Route path="/proyectos" element={<Projects />} />
         <Route path="/analitica" element={<Analitica />} />
+        <Route path="/robots" element={<Robots />} />
         <Route path="/editor/:projectId" element={<Editor />} />
         <Route path="*" element={<Navigate to="/proyectos" replace />} />
       </Route>

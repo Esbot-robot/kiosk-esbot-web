@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { IconoCarpeta, IconoGrafica, IconoSalir } from './iconos'
+import { IconoCarpeta, IconoGrafica, IconoRobotLinea, IconoSalir } from './iconos'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 px-6 py-4 text-base transition-colors ${
@@ -32,6 +32,9 @@ export function Layout() {
           </NavLink>
           <NavLink to="/analitica" className={navItemClass}>
             <IconoGrafica /> Analítica
+          </NavLink>
+          <NavLink to="/robots" className={navItemClass}>
+            <IconoRobotLinea /> Robots
           </NavLink>
         </nav>
 
