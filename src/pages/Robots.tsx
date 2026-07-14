@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import robotPng from '../assets/icons/robot.png'
 
-/* El latido de la app llega cada 3s; si el último tiene más de 10s
-   (3+ latidos perdidos), el robot se muestra como "Sin reporte". */
-const UMBRAL_SIN_REPORTE_MS = 10_000
-const REFRESCO_PANEL_MS = 3_000
+/* El latido de la app llega cada 3s; si el último tiene más de 6s
+   (2 latidos perdidos), el robot se muestra como "Sin reporte".
+   El panel se refresca cada 2s para que el cambio se vea casi al instante. */
+const UMBRAL_SIN_REPORTE_MS = 6_000
+const REFRESCO_PANEL_MS = 2_000
 
 interface RobotStatus {
   serial: string
