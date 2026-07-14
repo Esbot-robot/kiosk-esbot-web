@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import robotPng from '../assets/icons/robot.png'
@@ -16,12 +17,12 @@ interface RobotStatus {
   updated_at: string
 }
 
-function edadMs(iso: string): number {
-  return Date.now() - new Date(iso).getTime()
+function edadMs(iso: string, ahora: number): number {
+  return ahora - new Date(iso).getTime()
 }
 
-function haceCuanto(iso: string): string {
-  const seg = Math.max(0, Math.floor(edadMs(iso) / 1000))
+function haceCuanto(iso: string, ahora: number): string {
+  const seg = Math.max(0, Math.floor(edadMs(iso, ahora) / 1000))
   if (seg < 60) return `hace ${seg} s`
   const min = Math.floor(seg / 60)
   if (min < 60) return `hace ${min} min`
@@ -37,6 +38,14 @@ function colorBateria(nivel: number): string {
 }
 
 export function Robots() {
+  // "tic" que redibuja cada segundo aunque no lleguen datos nuevos, para que
+  // el paso a "Sin reporte" (que depende del tiempo, no de un dato) ocurra solo
+  const [ahora, setAhora] = useState(Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
   const { data: robots, isLoading } = useQuery({
     queryKey: ['robot-status'],
     queryFn: async (): Promise<RobotStatus[]> => {
@@ -68,7 +77,7 @@ export function Robots() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {(robots ?? []).map((r) => {
-          const enServicio = edadMs(r.updated_at) <= UMBRAL_SIN_REPORTE_MS
+          const enServicio = edadMs(r.updated_at, ahora) <= UMBRAL_SIN_REPORTE_MS
           return (
             <div
               key={r.serial}
@@ -102,7 +111,7 @@ export function Robots() {
                     {enServicio ? (
                       <span className="text-emerald-700">En servicio</span>
                     ) : (
-                      <span className="text-slate-500">Sin reporte · {haceCuanto(r.updated_at)}</span>
+                      <span className="text-slate-500">Sin reporte · {haceCuanto(r.updated_at, ahora)}</span>
                     )}
                   </p>
                 </div>
