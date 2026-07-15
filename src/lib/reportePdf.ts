@@ -176,7 +176,8 @@ export function construirReportePdf(d: DatosReporte): jsPDF {
     doc.text('No se registraron respuestas de quiz en este rango.', M, y)
     y += 20
   } else {
-    for (const preg of d.distribucion) {
+    d.distribucion.forEach((preg, idx) => {
+      if (idx > 0) y += 18 // aire antes de cada pregunta (menos la primera)
       const altoPregunta = 22 + preg.respuestas.length * 24 + 12
       saltoSiHaceFalta(altoPregunta)
       doc.setFont('helvetica', 'bold')
@@ -207,7 +208,7 @@ export function construirReportePdf(d: DatosReporte): jsPDF {
         y += 24
       }
       y += 10
-    }
+    })
   }
 
   pieDePagina()
