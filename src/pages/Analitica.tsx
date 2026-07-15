@@ -89,8 +89,6 @@ const NOMBRE_TIPO: Record<string, string> = {
   boton_jugar: 'Botón jugar',
 }
 
-const COLOR_BARRA = '#2a78d6'
-
 export function Analitica() {
   const [desde, setDesde] = useState(inicioDeMes())
   const [hasta, setHasta] = useState(ahoraLocal())
@@ -400,50 +398,6 @@ export function Analitica() {
             granularidad={granularidad}
             series={[serieToques, serieJugar]}
           />
-        )}
-      </div>
-
-      {/* Distribución de respuestas por pregunta */}
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="font-semibold text-slate-900">Respuestas por pregunta</h3>
-        <p className="text-sm text-slate-500">
-          Qué eligieron los visitantes en cada pregunta del quiz.
-        </p>
-
-        {(distribucion?.length ?? 0) === 0 ? (
-          <p className="py-10 text-center text-slate-400">
-            No se registraron respuestas de quiz en este rango.
-          </p>
-        ) : (
-          <div className="mt-5 space-y-6">
-            {distribucion!.map((preg) => (
-              <div key={preg.pregunta}>
-                <p className="font-medium text-slate-800">{preg.pregunta}</p>
-                <p className="mb-2 text-xs text-slate-400">{preg.total} respuestas</p>
-                <div className="space-y-2">
-                  {preg.respuestas.map((r) => {
-                    const pct = preg.total > 0 ? Math.round((r.conteo / preg.total) * 100) : 0
-                    return (
-                      <div key={r.texto}>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-700">{r.texto}</span>
-                          <span className="text-slate-500" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {r.conteo} · {pct}%
-                          </span>
-                        </div>
-                        <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${Math.max(2, pct)}%`, backgroundColor: COLOR_BARRA }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
         )}
       </div>
 
