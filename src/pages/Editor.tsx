@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { publicarConfigRobot } from '../lib/storage'
+import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
+import { Modal } from '../components/Modal'
 import { COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
 import { DialogBoton, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
@@ -95,6 +96,7 @@ function ItemPanel({
 
 export function Editor() {
   const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [pestana, setPestana] = useState<Pestana>('inicial')
   const [dialogo, setDialogo] = useState<Dialogo | null>(null)
@@ -102,6 +104,7 @@ export function Editor() {
   const [config, setConfig] = useState<EventConfig | null>(null)
   const [guardadoOk, setGuardadoOk] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState('')
+  const [confirmarBorrar, setConfirmarBorrar] = useState(false)
 
   const { data: proyecto, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -171,6 +174,48 @@ export function Editor() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setGuardadoOk(true)
       setTimeout(() => setGuardadoOk(false), 2500)
+    },
+  })
+
+  // Robots fijados a este proyecto (para advertir al eliminar)
+  const { data: robotsFijados } = useQuery({
+    queryKey: ['robots-proyecto', projectId],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('robots')
+        .select('serial')
+        .eq('project_id', projectId)
+        .order('serial')
+      if (error) throw error
+      return (data as { serial: string }[]).map((r) => r.serial)
+    },
+    enabled: !!projectId,
+  })
+
+  const borrar = useMutation({
+    mutationFn: async () => {
+      if (!projectId) return
+      // 1. desfijar robots + borrar su config publicada
+      const seriales = robotsFijados ?? []
+      for (const s of seriales) await eliminarConfigRobot(s)
+      await supabase.from('robots').delete().eq('project_id', projectId)
+      // 2. borrar los archivos (fondos/logo/video) del proyecto — best effort
+      try {
+        const { data: files } = await supabase.storage.from('media').list(projectId)
+        if (files && files.length) {
+          await supabase.storage.from('media').remove(files.map((f) => `${projectId}/${f.name}`))
+        }
+      } catch {
+        // si falla la limpieza de media no se bloquea el borrado del proyecto
+      }
+      // 3. borrar el proyecto
+      const { error } = await supabase.from('projects').delete().eq('id', projectId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['robots'] })
+      navigate('/proyectos')
     },
   })
 
@@ -510,14 +555,24 @@ export function Editor() {
           </div>
 
           <div className="border-t border-slate-200 p-6">
-            <button
-              onClick={intentarGuardar}
-              disabled={guardar.isPending}
-              className="flex w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-            >
-              <IconoGuardar />
-              {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmarBorrar(true)}
+                disabled={guardar.isPending || borrar.isPending}
+                title="Eliminar proyecto"
+                className="rounded-lg border border-red-300 px-5 py-4 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              >
+                Eliminar
+              </button>
+              <button
+                onClick={intentarGuardar}
+                disabled={guardar.isPending}
+                className="flex flex-1 items-center justify-center gap-3 rounded-lg bg-indigo-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <IconoGuardar />
+                {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
+              </button>
+            </div>
             {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
             {guardar.isError && (
               <p className="mt-2 text-sm text-red-600">Error al guardar. Intenta de nuevo.</p>
@@ -525,6 +580,47 @@ export function Editor() {
           </div>
         </aside>
       </div>
+
+      {/* ─── Confirmar eliminación ─── */}
+      {confirmarBorrar && (
+        <Modal
+          titulo="Eliminar proyecto"
+          textoAceptar={borrar.isPending ? 'Eliminando...' : 'Sí, eliminar'}
+          aceptarDeshabilitado={borrar.isPending}
+          onCancelar={() => setConfirmarBorrar(false)}
+          onAceptar={() => borrar.mutate()}
+        >
+          <p className="text-slate-700">
+            Vas a eliminar el proyecto <span className="font-semibold">"{nombre}"</span>. Esta acción
+            no se puede deshacer y se borrarán también sus imágenes y videos.
+          </p>
+
+          {(robotsFijados?.length ?? 0) > 0 ? (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-semibold">⚠️ Este proyecto está fijado a estos robots:</p>
+              <ul className="mt-1 list-disc pl-5">
+                {robotsFijados!.map((s) => (
+                  <li key={s} className="font-mono">
+                    {s}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2">
+                Al eliminarlo, esos robots quedarán <span className="font-semibold">sin proyecto</span>{' '}
+                y volverán a su configuración por defecto en el próximo reinicio.
+              </p>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              Este proyecto no está fijado a ningún robot.
+            </p>
+          )}
+
+          {borrar.isError && (
+            <p className="mt-3 text-sm text-red-600">No se pudo eliminar. Intenta de nuevo.</p>
+          )}
+        </Modal>
+      )}
 
       {/* ─── Diálogos ─── */}
       {dialogo?.tipo === 'titulo' && (
