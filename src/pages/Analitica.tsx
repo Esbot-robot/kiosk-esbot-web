@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { generarReportePdf, type PreguntaDist } from '../lib/reportePdf'
 
 const FILAS_POR_PAGINA = 100
 
@@ -87,6 +88,8 @@ const NOMBRE_TIPO: Record<string, string> = {
   toque_pantalla: 'Toque pantalla',
   boton_jugar: 'Botón jugar',
 }
+
+const COLOR_BARRA = '#2a78d6'
 
 export function Analitica() {
   const [desde, setDesde] = useState(inicioDeMes())
@@ -201,6 +204,48 @@ export function Analitica() {
     },
   })
 
+  // Distribución de respuestas por pregunta (agrega en el navegador desde los
+  // eventos boton_jugar que llevan pregunta + respuesta)
+  const { data: distribucion } = useQuery({
+    queryKey: ['distribucion', desde, hasta, robot],
+    queryFn: async (): Promise<PreguntaDist[]> => {
+      const filas: { pregunta: string | null; respuesta: string | null }[] = []
+      for (let offset = 0; ; offset += 1000) {
+        let q = supabase
+          .from('events')
+          .select('pregunta,respuesta')
+          .eq('tipo', 'boton_jugar')
+          .not('pregunta', 'is', null)
+          .gte('creado_at', `${desde}:00`)
+          .lte('creado_at', `${hasta}:59`)
+          .range(offset, offset + 999)
+        if (robot !== 'todos') q = q.eq('serial', robot)
+        else q = q.like('serial', PATRON_SERIAL_REAL)
+        const { data, error } = await q
+        if (error) throw error
+        filas.push(...(data as { pregunta: string | null; respuesta: string | null }[]))
+        if (!data || data.length < 1000) break
+      }
+      const mapa = new Map<string, Map<string, number>>()
+      for (const f of filas) {
+        const p = (f.pregunta ?? '').trim()
+        if (!p) continue
+        const r = (f.respuesta ?? '').trim() || 'Sin respuesta'
+        if (!mapa.has(p)) mapa.set(p, new Map())
+        const m = mapa.get(p)!
+        m.set(r, (m.get(r) ?? 0) + 1)
+      }
+      const resultado: PreguntaDist[] = [...mapa.entries()].map(([pregunta, m]) => {
+        const respuestas = [...m.entries()]
+          .map(([texto, conteo]) => ({ texto, conteo }))
+          .sort((a, b) => b.conteo - a.conteo)
+        return { pregunta, total: respuestas.reduce((a, b) => a + b.conteo, 0), respuestas }
+      })
+      resultado.sort((a, b) => b.total - a.total)
+      return resultado
+    },
+  })
+
   const { buckets, serieToques, serieJugar, totalToques, totalJugar } = useMemo(() => {
     const buckets = generarBuckets(desde, hasta, granularidad)
     const idx = new Map(buckets.map((b, i) => [b, i]))
@@ -221,6 +266,22 @@ export function Analitica() {
     return { buckets, serieToques, serieJugar, totalToques, totalJugar }
   }, [agregados, desde, hasta, granularidad])
 
+  function descargarReporte() {
+    generarReportePdf({
+      robotLabel: robot,
+      desde,
+      hasta,
+      granularidad,
+      totalToques,
+      totalJugar,
+      buckets,
+      serieToques,
+      serieJugar,
+      etiquetaBucket: (b) => etiquetaBucket(b, granularidad),
+      distribucion: distribucion ?? [],
+    })
+  }
+
   return (
     <div className="px-12 py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -229,6 +290,16 @@ export function Analitica() {
           <p className="mt-2 text-slate-600">
             Interacción de los visitantes con el robot en el evento.
           </p>
+          <button
+            onClick={descargarReporte}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            Descargar reporte PDF
+          </button>
         </div>
 
         {/* Filtros: una sola fila, arriba de las gráficas */}
@@ -329,6 +400,50 @@ export function Analitica() {
             granularidad={granularidad}
             series={[serieToques, serieJugar]}
           />
+        )}
+      </div>
+
+      {/* Distribución de respuestas por pregunta */}
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="font-semibold text-slate-900">Respuestas por pregunta</h3>
+        <p className="text-sm text-slate-500">
+          Qué eligieron los visitantes en cada pregunta del quiz.
+        </p>
+
+        {(distribucion?.length ?? 0) === 0 ? (
+          <p className="py-10 text-center text-slate-400">
+            No se registraron respuestas de quiz en este rango.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-6">
+            {distribucion!.map((preg) => (
+              <div key={preg.pregunta}>
+                <p className="font-medium text-slate-800">{preg.pregunta}</p>
+                <p className="mb-2 text-xs text-slate-400">{preg.total} respuestas</p>
+                <div className="space-y-2">
+                  {preg.respuestas.map((r) => {
+                    const pct = preg.total > 0 ? Math.round((r.conteo / preg.total) * 100) : 0
+                    return (
+                      <div key={r.texto}>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-700">{r.texto}</span>
+                          <span className="text-slate-500" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {r.conteo} · {pct}%
+                          </span>
+                        </div>
+                        <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${Math.max(2, pct)}%`, backgroundColor: COLOR_BARRA }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
