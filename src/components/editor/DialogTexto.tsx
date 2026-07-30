@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
 import { CampoColor } from '../CampoColor'
-import type { BotonEstilo, TextoEstilo } from '../../types/config'
+import type { BotonEstilo, DestinoBotonInicial, TextoEstilo } from '../../types/config'
 
 interface DialogTextoProps {
   titulo: string
@@ -47,47 +47,154 @@ export function DialogTexto({ titulo, valor, maxCaracteres, onGuardar, onCerrar 
 
 interface DialogBotonProps {
   valor: BotonEstilo
+  valorAgente: BotonEstilo
+  destino: DestinoBotonInicial
+  agenteActivo: boolean
   maxCaracteres: number
-  onGuardar: (nuevo: BotonEstilo) => void
+  onGuardar: (
+    nuevo: BotonEstilo,
+    destino: DestinoBotonInicial,
+    nuevoAgente: BotonEstilo,
+  ) => void
   onCerrar: () => void
 }
 
 /** Diálogo "Editar botón" del mockup (incluye color de contorno) */
-export function DialogBoton({ valor, maxCaracteres, onGuardar, onCerrar }: DialogBotonProps) {
+export function DialogBoton({
+  valor,
+  valorAgente,
+  destino: destinoInicial,
+  agenteActivo,
+  maxCaracteres,
+  onGuardar,
+  onCerrar,
+}: DialogBotonProps) {
   const [texto, setTexto] = useState(valor.texto)
   const [colorTexto, setColorTexto] = useState(valor.color_texto)
   const [colorFondo, setColorFondo] = useState(valor.color_fondo)
   const [colorContorno, setColorContorno] = useState(valor.color_contorno)
+  const [textoAgente, setTextoAgente] = useState(valorAgente.texto)
+  const [colorTextoAgente, setColorTextoAgente] = useState(valorAgente.color_texto)
+  const [colorFondoAgente, setColorFondoAgente] = useState(valorAgente.color_fondo)
+  const [colorContornoAgente, setColorContornoAgente] = useState(valorAgente.color_contorno)
+  const [destino, setDestino] = useState(destinoInicial)
 
   return (
     <Modal
-      titulo="Editar botón"
+      titulo="Editar botón principal"
       onCancelar={onCerrar}
       onAceptar={() => {
-        onGuardar({
-          texto,
-          color_texto: colorTexto,
-          color_fondo: colorFondo,
-          color_contorno: colorContorno,
-        })
+        onGuardar(
+          {
+            texto,
+            color_texto: colorTexto,
+            color_fondo: colorFondo,
+            color_contorno: colorContorno,
+          },
+          destino,
+          {
+            texto: textoAgente,
+            color_texto: colorTextoAgente,
+            color_fondo: colorFondoAgente,
+            color_contorno: colorContornoAgente,
+          },
+        )
         onCerrar()
       }}
     >
-      <p className="mb-2 font-medium text-slate-800">Texto del elemento</p>
-      <input
-        value={texto}
-        onChange={(e) => setTexto(e.target.value.slice(0, maxCaracteres))}
-        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-      />
-      <p className="mt-1 text-right text-sm text-slate-400">
-        {texto.length} / {maxCaracteres} caracteres
-      </p>
-
-      <div className="mt-4 grid grid-cols-2 gap-6">
-        <CampoColor label="Color de texto" value={colorTexto} onChange={setColorTexto} />
-        <CampoColor label="Color de fondo" value={colorFondo} onChange={setColorFondo} />
-        <CampoColor label="Color de contorno" value={colorContorno} onChange={setColorContorno} />
+      <p className="mb-2 font-medium text-slate-800">Al tocar el botón</p>
+      <div className="grid grid-cols-3 gap-2">
+        {(
+          [
+            ['quiz', 'Abrir Quiz'],
+            ['agente', 'Abrir Agente IA'],
+            ['ambos', 'Mostrar ambos'],
+          ] as const
+        ).map(([valorDestino, label]) => {
+          const requiereAgente = valorDestino !== 'quiz'
+          const deshabilitado = requiereAgente && !agenteActivo
+          return (
+            <label
+              key={valorDestino}
+              className={`rounded-xl border px-3 py-3 text-center text-sm font-semibold transition ${
+                destino === valorDestino
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 text-slate-600'
+              } ${deshabilitado ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:border-indigo-300'}`}
+            >
+              <input
+                type="radio"
+                name="destino_boton"
+                value={valorDestino}
+                checked={destino === valorDestino}
+                disabled={deshabilitado}
+                onChange={() => setDestino(valorDestino)}
+                className="sr-only"
+              />
+              {label}
+            </label>
+          )
+        })}
       </div>
+      {!agenteActivo && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Activa el Agente IA para poder seleccionarlo como destino.
+        </p>
+      )}
+
+      <div className="mt-5 rounded-xl border border-slate-200 p-4">
+        <p className="mb-3 font-semibold text-slate-800">
+          {destino === 'ambos' ? 'Botón del Quiz' : 'Botón principal'}
+        </p>
+        <input
+          value={texto}
+          onChange={(e) => setTexto(e.target.value.slice(0, maxCaracteres))}
+          className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+        />
+        <p className="mt-1 text-right text-sm text-slate-400">
+          {texto.length} / {maxCaracteres} caracteres
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <CampoColor label="Color de texto" value={colorTexto} onChange={setColorTexto} />
+          <CampoColor label="Color de fondo" value={colorFondo} onChange={setColorFondo} />
+          <CampoColor
+            label="Color de contorno"
+            value={colorContorno}
+            onChange={setColorContorno}
+          />
+        </div>
+      </div>
+
+      {destino === 'ambos' && (
+        <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+          <p className="mb-3 font-semibold text-slate-800">Botón del Agente IA</p>
+          <input
+            value={textoAgente}
+            onChange={(e) => setTextoAgente(e.target.value.slice(0, maxCaracteres))}
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+          />
+          <p className="mt-1 text-right text-sm text-slate-400">
+            {textoAgente.length} / {maxCaracteres} caracteres
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <CampoColor
+              label="Color de texto"
+              value={colorTextoAgente}
+              onChange={setColorTextoAgente}
+            />
+            <CampoColor
+              label="Color de fondo"
+              value={colorFondoAgente}
+              onChange={setColorFondoAgente}
+            />
+            <CampoColor
+              label="Color de contorno"
+              value={colorContornoAgente}
+              onChange={setColorContornoAgente}
+            />
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }

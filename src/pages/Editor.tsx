@@ -4,13 +4,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
 import { Modal } from '../components/Modal'
-import { COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
+import {
+  COLORES_OPCIONES_DEFAULT,
+  COLOR_TEXTO_OPCION_DEFAULT,
+  LIMITES,
+  normalizarConfigAgente,
+  type AgenteConfig,
+  type EventConfig,
+  type Pregunta,
+  type Project,
+} from '../types/config'
 import { DialogBoton, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
+import { AgentPanel, AgentPreview } from '../components/editor/AgentEditor'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 
-type Pestana = 'inicial' | 'ruleta'
+type Pestana = 'inicial' | 'ruleta' | 'agente'
 
 type Dialogo =
   | { tipo: 'titulo' }
@@ -99,6 +109,7 @@ export function Editor() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [pestana, setPestana] = useState<Pestana>('inicial')
+  const [vistaAgente, setVistaAgente] = useState('inicio')
   const [dialogo, setDialogo] = useState<Dialogo | null>(null)
   const [nombre, setNombre] = useState('')
   const [config, setConfig] = useState<EventConfig | null>(null)
@@ -146,6 +157,16 @@ export function Editor() {
       if ((cfg.pantalla_ruleta as any).tts_agradecimiento === undefined) {
         cfg.pantalla_ruleta.tts_agradecimiento = '¡Gracias por tu opinión!'
       }
+      if (!cfg.pantalla_inicial.destino_boton) {
+        cfg.pantalla_inicial.destino_boton = 'quiz'
+      }
+      if (!cfg.pantalla_inicial.boton_agente) {
+        cfg.pantalla_inicial.boton_agente = {
+          ...cfg.pantalla_inicial.boton,
+          texto: 'HABLAR CON TEMI',
+        }
+      }
+      cfg.agente_ia = normalizarConfigAgente(cfg.agente_ia)
       setConfig(cfg)
     }
   }, [proyecto])
@@ -225,12 +246,16 @@ export function Editor() {
 
   const ini = config.pantalla_inicial
   const rul = config.pantalla_ruleta
+  const agente = config.agente_ia
 
   function setInicial(cambios: Partial<EventConfig['pantalla_inicial']>) {
     setConfig((c) => c && { ...c, pantalla_inicial: { ...c.pantalla_inicial, ...cambios } })
   }
   function setRuleta(cambios: Partial<EventConfig['pantalla_ruleta']>) {
     setConfig((c) => c && { ...c, pantalla_ruleta: { ...c.pantalla_ruleta, ...cambios } })
+  }
+  function setAgente(agente_ia: AgenteConfig) {
+    setConfig((c) => c && { ...c, agente_ia })
   }
 
   function guardarPregunta(index: number | null, pregunta: Pregunta) {
@@ -246,6 +271,13 @@ export function Editor() {
 
   /** Valida y guarda; bloquea si "guiar al stand" no tiene secuencia (rompería el robot) */
   function intentarGuardar() {
+    if (!agente.activo && ini.destino_boton !== 'quiz') {
+      setPestana('inicial')
+      setErrorGuardar(
+        'El botón principal intenta abrir el Agente IA, pero el agente está desactivado.',
+      )
+      return
+    }
     if (rul.despues_quiz.modo === 'guiar_al_stand' && !rul.despues_quiz.secuencia_guia.trim()) {
       setPestana('ruleta')
       setErrorGuardar('Falta el nombre de la secuencia de Temi para "Guiar al stand". Escríbelo antes de guardar.')
@@ -274,7 +306,7 @@ export function Editor() {
           <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
         </div>
         <div className="flex">
-          {(['inicial', 'ruleta'] as Pestana[]).map((p) => (
+          {(['inicial', 'ruleta', 'agente'] as Pestana[]).map((p) => (
             <button
               key={p}
               onClick={() => setPestana(p)}
@@ -284,7 +316,7 @@ export function Editor() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {p === 'inicial' ? 'Pantalla inicial' : 'Pantalla Ruleta'}
+              {p === 'inicial' ? 'Pantalla inicial' : p === 'ruleta' ? 'Pantalla Ruleta' : 'Agente IA'}
             </button>
           ))}
         </div>
@@ -348,22 +380,37 @@ export function Editor() {
                   </div>
                 </div>
 
-                <div className="mt-10 flex items-center gap-2">
-                  <span
-                    className="rounded-full px-12 py-4 text-xl font-bold"
-                    style={{
-                      color: ini.boton.color_texto || '#ffffff',
-                      backgroundColor: ini.boton.color_fondo || '#031046',
-                      border: `4px solid ${ini.boton.color_contorno || '#FFD700'}`,
-                    }}
-                  >
-                    {ini.boton.texto || 'JUGAR AHORA'}
-                  </span>
+                <div className="mt-10 flex items-center gap-3">
+                  {(ini.destino_boton === 'ambos'
+                    ? [
+                        { boton: ini.boton, textoDefault: 'JUGAR AHORA' },
+                        { boton: ini.boton_agente, textoDefault: 'HABLAR CON TEMI' },
+                      ]
+                    : [
+                        {
+                          boton: ini.boton,
+                          textoDefault:
+                            ini.destino_boton === 'agente' ? 'HABLAR CON TEMI' : 'JUGAR AHORA',
+                        },
+                      ]
+                  ).map(({ boton, textoDefault }, index) => (
+                    <span
+                      key={index}
+                      className="rounded-full px-10 py-4 text-lg font-bold"
+                      style={{
+                        color: boton.color_texto || '#ffffff',
+                        backgroundColor: boton.color_fondo || '#031046',
+                        border: `4px solid ${boton.color_contorno || '#FFD700'}`,
+                      }}
+                    >
+                      {boton.texto || textoDefault}
+                    </span>
+                  ))}
                   <Lapiz title="Editar botón" onClick={() => setDialogo({ tipo: 'boton' })} />
                 </div>
               </div>
             </div>
-          ) : (
+          ) : pestana === 'ruleta' ? (
             <div
               className="relative aspect-[16/10] w-full max-w-3xl overflow-hidden rounded-xl shadow-lg"
               style={estiloFondo(rul.fondo_url)}
@@ -430,12 +477,31 @@ export function Editor() {
                 })()}
               </div>
             </div>
+          ) : (
+            <AgentPreview
+              agente={agente}
+              vistaId={vistaAgente}
+              onVistaChange={setVistaAgente}
+            />
           )}
         </div>
 
         {/* ─── Panel derecho ─── */}
-        <aside className="flex w-96 flex-col border-l border-slate-200 bg-white">
+        <aside
+          className={`flex flex-col border-l border-slate-200 bg-white ${
+            pestana === 'agente' ? 'w-[430px]' : 'w-96'
+          }`}
+        >
           <div className="flex-1 overflow-y-auto p-6">
+            {pestana === 'agente' ? (
+              <AgentPanel
+                agente={agente}
+                vistaId={vistaAgente}
+                onVistaChange={setVistaAgente}
+                onChange={setAgente}
+              />
+            ) : (
+              <>
             <h3 className="flex items-center gap-3 text-xl font-bold text-slate-900">
               <IconoOnda /> Configuración de voces (TTS)
             </h3>
@@ -552,6 +618,8 @@ export function Editor() {
                 )}
               </div>
             )}
+              </>
+            )}
           </div>
 
           <div className="border-t border-slate-200 p-6">
@@ -644,8 +712,13 @@ export function Editor() {
       {dialogo?.tipo === 'boton' && (
         <DialogBoton
           valor={ini.boton}
+          valorAgente={ini.boton_agente}
+          destino={ini.destino_boton}
+          agenteActivo={agente.activo}
           maxCaracteres={LIMITES.BOTON_MAX}
-          onGuardar={(boton) => setInicial({ boton })}
+          onGuardar={(boton, destino_boton, boton_agente) =>
+            setInicial({ boton, destino_boton, boton_agente })
+          }
           onCerrar={() => setDialogo(null)}
         />
       )}

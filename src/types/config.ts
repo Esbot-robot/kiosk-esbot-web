@@ -15,6 +15,8 @@ export interface BotonEstilo extends TextoEstilo {
   color_contorno: string
 }
 
+export type DestinoBotonInicial = 'quiz' | 'agente' | 'ambos'
+
 export interface Pregunta {
   texto: string
   /** mínimo 2, máximo 3 (limitación de layout en el robot) */
@@ -32,6 +34,8 @@ export interface PantallaInicial {
   titulo: TextoEstilo
   subtitulo: TextoEstilo
   boton: BotonEstilo
+  destino_boton: DestinoBotonInicial
+  boton_agente: BotonEstilo
   tts_toca_pantalla: string
   tts_llega_stand: string
   tts_despedida_stand: string
@@ -76,12 +80,93 @@ export interface Tiempos {
   countdown_stand_seg: number
 }
 
+export type TipoRespuestaAgente = 'texto' | 'opciones' | 'tarjetas'
+export type ModoEscuchaAgente = 'automatico' | 'por_boton' | 'finalizar'
+export type AccionIntentosAgotados = 'volver_inicio' | 'finalizar' | 'permanecer'
+
+export interface OpcionAgente {
+  id: string
+  texto: string
+  accion: 'mostrar_respuesta' | 'ir_ubicacion' | 'iniciar_recorrido' | 'respuesta_libre'
+  destino: string
+  /** Texto mostrado a pantalla completa mientras Temi se desplaza. */
+  texto_movimiento: string
+  /** Respuesta configurada que se abre al llegar; vacio = permanecer en destino. */
+  respuesta_al_llegar: string
+}
+
+export interface TarjetaAgente {
+  id: string
+  titulo: string
+  subtitulo: string
+  etiqueta: string
+  precio: string
+}
+
+export interface RespuestaAgente {
+  id: string
+  nombre: string
+  tipo: TipoRespuestaAgente
+  mensaje: string
+  modo_escucha: ModoEscuchaAgente
+  texto_boton_escucha: string
+  opciones: OpcionAgente[]
+  tarjetas: TarjetaAgente[]
+}
+
+export interface AparienciaAgente {
+  color_texto_inicio: string
+  color_texto_fin: string
+  color_contorno_inicio: string
+  color_contorno_fin: string
+}
+
+export interface ParadaRecorridoAgente {
+  id: string
+  ubicacion: string
+  texto_movimiento: string
+  mensaje_llegada: string
+}
+
+export interface RecorridoAgente {
+  id: string
+  nombre: string
+  paradas: ParadaRecorridoAgente[]
+  /** Respuesta mostrada despues de la ultima parada; vacio = finalizar en la referencia. */
+  respuesta_final_id: string
+}
+
+export interface ReintentosAgente {
+  tiempo_respuesta_seg: number
+  max_reintentos: number
+  mensaje_sin_respuesta: string
+  mensaje_no_entendido: string
+  mensaje_intentos_agotados: string
+  accion_al_agotar: AccionIntentosAgotados
+}
+
+export interface AgenteConfig {
+  activo: boolean
+  prompt: string
+  mensaje_inicial: string
+  texto_escucha: string
+  modo_escucha_inicial: ModoEscuchaAgente
+  texto_boton_escucha_inicial: string
+  opciones_iniciales: OpcionAgente[]
+  respuestas: RespuestaAgente[]
+  recorridos: RecorridoAgente[]
+  reintentos: ReintentosAgente
+  apariencia: AparienciaAgente
+}
+
 export interface EventConfig {
   /** se incrementa en cada guardado; la app recarga cuando cambia */
   version: number
   empresa: string
   pantalla_inicial: PantallaInicial
   pantalla_ruleta: PantallaRuleta
+  /** Configuracion del asistente; la app antigua ignora este campo adicional. */
+  agente_ia: AgenteConfig
   tiempos: Tiempos
 }
 
@@ -99,6 +184,99 @@ export const LIMITES = {
 } as const
 
 /** Config vacía para crear un proyecto nuevo */
+/** Configuracion inicial del asistente basada en las pantallas de referencia. */
+export function configAgenteVacia(): AgenteConfig {
+  return {
+    activo: true,
+    prompt:
+      'Eres el asistente de la empresa. Responde de forma clara, breve y amable usando solamente la informacion suministrada.',
+    mensaje_inicial: 'Hola, soy tu asistente, ¿que quieres saber?',
+    texto_escucha: 'Puedes hablar....',
+    modo_escucha_inicial: 'automatico',
+    texto_boton_escucha_inicial: 'Preguntar otra cosa',
+    opciones_iniciales: [],
+    respuestas: [],
+    recorridos: [],
+    reintentos: {
+      tiempo_respuesta_seg: 10,
+      max_reintentos: 2,
+      mensaje_sin_respuesta: 'No te escuché. Intentemos de nuevo.',
+      mensaje_no_entendido: 'No te entendí bien. Intentemos de nuevo.',
+      mensaje_intentos_agotados: 'No pude obtener una respuesta. Volvamos al inicio.',
+      accion_al_agotar: 'volver_inicio',
+    },
+    apariencia: {
+      color_texto_inicio: '#160B15',
+      color_texto_fin: '#E95DC3',
+      color_contorno_inicio: '#111111',
+      color_contorno_fin: '#FF5ED2',
+    },
+  }
+}
+
+/** Completa configuraciones antiguas o parciales sin sobrescribir sus valores. */
+export function normalizarConfigAgente(valor?: Partial<AgenteConfig>): AgenteConfig {
+  const base = configAgenteVacia()
+  const idsRespuestasDemo = new Set(['planes', 'planes-internet', 'cobertura'])
+  const idsOpcionesDemo = new Set([
+    'inicio-planes',
+    'inicio-cobertura',
+    'inicio-stand',
+    'planes-internet',
+    'planes-television',
+    'planes-stand',
+  ])
+  const normalizarOpcion = (opcion: OpcionAgente): OpcionAgente => ({
+    ...opcion,
+    destino:
+      opcion.accion === 'mostrar_respuesta' && idsRespuestasDemo.has(opcion.destino)
+        ? ''
+        : opcion.destino,
+    texto_movimiento: opcion.texto_movimiento ?? '',
+    respuesta_al_llegar: opcion.respuesta_al_llegar ?? '',
+  })
+  const normalizarRespuesta = (respuesta: RespuestaAgente): RespuestaAgente => {
+    const anterior = respuesta as RespuestaAgente & { continuar_escuchando?: boolean }
+    const { continuar_escuchando, ...sinCampoAnterior } = anterior
+    return {
+      ...sinCampoAnterior,
+      modo_escucha:
+        respuesta.modo_escucha ??
+        (continuar_escuchando === false ? 'finalizar' : 'automatico'),
+      texto_boton_escucha: respuesta.texto_boton_escucha ?? 'Preguntar otra cosa',
+      opciones: (respuesta.opciones ?? [])
+        .filter((opcion) => !idsOpcionesDemo.has(opcion.id))
+        .map(normalizarOpcion),
+    }
+  }
+  return {
+    ...base,
+    ...valor,
+    modo_escucha_inicial: valor?.modo_escucha_inicial ?? base.modo_escucha_inicial,
+    texto_boton_escucha_inicial:
+      valor?.texto_boton_escucha_inicial ?? base.texto_boton_escucha_inicial,
+    opciones_iniciales: (valor?.opciones_iniciales ?? base.opciones_iniciales)
+      .filter((opcion) => !idsOpcionesDemo.has(opcion.id))
+      .map(normalizarOpcion),
+    respuestas: (valor?.respuestas ?? base.respuestas)
+      .filter((respuesta) => !idsRespuestasDemo.has(respuesta.id))
+      .map(normalizarRespuesta),
+    recorridos: (valor?.recorridos ?? base.recorridos).map((recorrido) => ({
+      ...recorrido,
+      respuesta_final_id: recorrido.respuesta_final_id ?? '',
+      paradas: recorrido.paradas ?? [],
+    })),
+    reintentos: {
+      ...base.reintentos,
+      ...valor?.reintentos,
+    },
+    apariencia: {
+      ...base.apariencia,
+      ...valor?.apariencia,
+    },
+  }
+}
+
 export function configVacia(): EventConfig {
   return {
     version: 1,
@@ -109,6 +287,13 @@ export function configVacia(): EventConfig {
       titulo: { texto: '', color_texto: '', color_fondo: '' },
       subtitulo: { texto: '', color_texto: '', color_fondo: '' },
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '' },
+      destino_boton: 'quiz',
+      boton_agente: {
+        texto: 'HABLAR CON TEMI',
+        color_texto: '',
+        color_fondo: '',
+        color_contorno: '',
+      },
       tts_toca_pantalla: '',
       tts_llega_stand: '',
       tts_despedida_stand: '',
@@ -127,6 +312,7 @@ export function configVacia(): EventConfig {
       colores_texto_opciones: ['', '', ''],
       preguntas: [],
     },
+    agente_ia: configAgenteVacia(),
     tiempos: {
       countdown_pausa_seg: 20,
       countdown_stand_seg: 20,

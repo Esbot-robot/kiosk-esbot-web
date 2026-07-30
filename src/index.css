@@ -3,3 +3,89 @@
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
+
+.agent-gradient-text {
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.agent-orb {
+  position: relative;
+  width: clamp(74px, 9vw, 126px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgb(34 43 61 / 70%);
+  background:
+    radial-gradient(circle at 68% 63%, rgb(255 255 255 / 95%) 0 8%, transparent 9%),
+    radial-gradient(circle at 76% 72%, rgb(255 255 255 / 80%) 0 4%, transparent 5%),
+    radial-gradient(circle at 35% 22%, rgb(255 255 255 / 58%) 0 10%, transparent 11%),
+    radial-gradient(circle at 44% 39%, #ff8cda 0 20%, #ec5fc5 33%, #a7e7ff 70%, #20afd2 100%);
+  box-shadow:
+    inset 9px 7px 12px rgb(255 255 255 / 48%),
+    inset -8px -7px 13px rgb(9 78 120 / 38%),
+    0 7px 12px rgb(15 23 42 / 22%);
+  animation: agent-float 3.8s ease-in-out infinite;
+}
+
+.agent-orb::after {
+  content: '';
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  border-top: 3px solid rgb(255 255 255 / 55%);
+  transform: rotate(-25deg);
+}
+
+.agent-orb-shadow {
+  width: clamp(56px, 7vw, 98px);
+  height: 12px;
+  margin-top: clamp(24px, 3vw, 42px);
+  border-radius: 50%;
+  background: rgb(109 99 255 / 28%);
+  filter: blur(9px);
+  animation: agent-shadow 3.8s ease-in-out infinite;
+}
+
+.agent-preview-button {
+  min-height: clamp(42px, 5vw, 68px);
+  font-size: clamp(14px, 1.75vw, 25px);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 4%);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.agent-preview-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 22px rgb(15 23 42 / 10%);
+}
+
+@keyframes agent-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes agent-shadow {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-orb,
+  .agent-orb-shadow {
+    animation: none;
+  }
+}
