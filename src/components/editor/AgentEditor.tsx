@@ -272,13 +272,17 @@ function ColorField({
 function SelectorModoEscucha({
   valor,
   textoBoton,
+  mensajeDespedida,
   onChange,
   onTextoBotonChange,
+  onMensajeDespedidaChange,
 }: {
   valor: ModoEscuchaAgente
   textoBoton: string
+  mensajeDespedida: string
   onChange: (valor: ModoEscuchaAgente) => void
   onTextoBotonChange: (valor: string) => void
+  onMensajeDespedidaChange: (valor: string) => void
 }) {
   const opciones: {
     valor: ModoEscuchaAgente
@@ -298,7 +302,7 @@ function SelectorModoEscucha({
     {
       valor: 'finalizar',
       titulo: 'Finalizar conversación',
-      detalle: 'No vuelve a activar el micrófono.',
+      detalle: 'Dice una despedida, cierra el agente y reanuda la ruta con video.',
     },
   ]
 
@@ -347,6 +351,25 @@ function SelectorModoEscucha({
             className={inputClass}
             placeholder="Preguntar otra cosa"
           />
+        </label>
+      )}
+
+      {valor === 'finalizar' && (
+        <label className="mt-3 block rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+          <span className="mb-1 block text-xs font-semibold text-slate-600">
+            Mensaje de despedida (solo voz)
+          </span>
+          <textarea
+            value={mensajeDespedida}
+            onChange={(event) => onMensajeDespedidaChange(event.target.value)}
+            rows={2}
+            className={`${inputClass} resize-none`}
+            placeholder="Gracias por visitarnos."
+          />
+          <span className="mt-2 block text-xs leading-relaxed text-slate-500">
+            Después de decir el mensaje en pantalla, Temi esperará 5 segundos, dirá esta despedida
+            solo por voz y luego reanudará la ruta con video.
+          </span>
         </label>
       )}
     </div>
@@ -460,6 +483,10 @@ function EditorOpcion({
                 className={`${inputClass} resize-none`}
                 placeholder="Ej. Acompañame, vamos hacia la recepcion"
               />
+              <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                Se muestra durante el trayecto y Temi lo dice una sola vez al iniciar el
+                desplazamiento.
+              </span>
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-semibold text-slate-600">
@@ -624,6 +651,9 @@ function EditorParada({
             className={`${inputClass} resize-none`}
             placeholder="Ej. Vamos a conocer la zona de productos"
           />
+          <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+            Se muestra durante el trayecto y Temi lo dice una sola vez al iniciar esta parada.
+          </span>
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-slate-600">
@@ -704,6 +734,7 @@ export function AgentPanel({
           mensaje: 'Escribe aqui la respuesta del agente',
           modo_escucha: 'automatico',
           texto_boton_escucha: 'Preguntar otra cosa',
+          mensaje_despedida: '',
           opciones: [],
           tarjetas: [],
         },
@@ -745,6 +776,7 @@ export function AgentPanel({
         },
       ],
       respuesta_final_id: '',
+      mensaje_reanudacion: 'Gracias por acompañarme. Continuemos nuestro recorrido.',
     }
     onChange({ ...agente, recorridos: [...agente.recorridos, nuevo] })
     setRecorridoId(id)
@@ -906,6 +938,9 @@ export function AgentPanel({
                       rows={3}
                       className={`${inputClass} resize-none`}
                     />
+                    <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                      Temi lo dice una sola vez al iniciar esta parada.
+                    </span>
                   </label>
                   <button
                     type="button"
@@ -932,11 +967,15 @@ export function AgentPanel({
               <SelectorModoEscucha
                 valor={agente.modo_escucha_inicial}
                 textoBoton={agente.texto_boton_escucha_inicial}
+                mensajeDespedida={agente.mensaje_despedida_inicial}
                 onChange={(modo_escucha_inicial) =>
                   onChange({ ...agente, modo_escucha_inicial })
                 }
                 onTextoBotonChange={(texto_boton_escucha_inicial) =>
                   onChange({ ...agente, texto_boton_escucha_inicial })
+                }
+                onMensajeDespedidaChange={(mensaje_despedida_inicial) =>
+                  onChange({ ...agente, mensaje_despedida_inicial })
                 }
               />
 
@@ -1033,9 +1072,13 @@ export function AgentPanel({
               <SelectorModoEscucha
                 valor={respuesta.modo_escucha}
                 textoBoton={respuesta.texto_boton_escucha}
+                mensajeDespedida={respuesta.mensaje_despedida}
                 onChange={(modo_escucha) => actualizarRespuesta({ modo_escucha })}
                 onTextoBotonChange={(texto_boton_escucha) =>
                   actualizarRespuesta({ texto_boton_escucha })
+                }
+                onMensajeDespedidaChange={(mensaje_despedida) =>
+                  actualizarRespuesta({ mensaje_despedida })
                 }
               />
 
@@ -1290,18 +1333,35 @@ export function AgentPanel({
                   }
                   className={inputClass}
                 >
-                  <option value="">Finalizar en la última referencia</option>
+                  <option value="">Reanudar patrullaje</option>
                   {agente.respuestas.map((item) => (
                     <option key={item.id} value={item.id}>
                       Mostrar: {item.nombre}
                     </option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs leading-relaxed text-slate-500">
-                  Si eliges una respuesta, esa pantalla decidirá si Temi vuelve a escuchar o
-                  finaliza la conversación.
-                </span>
               </label>
+
+              {recorrido.respuesta_final_id === '' && (
+                <label className="block rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">
+                    Mensaje antes de reanudar el patrullaje
+                  </span>
+                  <textarea
+                    value={recorrido.mensaje_reanudacion}
+                    onChange={(event) =>
+                      actualizarRecorrido({ mensaje_reanudacion: event.target.value })
+                    }
+                    rows={2}
+                    className={`${inputClass} resize-none`}
+                    placeholder="Gracias por acompañarme. Continuemos nuestro recorrido."
+                  />
+                  <span className="mt-2 block text-xs leading-relaxed text-slate-500">
+                    Temi mostrará y dirá únicamente este mensaje, sin activar la escucha. Después
+                    volverá a la pantalla inicial general y reanudará la ruta con video.
+                  </span>
+                </label>
+              )}
 
               <button
                 type="button"
@@ -1553,16 +1613,17 @@ export function AgentPanel({
                   }
                   className={inputClass}
                 >
-                  <option value="volver_inicio">Volver a la pantalla inicial</option>
-                  <option value="permanecer">Permanecer en la pantalla actual</option>
-                  <option value="finalizar">Finalizar la conversación</option>
+                  <option value="volver_inicio">Volver al inicio del agente</option>
+                  <option value="finalizar">Finalizar conversación y reanudar ruta</option>
                 </select>
               </label>
             </div>
 
             <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
               Los reintentos aplican únicamente a pantallas que esperan una respuesta del usuario.
-              Durante los recorridos, Temi pronuncia cada referencia y continúa automáticamente.
+              Finalizar cierra el agente, regresa a la pantalla inicial general y reanuda la ruta con
+              video. Durante los recorridos, Temi pronuncia cada referencia y continúa
+              automáticamente.
             </p>
           </section>
         </div>

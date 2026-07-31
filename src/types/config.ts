@@ -82,7 +82,7 @@ export interface Tiempos {
 
 export type TipoRespuestaAgente = 'texto' | 'opciones' | 'tarjetas'
 export type ModoEscuchaAgente = 'automatico' | 'por_boton' | 'finalizar'
-export type AccionIntentosAgotados = 'volver_inicio' | 'finalizar' | 'permanecer'
+export type AccionIntentosAgotados = 'volver_inicio' | 'finalizar'
 
 export interface OpcionAgente {
   id: string
@@ -110,6 +110,7 @@ export interface RespuestaAgente {
   mensaje: string
   modo_escucha: ModoEscuchaAgente
   texto_boton_escucha: string
+  mensaje_despedida: string
   opciones: OpcionAgente[]
   tarjetas: TarjetaAgente[]
 }
@@ -132,8 +133,9 @@ export interface RecorridoAgente {
   id: string
   nombre: string
   paradas: ParadaRecorridoAgente[]
-  /** Respuesta mostrada despues de la ultima parada; vacio = finalizar en la referencia. */
+  /** Respuesta mostrada despues de la ultima parada; vacio = reanudar la ruta base. */
   respuesta_final_id: string
+  mensaje_reanudacion: string
 }
 
 export interface ReintentosAgente {
@@ -152,6 +154,7 @@ export interface AgenteConfig {
   texto_escucha: string
   modo_escucha_inicial: ModoEscuchaAgente
   texto_boton_escucha_inicial: string
+  mensaje_despedida_inicial: string
   opciones_iniciales: OpcionAgente[]
   respuestas: RespuestaAgente[]
   recorridos: RecorridoAgente[]
@@ -194,6 +197,7 @@ export function configAgenteVacia(): AgenteConfig {
     texto_escucha: 'Puedes hablar....',
     modo_escucha_inicial: 'automatico',
     texto_boton_escucha_inicial: 'Preguntar otra cosa',
+    mensaje_despedida_inicial: '',
     opciones_iniciales: [],
     respuestas: [],
     recorridos: [],
@@ -244,6 +248,7 @@ export function normalizarConfigAgente(valor?: Partial<AgenteConfig>): AgenteCon
         respuesta.modo_escucha ??
         (continuar_escuchando === false ? 'finalizar' : 'automatico'),
       texto_boton_escucha: respuesta.texto_boton_escucha ?? 'Preguntar otra cosa',
+      mensaje_despedida: respuesta.mensaje_despedida ?? '',
       opciones: (respuesta.opciones ?? [])
         .filter((opcion) => !idsOpcionesDemo.has(opcion.id))
         .map(normalizarOpcion),
@@ -255,6 +260,8 @@ export function normalizarConfigAgente(valor?: Partial<AgenteConfig>): AgenteCon
     modo_escucha_inicial: valor?.modo_escucha_inicial ?? base.modo_escucha_inicial,
     texto_boton_escucha_inicial:
       valor?.texto_boton_escucha_inicial ?? base.texto_boton_escucha_inicial,
+    mensaje_despedida_inicial:
+      valor?.mensaje_despedida_inicial ?? base.mensaje_despedida_inicial,
     opciones_iniciales: (valor?.opciones_iniciales ?? base.opciones_iniciales)
       .filter((opcion) => !idsOpcionesDemo.has(opcion.id))
       .map(normalizarOpcion),
@@ -264,11 +271,18 @@ export function normalizarConfigAgente(valor?: Partial<AgenteConfig>): AgenteCon
     recorridos: (valor?.recorridos ?? base.recorridos).map((recorrido) => ({
       ...recorrido,
       respuesta_final_id: recorrido.respuesta_final_id ?? '',
+      mensaje_reanudacion:
+        recorrido.mensaje_reanudacion ??
+        'Gracias por acompañarme. Continuemos nuestro recorrido.',
       paradas: recorrido.paradas ?? [],
     })),
     reintentos: {
       ...base.reintentos,
       ...valor?.reintentos,
+      accion_al_agotar:
+        valor?.reintentos?.accion_al_agotar === 'finalizar'
+          ? 'finalizar'
+          : 'volver_inicio',
     },
     apariencia: {
       ...base.apariencia,
