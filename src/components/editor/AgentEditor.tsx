@@ -15,6 +15,9 @@ type SeccionAgente = 'contenido' | 'recorridos' | 'apariencia' | 'comportamiento
 interface AgentEditorProps {
   agente: AgenteConfig
   vistaId: string
+  esPantallaInicialApp?: boolean
+  videoPatrullajeUrl?: string
+  onEditarVideoPatrullaje?: () => void
   onVistaChange: (vistaId: string) => void
   onChange: (agente: AgenteConfig) => void
 }
@@ -273,6 +276,7 @@ function SelectorModoEscucha({
   valor,
   textoBoton,
   mensajeDespedida,
+  automaticoDeshabilitado = false,
   onChange,
   onTextoBotonChange,
   onMensajeDespedidaChange,
@@ -280,6 +284,7 @@ function SelectorModoEscucha({
   valor: ModoEscuchaAgente
   textoBoton: string
   mensajeDespedida: string
+  automaticoDeshabilitado?: boolean
   onChange: (valor: ModoEscuchaAgente) => void
   onTextoBotonChange: (valor: string) => void
   onMensajeDespedidaChange: (valor: string) => void
@@ -312,32 +317,41 @@ function SelectorModoEscucha({
         Después de que Temi termine de hablar
       </p>
       <div className="space-y-2">
-        {opciones.map((opcion) => (
-          <label
-            key={opcion.valor}
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition ${
-              valor === opcion.valor
-                ? 'border-indigo-400 bg-indigo-50'
-                : 'border-slate-200 bg-white hover:border-indigo-200'
-            }`}
-          >
-            <input
-              type="radio"
-              name="modo_escucha"
-              checked={valor === opcion.valor}
-              onChange={() => onChange(opcion.valor)}
-              className="mt-1 accent-indigo-600"
-            />
-            <span>
-              <span className="block text-sm font-semibold text-slate-800">
-                {opcion.titulo}
+        {opciones.map((opcion) => {
+          const deshabilitada = opcion.valor === 'automatico' && automaticoDeshabilitado
+          const detalle = deshabilitada
+            ? 'No disponible en la pantalla inicial de la aplicación.'
+            : opcion.detalle
+          return (
+            <label
+              key={opcion.valor}
+              className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition ${
+                deshabilitada ? 'cursor-not-allowed bg-slate-50 opacity-60' : 'cursor-pointer'
+              } ${
+                valor === opcion.valor
+                  ? 'border-indigo-400 bg-indigo-50'
+                  : 'border-slate-200 bg-white hover:border-indigo-200'
+              }`}
+            >
+              <input
+                type="radio"
+                name="modo_escucha"
+                disabled={deshabilitada}
+                checked={valor === opcion.valor}
+                onChange={() => onChange(opcion.valor)}
+                className="mt-1 accent-indigo-600"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">
+                  {opcion.titulo}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                  {detalle}
+                </span>
               </span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
-                {opcion.detalle}
-              </span>
-            </span>
-          </label>
-        ))}
+            </label>
+          )
+        })}
       </div>
 
       {valor === 'por_boton' && (
@@ -684,6 +698,9 @@ function EditorParada({
 export function AgentPanel({
   agente,
   vistaId,
+  esPantallaInicialApp = false,
+  videoPatrullajeUrl,
+  onEditarVideoPatrullaje,
   onVistaChange,
   onChange,
 }: AgentEditorProps) {
@@ -954,6 +971,28 @@ export function AgentPanel({
             </div>
           ) : esInicio ? (
             <div className="space-y-4">
+              {esPantallaInicialApp && onEditarVideoPatrullaje && (
+                <button
+                  type="button"
+                  onClick={onEditarVideoPatrullaje}
+                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                      <path d="M8 5.5v13l10-6.5-10-6.5Z" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-800">
+                      Video para patrullaje
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">
+                      {videoPatrullajeUrl ? 'Video cargado' : 'Vacío'}
+                    </span>
+                  </span>
+                </button>
+              )}
+
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-slate-700">Mensaje inicial</span>
                 <textarea
@@ -968,6 +1007,7 @@ export function AgentPanel({
                 valor={agente.modo_escucha_inicial}
                 textoBoton={agente.texto_boton_escucha_inicial}
                 mensajeDespedida={agente.mensaje_despedida_inicial}
+                automaticoDeshabilitado={esPantallaInicialApp}
                 onChange={(modo_escucha_inicial) =>
                   onChange({ ...agente, modo_escucha_inicial })
                 }

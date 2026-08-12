@@ -116,6 +116,7 @@ export function Editor() {
   const [guardadoOk, setGuardadoOk] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState('')
   const [confirmarBorrar, setConfirmarBorrar] = useState(false)
+  const [mostrarPantallaPausa, setMostrarPantallaPausa] = useState(false)
 
   const { data: proyecto, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -160,6 +161,9 @@ export function Editor() {
       if (!cfg.pantalla_inicial.destino_boton) {
         cfg.pantalla_inicial.destino_boton = 'quiz'
       }
+      if (!cfg.pantalla_inicial.pantalla_al_pausar) {
+        cfg.pantalla_inicial.pantalla_al_pausar = 'inicial'
+      }
       if (!cfg.pantalla_inicial.boton_agente) {
         cfg.pantalla_inicial.boton_agente = {
           ...cfg.pantalla_inicial.boton,
@@ -167,6 +171,12 @@ export function Editor() {
         }
       }
       cfg.agente_ia = normalizarConfigAgente(cfg.agente_ia)
+      if (
+        cfg.pantalla_inicial.pantalla_al_pausar === 'agente' &&
+        cfg.agente_ia.modo_escucha_inicial === 'automatico'
+      ) {
+        cfg.agente_ia.modo_escucha_inicial = 'por_boton'
+      }
       setConfig(cfg)
     }
   }, [proyecto])
@@ -255,7 +265,33 @@ export function Editor() {
     setConfig((c) => c && { ...c, pantalla_ruleta: { ...c.pantalla_ruleta, ...cambios } })
   }
   function setAgente(agente_ia: AgenteConfig) {
-    setConfig((c) => c && { ...c, agente_ia })
+    setConfig((c) => {
+      if (!c) return c
+      return {
+        ...c,
+        agente_ia,
+        pantalla_inicial:
+          !agente_ia.activo && c.pantalla_inicial.pantalla_al_pausar === 'agente'
+            ? { ...c.pantalla_inicial, pantalla_al_pausar: 'inicial' }
+            : c.pantalla_inicial,
+      }
+    })
+  }
+
+  function seleccionarPantallaPausa(valor: EventConfig['pantalla_inicial']['pantalla_al_pausar']) {
+    setConfig((c) => {
+      if (!c || (valor === 'agente' && !c.agente_ia.activo)) return c
+      return {
+        ...c,
+        pantalla_inicial: { ...c.pantalla_inicial, pantalla_al_pausar: valor },
+        agente_ia:
+          valor === 'agente' && c.agente_ia.modo_escucha_inicial === 'automatico'
+            ? { ...c.agente_ia, modo_escucha_inicial: 'por_boton' }
+            : c.agente_ia,
+      }
+    })
+    setErrorGuardar('')
+    setMostrarPantallaPausa(false)
   }
 
   function guardarPregunta(index: number | null, pregunta: Pregunta) {
@@ -271,6 +307,13 @@ export function Editor() {
 
   /** Valida y guarda; bloquea si "guiar al stand" no tiene secuencia (rompería el robot) */
   function intentarGuardar() {
+    if (ini.pantalla_al_pausar === 'agente' && !agente.activo) {
+      setPestana('agente')
+      setErrorGuardar(
+        'La pantalla al pausar intenta abrir el Agente IA, pero el agente estÃ¡ desactivado.',
+      )
+      return
+    }
     if (!agente.activo && ini.destino_boton !== 'quiz') {
       setPestana('inicial')
       setErrorGuardar(
@@ -278,7 +321,11 @@ export function Editor() {
       )
       return
     }
-    if (rul.despues_quiz.modo === 'guiar_al_stand' && !rul.despues_quiz.secuencia_guia.trim()) {
+    if (
+      ini.pantalla_al_pausar !== 'agente' &&
+      rul.despues_quiz.modo === 'guiar_al_stand' &&
+      !rul.despues_quiz.secuencia_guia.trim()
+    ) {
       setPestana('ruleta')
       setErrorGuardar('Falta el nombre de la secuencia de Temi para "Guiar al stand". Escríbelo antes de guardar.')
       return
@@ -306,17 +353,95 @@ export function Editor() {
           <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
         </div>
         <div className="flex">
-          {(['inicial', 'ruleta', 'agente'] as Pestana[]).map((p) => (
+          <div
+            className={`relative flex items-center border-b-2 transition-colors ${
+              pestana === 'inicial'
+                ? 'border-indigo-600 bg-slate-50 text-indigo-600'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setMostrarPantallaPausa((visible) => !visible)}
+              className="ml-5 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Configurar pantalla al pausar el video"
+              title="Pantalla al pausar el video"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none" aria-hidden="true">
+                <path
+                  d="M9.6 3.2 10 5a7.5 7.5 0 0 1 4 0l.4-1.8 2.2.9-.8 1.7a7.6 7.6 0 0 1 2.8 2.8l1.7-.8.9 2.2-1.8.4a7.5 7.5 0 0 1 0 4l1.8.4-.9 2.2-1.7-.8a7.6 7.6 0 0 1-2.8 2.8l.8 1.7-2.2.9L14 19a7.5 7.5 0 0 1-4 0l-.4 1.8-2.2-.9.8-1.7a7.6 7.6 0 0 1-2.8-2.8l-1.7.8-.9-2.2 1.8-.4a7.5 7.5 0 0 1 0-4L2.8 10l.9-2.2 1.7.8a7.6 7.6 0 0 1 2.8-2.8l-.8-1.7 2.2-.9Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <circle cx="12" cy="12" r="2.7" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPestana('inicial')
+                setMostrarPantallaPausa(false)
+              }}
+              className="py-5 pl-2 pr-8 font-medium"
+            >
+              Pantalla inicial
+            </button>
+
+            {mostrarPantallaPausa && (
+              <div className="absolute left-3 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-800 shadow-xl">
+                <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Pantalla al pausar el video
+                </p>
+                {(
+                  [
+                    ['inicial', 'Pantalla inicial general'],
+                    ['agente', 'Agente IA'],
+                  ] as const
+                ).map(([valor, label]) => {
+                  const seleccionado = ini.pantalla_al_pausar === valor
+                  const deshabilitado = valor === 'agente' && !agente.activo
+                  return (
+                    <button
+                      key={valor}
+                      type="button"
+                      disabled={deshabilitado}
+                      onClick={() => seleccionarPantallaPausa(valor)}
+                      className={`mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                        seleccionado
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'text-slate-600 hover:bg-slate-50'
+                      } ${deshabilitado ? 'cursor-not-allowed opacity-45' : ''}`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                          seleccionado ? 'border-indigo-600' : 'border-slate-300'
+                        }`}
+                      >
+                        {seleccionado && <span className="h-2 w-2 rounded-full bg-indigo-600" />}
+                      </span>
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {(['ruleta', 'agente'] as Pestana[]).map((p) => (
             <button
               key={p}
-              onClick={() => setPestana(p)}
+              onClick={() => {
+                setPestana(p)
+                setMostrarPantallaPausa(false)
+              }}
               className={`px-8 py-5 font-medium transition-colors ${
                 pestana === p
                   ? 'border-b-2 border-indigo-600 bg-slate-50 text-indigo-600'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {p === 'inicial' ? 'Pantalla inicial' : p === 'ruleta' ? 'Pantalla Ruleta' : 'Agente IA'}
+              {p === 'ruleta' ? 'Pantalla Ruleta' : 'Agente IA'}
             </button>
           ))}
         </div>
@@ -497,6 +622,9 @@ export function Editor() {
               <AgentPanel
                 agente={agente}
                 vistaId={vistaAgente}
+                esPantallaInicialApp={ini.pantalla_al_pausar === 'agente'}
+                videoPatrullajeUrl={ini.video_patrullaje_url}
+                onEditarVideoPatrullaje={() => setDialogo({ tipo: 'video' })}
                 onVistaChange={setVistaAgente}
                 onChange={setAgente}
               />
@@ -528,17 +656,21 @@ export function Editor() {
                   ))}
             </div>
 
-            <hr className="my-5 border-slate-200" />
+            {(pestana !== 'inicial' || ini.pantalla_al_pausar !== 'agente') && (
+              <hr className="my-5 border-slate-200" />
+            )}
 
             {pestana === 'inicial' ? (
-              <div className="space-y-1">
-                <ItemPanel
-                  icono={<IconoPlay />}
-                  label="Video para patrullaje"
-                  detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
-                  onClick={() => setDialogo({ tipo: 'video' })}
-                />
-              </div>
+              ini.pantalla_al_pausar !== 'agente' ? (
+                <div className="space-y-1">
+                  <ItemPanel
+                    icono={<IconoPlay />}
+                    label="Video para patrullaje"
+                    detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
+                    onClick={() => setDialogo({ tipo: 'video' })}
+                  />
+                </div>
+              ) : null
             ) : (
               <div>
                 {/* Qué hace el robot al terminar el quiz */}

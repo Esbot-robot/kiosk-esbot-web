@@ -16,6 +16,7 @@ export interface BotonEstilo extends TextoEstilo {
 }
 
 export type DestinoBotonInicial = 'quiz' | 'agente' | 'ambos'
+export type PantallaAlPausar = 'inicial' | 'agente'
 
 export interface Pregunta {
   texto: string
@@ -35,6 +36,7 @@ export interface PantallaInicial {
   subtitulo: TextoEstilo
   boton: BotonEstilo
   destino_boton: DestinoBotonInicial
+  pantalla_al_pausar: PantallaAlPausar
   boton_agente: BotonEstilo
   tts_toca_pantalla: string
   tts_llega_stand: string
@@ -302,6 +304,7 @@ export function configVacia(): EventConfig {
       subtitulo: { texto: '', color_texto: '', color_fondo: '' },
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '' },
       destino_boton: 'quiz',
+      pantalla_al_pausar: 'inicial',
       boton_agente: {
         texto: 'HABLAR CON TEMI',
         color_texto: '',
