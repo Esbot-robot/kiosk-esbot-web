@@ -13,6 +13,30 @@ export interface TextoEstilo {
 
 export interface BotonEstilo extends TextoEstilo {
   color_contorno: string
+  /** pildora = botón actual; tarjeta = tarjeta alta con bordes redondeados. */
+  forma: 'pildora' | 'tarjeta'
+  /** Imagen mostrada directamente en la tarjeta, sin capas ni filtros. */
+  imagen_url: string
+}
+
+/** Acción opcional disponible desde la pantalla inicial del robot. */
+export interface BotonAdicionalInicial {
+  /** estable: permite reconocer el botón aunque se cambie su texto */
+  id: string
+  activo: boolean
+  boton: BotonEstilo
+  accion: 'video' | 'ir_ubicacion'
+  /** video que se reproduce una vez y después devuelve el contador pausado */
+  video_url: string
+  tts_despues_video: string
+  /** nombre exacto de la ubicación creada en el mapa de Temi */
+  ubicacion: string
+  tts_antes_de_ir: string
+  /** video opcional, en bucle durante el desplazamiento */
+  video_trayecto_url: string
+  tts_al_llegar: string
+  /** despedida propia antes de retomar el patrullaje */
+  tts_despedida: string
 }
 
 export interface Pregunta {
@@ -32,12 +56,45 @@ export interface PantallaInicial {
   titulo: TextoEstilo
   subtitulo: TextoEstilo
   boton: BotonEstilo
+  /** máximo dos acciones adicionales junto al botón Jugar */
+  botones_adicionales: BotonAdicionalInicial[]
   tts_toca_pantalla: string
   tts_llega_stand: string
   tts_despedida_stand: string
   tts_reanuda_patrulla: string
   tts_sigueme: string
   video_patrullaje_url: string
+}
+
+export function botonesAdicionalesVacios(): BotonAdicionalInicial[] {
+  return [
+    {
+      id: 'accion_1',
+      activo: false,
+      boton: { texto: 'Ver video', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
+      accion: 'video',
+      video_url: '',
+      tts_despues_video: '',
+      ubicacion: '',
+      tts_antes_de_ir: '',
+      video_trayecto_url: '',
+      tts_al_llegar: '',
+      tts_despedida: '',
+    },
+    {
+      id: 'accion_2',
+      activo: false,
+      boton: { texto: 'Conocer un lugar', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
+      accion: 'ir_ubicacion',
+      video_url: '',
+      tts_despues_video: '',
+      ubicacion: '',
+      tts_antes_de_ir: '',
+      video_trayecto_url: '',
+      tts_al_llegar: '',
+      tts_despedida: '',
+    },
+  ]
 }
 
 /** Qué hace el robot cuando el visitante termina el quiz */
@@ -108,7 +165,8 @@ export function configVacia(): EventConfig {
       logo_url: '',
       titulo: { texto: '', color_texto: '', color_fondo: '' },
       subtitulo: { texto: '', color_texto: '', color_fondo: '' },
-      boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '' },
+      boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
+      botones_adicionales: botonesAdicionalesVacios(),
       tts_toca_pantalla: '',
       tts_llega_stand: '',
       tts_despedida_stand: '',

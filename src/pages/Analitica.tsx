@@ -9,9 +9,11 @@ const FILAS_POR_PAGINA = 100
 // para excluir seriales de demo/prueba (ej. el "0016004060" del emulador).
 const PATRON_SERIAL_REAL = '_'.repeat(11)
 
-/* Paleta validada (dataviz): 2 series, CVD-safe */
+/* Paleta validada (dataviz): acciones directas y acciones configurables */
 const COLOR_TOQUE = '#2a78d6' // azul — toques de pantalla
 const COLOR_JUGAR = '#1baf7a' // aqua — botón jugar
+const COLOR_VIDEO = '#8b5cf6' // violeta — video configurado
+const COLOR_UBICACION = '#e57a28' // naranja — guía a ubicación
 const INK_MUTED = '#898781'
 const GRID = '#e1e0d9'
 
@@ -84,10 +86,16 @@ function etiquetaLarga(clave: string, gran: Granularidad): string {
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
-const NOMBRE_TIPO: Record<string, string> = {
-  toque_pantalla: 'Toque pantalla',
-  boton_jugar: 'Botón jugar',
-}
+const TIPOS_EVENTO = [
+  { tipo: 'toque_pantalla', nombre: 'Toque pantalla', tarjeta: 'Total toques de pantalla', color: COLOR_TOQUE },
+  { tipo: 'boton_jugar', nombre: 'Botón jugar', tarjeta: 'Total toques botón jugar', color: COLOR_JUGAR },
+  { tipo: 'boton_video', nombre: 'Botón video', tarjeta: 'Total toques botón video', color: COLOR_VIDEO },
+  { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', tarjeta: 'Total guías a ubicación', color: COLOR_UBICACION },
+] as const
+
+const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
+  TIPOS_EVENTO.map(({ tipo, nombre }) => [tipo, nombre])
+)
 
 export function Analitica() {
   const [desde, setDesde] = useState(inicioDeMes())
@@ -244,24 +252,25 @@ export function Analitica() {
     },
   })
 
-  const { buckets, serieToques, serieJugar, totalToques, totalJugar } = useMemo(() => {
+  const { buckets, series, totales, totalInteracciones } = useMemo(() => {
     const buckets = generarBuckets(desde, hasta, granularidad)
     const idx = new Map(buckets.map((b, i) => [b, i]))
-    const serieToques = buckets.map(() => 0)
-    const serieJugar = buckets.map(() => 0)
-    let totalToques = 0
-    let totalJugar = 0
+    const series = TIPOS_EVENTO.map(() => buckets.map(() => 0))
+    const totales = TIPOS_EVENTO.map(() => 0)
     for (const fila of agregados ?? []) {
       const i = idx.get(fila.bucket)
-      if (fila.tipo === 'toque_pantalla') {
-        totalToques += fila.total
-        if (i !== undefined) serieToques[i] = fila.total
-      } else if (fila.tipo === 'boton_jugar') {
-        totalJugar += fila.total
-        if (i !== undefined) serieJugar[i] = fila.total
+      const serieIndex = TIPOS_EVENTO.findIndex((tipo) => tipo.tipo === fila.tipo)
+      if (serieIndex >= 0) {
+        totales[serieIndex] += fila.total
+        if (i !== undefined) series[serieIndex][i] = fila.total
       }
     }
-    return { buckets, serieToques, serieJugar, totalToques, totalJugar }
+    return {
+      buckets,
+      series,
+      totales,
+      totalInteracciones: totales.reduce((total, cantidad) => total + cantidad, 0),
+    }
   }, [agregados, desde, hasta, granularidad])
 
   function descargarReporte() {
@@ -270,11 +279,15 @@ export function Analitica() {
       desde,
       hasta,
       granularidad,
-      totalToques,
-      totalJugar,
+      totalToques: totales[0],
+      totalJugar: totales[1],
+      totalVideos: totales[2],
+      totalUbicaciones: totales[3],
       buckets,
-      serieToques,
-      serieJugar,
+      serieToques: series[0],
+      serieJugar: series[1],
+      serieVideos: series[2],
+      serieUbicaciones: series[3],
       etiquetaBucket: (b) => etiquetaBucket(b, granularidad),
       distribucion: distribucion ?? [],
     })
@@ -341,25 +354,18 @@ export function Analitica() {
       </div>
 
       {/* Tarjetas de totales */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_TOQUE }} />
-            Total toques de pantalla
-          </p>
-          <p className="mt-2 text-4xl font-bold text-slate-900">
-            {isLoading ? '—' : totalToques.toLocaleString('es-CO')}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_JUGAR }} />
-            Total toques botón jugar
-          </p>
-          <p className="mt-2 text-4xl font-bold text-slate-900">
-            {isLoading ? '—' : totalJugar.toLocaleString('es-CO')}
-          </p>
-        </div>
+      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {TIPOS_EVENTO.map((tipo, index) => (
+          <div key={tipo.tipo} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tipo.color }} />
+              {tipo.tarjeta}
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {isLoading ? '—' : (totales[index] ?? 0).toLocaleString('es-CO')}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Gráfica */}
@@ -370,25 +376,23 @@ export function Analitica() {
               Frecuencia de toques por {granularidad === 'hora' ? 'hora' : 'día'}
             </h3>
             <p className="text-sm text-slate-500">
-              Interacción directa vs. intención de juego
+              Toques de pantalla y acciones configuradas
               {granularidad === 'hora' && ' — rango corto: agrupado por hora'}
             </p>
           </div>
           <div className="flex items-center gap-5 text-sm text-slate-600">
-            <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_TOQUE }} />
-              Toques de pantalla
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_JUGAR }} />
-              Botón jugar
-            </span>
+            {TIPOS_EVENTO.map((tipo) => (
+              <span key={tipo.tipo} className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tipo.color }} />
+                {tipo.nombre}
+              </span>
+            ))}
           </div>
         </div>
 
         {isLoading ? (
           <p className="py-16 text-center text-slate-400">Cargando eventos...</p>
-        ) : totalToques + totalJugar === 0 ? (
+        ) : totalInteracciones === 0 ? (
           <p className="py-16 text-center text-slate-400">
             Sin eventos en este rango. Los robots registran toques automáticamente.
           </p>
@@ -396,7 +400,11 @@ export function Analitica() {
           <GraficaLineas
             buckets={buckets}
             granularidad={granularidad}
-            series={[serieToques, serieJugar]}
+            series={TIPOS_EVENTO.map((tipo, index) => ({
+              valores: series[index],
+              color: tipo.color,
+              nombre: tipo.nombre,
+            }))}
           />
         )}
       </div>
@@ -431,7 +439,8 @@ export function Analitica() {
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
                       style={{
-                        backgroundColor: e.tipo === 'toque_pantalla' ? COLOR_TOQUE : COLOR_JUGAR,
+                        backgroundColor:
+                          TIPOS_EVENTO.find((tipo) => tipo.tipo === e.tipo)?.color ?? COLOR_TOQUE,
                       }}
                     />
                     {NOMBRE_TIPO[e.tipo] ?? e.tipo}
@@ -523,15 +532,13 @@ function GraficaLineas({
 }: {
   buckets: string[]
   granularidad: Granularidad
-  series: number[][]
+  series: { valores: number[]; color: string; nombre: string }[]
 }) {
   const [hover, setHover] = useState<number | null>(null)
-  const colores = [COLOR_TOQUE, COLOR_JUGAR]
-  const nombres = ['Toques de pantalla', 'Botón jugar']
 
   const plotW = ANCHO - M.left - M.right
   const plotH = ALTO - M.top - M.bottom
-  const maxY = Math.max(1, ...series.flat())
+  const maxY = Math.max(1, ...series.flatMap((serie) => serie.valores))
   const x = (i: number) =>
     M.left + (buckets.length === 1 ? plotW / 2 : (i / (buckets.length - 1)) * plotW)
   const y = (v: number) => M.top + plotH - (v / maxY) * plotH
@@ -587,12 +594,12 @@ function GraficaLineas({
         )}
 
         {/* líneas de las series (2px) */}
-        {series.map((serie, s) => (
+        {series.map((serie) => (
           <polyline
-            key={s}
-            points={serie.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+            key={serie.nombre}
+            points={serie.valores.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
             fill="none"
-            stroke={colores[s]}
+            stroke={serie.color}
             strokeWidth="2"
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -601,13 +608,13 @@ function GraficaLineas({
 
         {/* marcadores en el punto bajo el cursor (≥8px) */}
         {hover !== null &&
-          series.map((serie, s) => (
+          series.map((serie) => (
             <circle
-              key={s}
+              key={serie.nombre}
               cx={x(hover)}
-              cy={y(serie[hover])}
+              cy={y(serie.valores[hover])}
               r="5"
-              fill={colores[s]}
+              fill={serie.color}
               stroke="#ffffff"
               strokeWidth="2"
             />
@@ -626,10 +633,10 @@ function GraficaLineas({
           <p className="text-sm font-bold whitespace-nowrap text-slate-900">
             {etiquetaLarga(buckets[hover], granularidad)}
           </p>
-          {series.map((serie, s) => (
-            <p key={s} className="mt-1 flex items-center gap-2 text-sm whitespace-nowrap text-slate-600">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colores[s] }} />
-              {nombres[s]}: <span className="font-semibold text-slate-900">{serie[hover]}</span>
+          {series.map((serie) => (
+            <p key={serie.nombre} className="mt-1 flex items-center gap-2 text-sm whitespace-nowrap text-slate-600">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: serie.color }} />
+              {serie.nombre}: <span className="font-semibold text-slate-900">{serie.valores[hover]}</span>
             </p>
           ))}
         </div>

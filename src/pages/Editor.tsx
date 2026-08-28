@@ -4,10 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
 import { Modal } from '../components/Modal'
-import { COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type EventConfig, type Pregunta, type Project } from '../types/config'
+import { botonesAdicionalesVacios, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type EventConfig, type Pregunta, type Project } from '../types/config'
 import { DialogBoton, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
+import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 
 type Pestana = 'inicial' | 'ruleta'
@@ -16,6 +17,7 @@ type Dialogo =
   | { tipo: 'titulo' }
   | { tipo: 'subtitulo' }
   | { tipo: 'boton' }
+  | { tipo: 'boton-adicional'; index: number }
   | { tipo: 'logo' }
   | { tipo: 'tts-inicial'; campo: CampoTtsInicial; titulo: string }
   | { tipo: 'tts-ruleta'; campo: CampoTtsRuleta; titulo: string }
@@ -146,6 +148,22 @@ export function Editor() {
       if ((cfg.pantalla_ruleta as any).tts_agradecimiento === undefined) {
         cfg.pantalla_ruleta.tts_agradecimiento = '¡Gracias por tu opinión!'
       }
+      // Los botones antiguos no tenían formato ni imagen configurables.
+      cfg.pantalla_inicial.boton = {
+        ...cfg.pantalla_inicial.boton,
+        forma: cfg.pantalla_inicial.boton.forma ?? 'pildora',
+        imagen_url: cfg.pantalla_inicial.boton.imagen_url ?? '',
+      }
+      // Proyectos anteriores solo tenían el botón Jugar. Se agregan dos espacios
+      // desactivados para que no cambien la pantalla ni el comportamiento existente.
+      const inicialAnterior = cfg.pantalla_inicial as Partial<EventConfig['pantalla_inicial']>
+      const adicionalesGuardados = inicialAnterior.botones_adicionales ?? []
+      cfg.pantalla_inicial.botones_adicionales = botonesAdicionalesVacios().map((base, index) => {
+        const guardado = adicionalesGuardados[index]
+        return guardado
+          ? { ...base, ...guardado, boton: { ...base.boton, ...guardado.boton } }
+          : base
+      })
       setConfig(cfg)
     }
   }, [proyecto])
@@ -225,12 +243,35 @@ export function Editor() {
 
   const ini = config.pantalla_inicial
   const rul = config.pantalla_ruleta
+  const botonesAdicionales = ini.botones_adicionales ?? botonesAdicionalesVacios()
+  const botonesVistaPrevia = [
+    {
+      id: 'jugar',
+      estilo: ini.boton,
+      textoDefecto: 'JUGAR AHORA',
+      editar: () => setDialogo({ tipo: 'boton' } as const),
+    },
+    ...botonesAdicionales
+      .map((boton, index) => ({ boton, index }))
+      .filter(({ boton }) => boton.activo)
+      .map(({ boton, index }) => ({
+        id: boton.id,
+        estilo: boton.boton,
+        textoDefecto: `BOTÓN ${index + 1}`,
+        editar: () => setDialogo({ tipo: 'boton-adicional', index } as const),
+      })),
+  ]
 
   function setInicial(cambios: Partial<EventConfig['pantalla_inicial']>) {
     setConfig((c) => c && { ...c, pantalla_inicial: { ...c.pantalla_inicial, ...cambios } })
   }
   function setRuleta(cambios: Partial<EventConfig['pantalla_ruleta']>) {
     setConfig((c) => c && { ...c, pantalla_ruleta: { ...c.pantalla_ruleta, ...cambios } })
+  }
+  function setBotonAdicional(index: number, boton: BotonAdicionalInicial) {
+    const nuevos = [...botonesAdicionales]
+    nuevos[index] = boton
+    setInicial({ botones_adicionales: nuevos })
   }
 
   function guardarPregunta(index: number | null, pregunta: Pregunta) {
@@ -249,6 +290,24 @@ export function Editor() {
     if (rul.despues_quiz.modo === 'guiar_al_stand' && !rul.despues_quiz.secuencia_guia.trim()) {
       setPestana('ruleta')
       setErrorGuardar('Falta el nombre de la secuencia de Temi para "Guiar al stand". Escríbelo antes de guardar.')
+      return
+    }
+    const botonIncompleto = botonesAdicionales.find((boton) =>
+      boton.activo &&
+      ((boton.accion === 'video' && (!boton.video_url || !boton.tts_despues_video.trim())) ||
+        (boton.accion === 'ir_ubicacion' &&
+          (!boton.ubicacion.trim() ||
+            !boton.tts_antes_de_ir.trim() ||
+            !boton.tts_al_llegar.trim() ||
+            !boton.tts_despedida.trim())))
+    )
+    if (botonIncompleto) {
+      setPestana('inicial')
+      setErrorGuardar(
+        botonIncompleto.accion === 'video'
+          ? `Completa el video y el texto final de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+          : `Completa la ubicación y los textos de guía de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+      )
       return
     }
     setErrorGuardar('')
@@ -348,18 +407,40 @@ export function Editor() {
                   </div>
                 </div>
 
-                <div className="mt-10 flex items-center gap-2">
-                  <span
-                    className="rounded-full px-12 py-4 text-xl font-bold"
-                    style={{
-                      color: ini.boton.color_texto || '#ffffff',
-                      backgroundColor: ini.boton.color_fondo || '#031046',
-                      border: `4px solid ${ini.boton.color_contorno || '#FFD700'}`,
-                    }}
-                  >
-                    {ini.boton.texto || 'JUGAR AHORA'}
-                  </span>
-                  <Lapiz title="Editar botón" onClick={() => setDialogo({ tipo: 'boton' })} />
+                <div
+                  className={`mt-8 flex w-full flex-nowrap items-center justify-center gap-3 px-5 ${
+                    botonesVistaPrevia.length === 1 ? 'max-w-xl' : ''
+                  }`}
+                >
+                  {botonesVistaPrevia.map(({ id, estilo, textoDefecto, editar }) => {
+                    const esTarjeta = estilo.forma === 'tarjeta'
+                    const tieneImagen = esTarjeta && Boolean(estilo.imagen_url)
+                    return (
+                      <div key={id} className="flex min-w-0 flex-1 items-center gap-1.5">
+                        <span
+                          className={`flex min-w-0 flex-1 items-center justify-center truncate text-center font-bold ${
+                            esTarjeta
+                              ? 'h-28 rounded-[28px] px-4 text-base leading-tight'
+                              : `rounded-full py-3 ${botonesVistaPrevia.length === 3 ? 'px-4 text-base' : 'px-6 text-lg'}`
+                          }`}
+                          style={{
+                            color: estilo.color_texto || '#ffffff',
+                            backgroundColor: estilo.color_fondo || '#031046',
+                            backgroundImage: tieneImagen ? `url(${estilo.imagen_url})` : undefined,
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: 'cover',
+                            border: tieneImagen ? 'none' : `4px solid ${estilo.color_contorno || '#FFD700'}`,
+                          }}
+                        >
+                          {estilo.texto || textoDefecto}
+                        </span>
+                        <span className="shrink-0">
+                          <Lapiz title="Editar botón" onClick={editar} />
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -472,6 +553,23 @@ export function Editor() {
                   detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
                   onClick={() => setDialogo({ tipo: 'video' })}
                 />
+                <hr className="my-5 border-slate-200" />
+                <p className="px-3 pb-2 font-semibold text-slate-800">Botones adicionales</p>
+                {botonesAdicionales.map((boton, index) => (
+                  <ItemPanel
+                    key={boton.id}
+                    icono={<IconoPlay />}
+                    label={boton.boton.texto || `Botón adicional ${index + 1}`}
+                    detalle={
+                      !boton.activo
+                        ? 'Desactivado'
+                        : boton.accion === 'video'
+                          ? 'Reproduce un video'
+                          : `Va a ${boton.ubicacion || 'ubicación pendiente'}`
+                    }
+                    onClick={() => setDialogo({ tipo: 'boton-adicional', index })}
+                  />
+                ))}
               </div>
             ) : (
               <div>
@@ -644,8 +742,18 @@ export function Editor() {
       {dialogo?.tipo === 'boton' && (
         <DialogBoton
           valor={ini.boton}
+          projectId={projectId!}
           maxCaracteres={LIMITES.BOTON_MAX}
           onGuardar={(boton) => setInicial({ boton })}
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'boton-adicional' && (
+        <DialogBotonAdicional
+          indice={dialogo.index}
+          valor={botonesAdicionales[dialogo.index]}
+          projectId={projectId!}
+          onGuardar={(boton) => setBotonAdicional(dialogo.index, boton)}
           onCerrar={() => setDialogo(null)}
         />
       )}

@@ -4,6 +4,8 @@ import { jsPDF } from 'jspdf'
 const NAVY: [number, number, number] = [22, 34, 63]
 const BLUE: [number, number, number] = [42, 120, 214]
 const AQUA: [number, number, number] = [27, 175, 122]
+const PURPLE: [number, number, number] = [139, 92, 246]
+const ORANGE: [number, number, number] = [229, 122, 40]
 const MUTED: [number, number, number] = [110, 122, 150]
 const TRACK: [number, number, number] = [225, 230, 240]
 const INK: [number, number, number] = [26, 37, 66]
@@ -25,9 +27,13 @@ export interface DatosReporte {
   granularidad: 'hora' | 'dia'
   totalToques: number
   totalJugar: number
+  totalVideos: number
+  totalUbicaciones: number
   buckets: string[]
   serieToques: number[]
   serieJugar: number[]
+  serieVideos: number[]
+  serieUbicaciones: number[]
   etiquetaBucket: (b: string) => string
   distribucion: PreguntaDist[]
 }
@@ -93,7 +99,7 @@ export function construirReportePdf(d: DatosReporte): jsPDF {
   )
   y += 24
 
-  // ── Resumen (dos tarjetas) ──
+  // ── Resumen ──
   const cardW = (W - 2 * M - 16) / 2
   const cardH = 78
   const dibujarKpi = (x: number, color: [number, number, number], valor: number, etiqueta: string) => {
@@ -111,9 +117,21 @@ export function construirReportePdf(d: DatosReporte): jsPDF {
     doc.setTextColor(...MUTED)
     doc.text(etiqueta, x + 16, y + 68)
   }
-  dibujarKpi(M, BLUE, d.totalToques, 'Toques de pantalla')
-  dibujarKpi(M + cardW + 16, AQUA, d.totalJugar, 'Toques botón jugar')
-  y += cardH + 30
+  const kpis = [
+    { color: BLUE, valor: d.totalToques, etiqueta: 'Toques de pantalla' },
+    { color: AQUA, valor: d.totalJugar, etiqueta: 'Toques botón jugar' },
+    { color: PURPLE, valor: d.totalVideos, etiqueta: 'Toques botón video' },
+    { color: ORANGE, valor: d.totalUbicaciones, etiqueta: 'Guías a ubicación' },
+  ]
+  kpis.forEach((kpi, index) => {
+    const x = M + (index % 2) * (cardW + 16)
+    const row = Math.floor(index / 2)
+    const originalY = y
+    y = originalY + row * (cardH + 12)
+    dibujarKpi(x, kpi.color, kpi.valor, kpi.etiqueta)
+    y = originalY
+  })
+  y += 2 * cardH + 42
 
   // ── Gráfica de interacciones ──
   doc.setFont('helvetica', 'bold')
@@ -124,35 +142,49 @@ export function construirReportePdf(d: DatosReporte): jsPDF {
   // leyenda
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.setFillColor(...BLUE)
-  doc.circle(M + 6, y + 6, 3, 'F')
-  doc.setTextColor(...MUTED)
-  doc.text('Toques de pantalla', M + 14, y + 9)
-  doc.setFillColor(...AQUA)
-  doc.circle(M + 130, y + 6, 3, 'F')
-  doc.text('Botón jugar', M + 138, y + 9)
-  y += 20
+  ;[
+    { color: BLUE, label: 'Toques de pantalla' },
+    { color: AQUA, label: 'Botón jugar' },
+    { color: PURPLE, label: 'Botón video' },
+    { color: ORANGE, label: 'Guías a ubicación' },
+  ].forEach((item, index) => {
+    const column = index % 2
+    const row = Math.floor(index / 2)
+    const x = M + column * 190
+    const yy = y + row * 14
+    doc.setFillColor(...item.color)
+    doc.circle(x + 6, yy + 6, 3, 'F')
+    doc.setTextColor(...MUTED)
+    doc.text(item.label, x + 14, yy + 9)
+  })
+  y += 34
 
   const chartX = M
   const chartY = y
   const chartW = W - 2 * M
   const chartH = 150
-  const maxV = Math.max(1, ...d.serieToques, ...d.serieJugar)
+  const series = [
+    { color: BLUE, valores: d.serieToques },
+    { color: AQUA, valores: d.serieJugar },
+    { color: PURPLE, valores: d.serieVideos },
+    { color: ORANGE, valores: d.serieUbicaciones },
+  ]
+  const maxV = Math.max(1, ...series.flatMap((serie) => serie.valores))
   // eje base
   doc.setDrawColor(...TRACK)
   doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH)
   const n = d.buckets.length
   const grupoW = chartW / Math.max(1, n)
-  const barW = Math.min(10, grupoW / 3)
+  const barW = Math.min(8, grupoW / (series.length + 2))
   const pasoEtiqueta = Math.max(1, Math.ceil(n / 12))
   for (let i = 0; i < n; i++) {
     const cx = chartX + i * grupoW + grupoW / 2
-    const hT = (d.serieToques[i] / maxV) * chartH
-    const hJ = (d.serieJugar[i] / maxV) * chartH
-    doc.setFillColor(...BLUE)
-    doc.rect(cx - barW - 1, chartY + chartH - hT, barW, hT, 'F')
-    doc.setFillColor(...AQUA)
-    doc.rect(cx + 1, chartY + chartH - hJ, barW, hJ, 'F')
+    series.forEach((serie, serieIndex) => {
+      const height = (serie.valores[i] / maxV) * chartH
+      const offset = (serieIndex - (series.length - 1) / 2) * (barW + 2)
+      doc.setFillColor(...serie.color)
+      doc.rect(cx + offset - barW / 2, chartY + chartH - height, barW, height, 'F')
+    })
     if (i % pasoEtiqueta === 0) {
       doc.setFontSize(7)
       doc.setTextColor(...MUTED)
