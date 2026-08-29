@@ -420,7 +420,7 @@ export function Editor() {
                         <span
                           className={`flex min-w-0 flex-1 items-center justify-center truncate text-center font-bold ${
                             esTarjeta
-                              ? 'h-28 rounded-[28px] px-4 text-base leading-tight'
+                              ? 'h-42 rounded-[28px] px-4 text-base leading-tight'
                               : `rounded-full py-3 ${botonesVistaPrevia.length === 3 ? 'px-4 text-base' : 'px-6 text-lg'}`
                           }`}
                           style={{
