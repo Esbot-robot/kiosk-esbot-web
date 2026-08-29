@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
 import { Modal } from '../components/Modal'
-import { botonesAdicionalesVacios, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type EventConfig, type Pregunta, type Project } from '../types/config'
-import { DialogBoton, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
+import { botonesAdicionalesVacios, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
+import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
 import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
@@ -23,6 +23,7 @@ type Dialogo =
   | { tipo: 'tts-ruleta'; campo: CampoTtsRuleta; titulo: string }
   | { tipo: 'fondo'; pantalla: Pestana }
   | { tipo: 'video' }
+  | { tipo: 'color-contador' }
   | { tipo: 'secuencia' }
   | { tipo: 'pregunta'; index: number | null }
   | { tipo: 'colores-opciones' }
@@ -154,6 +155,14 @@ export function Editor() {
         forma: cfg.pantalla_inicial.boton.forma ?? 'pildora',
         imagen_url: cfg.pantalla_inicial.boton.imagen_url ?? '',
       }
+      const textosIniciales = [cfg.pantalla_inicial.titulo, cfg.pantalla_inicial.subtitulo]
+      textosIniciales.forEach((texto) => {
+        texto.opacidad_fondo ??= 100
+        texto.sombra_activa ??= false
+        texto.color_sombra ??= '#000000'
+        texto.intensidad_sombra ??= 'leve'
+      })
+      cfg.pantalla_inicial.color_contador = cfg.pantalla_inicial.color_contador ?? '#FFD700'
       // Proyectos anteriores solo tenían el botón Jugar. Se agregan dos espacios
       // desactivados para que no cambien la pantalla ni el comportamiento existente.
       const inicialAnterior = cfg.pantalla_inicial as Partial<EventConfig['pantalla_inicial']>
@@ -294,7 +303,7 @@ export function Editor() {
     }
     const botonIncompleto = botonesAdicionales.find((boton) =>
       boton.activo &&
-      ((boton.accion === 'video' && (!boton.video_url || !boton.tts_despues_video.trim())) ||
+      ((boton.accion === 'video' && (!boton.video_url || !boton.tts_despues_video.trim() || !boton.tts_despedida.trim())) ||
         (boton.accion === 'ir_ubicacion' &&
           (!boton.ubicacion.trim() ||
             !boton.tts_antes_de_ir.trim() ||
@@ -305,7 +314,7 @@ export function Editor() {
       setPestana('inicial')
       setErrorGuardar(
         botonIncompleto.accion === 'video'
-          ? `Completa el video y el texto final de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+          ? `Completa el video, el texto final y la despedida de "${botonIncompleto.boton.texto || 'botón adicional'}".`
           : `Completa la ubicación y los textos de guía de "${botonIncompleto.boton.texto || 'botón adicional'}".`
       )
       return
@@ -318,6 +327,27 @@ export function Editor() {
     url
       ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
       : { background: 'linear-gradient(160deg, #1e2a4a 0%, #10173a 100%)' }
+
+  const colorConOpacidad = (color: string, opacidad: number | undefined) => {
+    const hex = (color || '#ffffff').replace('#', '')
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color || '#ffffff'
+    const numero = Number.parseInt(hex, 16)
+    const rojo = (numero >> 16) & 255
+    const verde = (numero >> 8) & 255
+    const azul = numero & 255
+    return `rgba(${rojo}, ${verde}, ${azul}, ${(opacidad ?? 100) / 100})`
+  }
+
+  const sombraTexto = (estilo: TextoEstilo) => {
+    if (!estilo.sombra_activa) return 'none'
+    const intensidad = estilo.intensidad_sombra ?? 'leve'
+    const medidas = {
+      leve: '0 1px 3px',
+      media: '0 2px 5px',
+      fuerte: '0 3px 8px',
+    }[intensidad]
+    return `${medidas} ${estilo.color_sombra || '#000000'}`
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -382,7 +412,8 @@ export function Editor() {
                     className="w-full px-16 py-2 text-center text-2xl font-bold"
                     style={{
                       color: ini.titulo.color_texto || '#1e2a4a',
-                      backgroundColor: ini.titulo.color_fondo || '#ffffff',
+                      backgroundColor: colorConOpacidad(ini.titulo.color_fondo, ini.titulo.opacidad_fondo),
+                      textShadow: sombraTexto(ini.titulo),
                     }}
                   >
                     {ini.titulo.texto || 'Título (clic en el lápiz)'}
@@ -397,7 +428,8 @@ export function Editor() {
                     className="w-full px-16 py-2 text-center text-xl font-semibold"
                     style={{
                       color: ini.subtitulo.color_texto || '#1e2a4a',
-                      backgroundColor: ini.subtitulo.color_fondo || '#ffffff',
+                      backgroundColor: colorConOpacidad(ini.subtitulo.color_fondo, ini.subtitulo.opacidad_fondo),
+                      textShadow: sombraTexto(ini.subtitulo),
                     }}
                   >
                     {ini.subtitulo.texto || 'Subtítulo'}
@@ -552,6 +584,18 @@ export function Editor() {
                   label="Video para patrullaje"
                   detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
                   onClick={() => setDialogo({ tipo: 'video' })}
+                />
+                <ItemPanel
+                  icono={
+                    <span
+                      aria-hidden="true"
+                      className="mt-1 block h-5 w-5 rounded border border-slate-300"
+                      style={{ backgroundColor: ini.color_contador || '#FFD700' }}
+                    />
+                  }
+                  label="Color del contador"
+                  detalle={ini.color_contador || '#FFD700'}
+                  onClick={() => setDialogo({ tipo: 'color-contador' })}
                 />
                 <hr className="my-5 border-slate-200" />
                 <p className="px-3 pb-2 font-semibold text-slate-800">Botones adicionales</p>
@@ -802,6 +846,16 @@ export function Editor() {
           tipo="video"
           projectId={projectId!}
           onSubido={(url) => setInicial({ video_patrullaje_url: url })}
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'color-contador' && (
+        <DialogColor
+          titulo="Color del contador"
+          etiqueta="Color de texto"
+          valor={ini.color_contador || '#FFD700'}
+          textoAyuda="Se muestra en la esquina inferior derecha cuando el robot va a retomar su patrullaje."
+          onGuardar={(color_contador) => setInicial({ color_contador })}
           onCerrar={() => setDialogo(null)}
         />
       )}

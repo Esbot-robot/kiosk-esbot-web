@@ -67,6 +67,10 @@ export function DialogBotonAdicional({
       setError('Escribe el texto que Temi dirá al terminar el video.')
       return
     }
+    if (boton.activo && boton.accion === 'video' && !boton.tts_despedida.trim()) {
+      setError('Escribe la despedida antes de que Temi reanude el patrullaje.')
+      return
+    }
     if (boton.activo && boton.accion === 'ir_ubicacion' && !boton.ubicacion.trim()) {
       setError('Escribe el nombre exacto de la ubicación creada en Temi.')
       return
@@ -238,6 +242,11 @@ export function DialogBotonAdicional({
                 Después de decirlo, continúa el contador que estaba pausado.
               </p>
             </div>
+            <TtsField
+              titulo="Despedida antes de reanudar patrullaje"
+              value={boton.tts_despedida}
+              onChange={(tts_despedida) => setBoton((actual) => ({ ...actual, tts_despedida }))}
+            />
           </>
         ) : (
           <>

@@ -9,6 +9,11 @@ export interface TextoEstilo {
   /** hex "#RRGGBB"; vacío = usar el diseño por defecto del layout */
   color_texto: string
   color_fondo: string
+  /** 0 = transparente; 100 = color de fondo sólido. Solo título y subtítulo. */
+  opacidad_fondo?: number
+  sombra_activa?: boolean
+  color_sombra?: string
+  intensidad_sombra?: 'leve' | 'media' | 'fuerte'
 }
 
 export interface BotonEstilo extends TextoEstilo {
@@ -64,6 +69,8 @@ export interface PantallaInicial {
   tts_reanuda_patrulla: string
   tts_sigueme: string
   video_patrullaje_url: string
+  /** color del texto "Continuaré en..."; vacío = dorado original */
+  color_contador: string
 }
 
 export function botonesAdicionalesVacios(): BotonAdicionalInicial[] {
@@ -163,8 +170,8 @@ export function configVacia(): EventConfig {
     pantalla_inicial: {
       fondo_url: '',
       logo_url: '',
-      titulo: { texto: '', color_texto: '', color_fondo: '' },
-      subtitulo: { texto: '', color_texto: '', color_fondo: '' },
+      titulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
+      subtitulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
       botones_adicionales: botonesAdicionalesVacios(),
       tts_toca_pantalla: '',
@@ -173,6 +180,7 @@ export function configVacia(): EventConfig {
       tts_reanuda_patrulla: '',
       tts_sigueme: '¡Sígueme!',
       video_patrullaje_url: '',
+      color_contador: '#FFD700',
     },
     pantalla_ruleta: {
       fondo_url: '',
