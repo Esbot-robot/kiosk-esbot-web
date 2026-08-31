@@ -463,6 +463,8 @@ export function Editor() {
                             backgroundRepeat: 'no-repeat',
                             backgroundSize: 'cover',
                             border: tieneImagen ? 'none' : `4px solid ${estilo.color_contorno || '#FFD700'}`,
+                            // Sombra fija del contenedor: da profundidad sin alterar la imagen.
+                            boxShadow: esTarjeta ? '0 10px 18px rgba(100, 116, 139, 0.32)' : undefined,
                           }}
                         >
                           {estilo.texto || textoDefecto}
