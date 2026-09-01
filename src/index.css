@@ -1,5 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.login-montserrat {
+  font-family: 'Montserrat', system-ui, sans-serif;
+}
+
+@keyframes login-autofill-start {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+.login-montserrat input:-webkit-autofill,
+.login-montserrat input:-webkit-autofill:hover,
+.login-montserrat input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #163d80;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  animation-name: login-autofill-start;
+  animation-duration: 0.01s;
 }
