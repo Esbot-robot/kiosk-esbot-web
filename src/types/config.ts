@@ -69,6 +69,8 @@ export interface BotonFoto {
   texto: string
   /** segundos que la foto y el número quedan en pantalla */
   segundos_pantalla: number
+  /** grados que se inclina la cabeza del robot al tomar la foto (-30 a 50) */
+  inclinacion_pantalla: number
   /** muestra un QR que abre WhatsApp con el mensaje ya escrito */
   whatsapp_activo: boolean
   /** solo dígitos, con indicativo de país. Ej: 573108676490 */
@@ -91,6 +93,7 @@ export function botonFotoVacio(): BotonFoto {
     marco_url: '',
     texto: 'Escanea el QR, envía el mensaje y pásate por nuestro stand a reclamar tu foto.',
     segundos_pantalla: 10,
+    inclinacion_pantalla: 0,
     whatsapp_activo: false,
     whatsapp_numero: '',
     whatsapp_mensaje: 'Hola, quiero reclamar mi foto #{numero} en el stand.',

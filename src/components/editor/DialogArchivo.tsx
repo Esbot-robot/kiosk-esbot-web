@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Modal } from '../Modal'
+import { Ayuda } from '../Ayuda'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { IconoNube } from '../iconos'
 
@@ -102,9 +103,13 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, onSubido, onCerra
             <span className="font-medium text-indigo-600">haz clic para subir</span>
           </p>
         )}
-        <p className="mt-1 text-sm text-slate-400">{cfg.ayuda}</p>
+        {/* Los formatos y el peso quedan a la vista: hacen falta antes de
+            elegir el archivo. La recomendación se va al icono. */}
+        <p className="mt-1 flex items-center justify-center gap-2 text-sm text-slate-400">
+          {cfg.ayuda}
+          <Ayuda>{nota ?? cfg.extra}</Ayuda>
+        </p>
       </div>
-      <p className="mt-3 text-sm text-slate-500">{nota ?? cfg.extra}</p>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <input

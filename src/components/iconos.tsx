@@ -75,6 +75,21 @@ export const IconoGrafica = ({ className = 'h-5 w-5' }: IconoProps) => (
   </svg>
 )
 
+/**
+ * Icono de información de las ayudas del editor.
+ *
+ * El círculo va en #F0F0F0, el color pedido. Ese gris sobre fondo blanco casi
+ * no se distingue, así que lleva un contorno tenue para que se note dónde hay
+ * que poner el cursor, y la "i" en un gris oscuro para que se lea.
+ */
+export const IconoInfo = ({ className = 'h-4 w-4' }: IconoProps) => (
+  <svg className={className} viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10.5" fill="#F0F0F0" stroke="#CBD5E1" strokeWidth="1.5" />
+    <circle cx="12" cy="7.3" r="1.3" fill="#64748B" />
+    <rect x="10.8" y="10.4" width="2.4" height="7.2" rx="1.2" fill="#64748B" />
+  </svg>
+)
+
 export const IconoPlay = ({ className = 'h-5 w-5' }: IconoProps) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
     <circle cx="12" cy="12" r="11" opacity="0.15" />

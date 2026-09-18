@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
+import { Ayuda } from '../Ayuda'
 import { LIMITES, type Pregunta } from '../../types/config'
 
 interface DialogPreguntaProps {
@@ -77,8 +78,10 @@ export function DialogPregunta({
               tipo === op.v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'
             }`}
           >
-            <span className="block font-semibold text-slate-800">{op.label}</span>
-            <span className="block text-sm text-slate-500">{op.detalle}</span>
+            <span className="flex items-center gap-2 font-semibold text-slate-800">
+              {op.label}
+              <Ayuda>{op.detalle}</Ayuda>
+            </span>
           </button>
         ))}
       </div>

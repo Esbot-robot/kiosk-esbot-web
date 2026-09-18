@@ -1,11 +1,16 @@
+import type { ReactNode } from 'react'
+import { Ayuda } from './Ayuda'
+
 interface CampoColorProps {
   label: string
   /** hex "#RRGGBB" o vacío (= usar diseño por defecto de la app) */
   value: string
   onChange: (hex: string) => void
+  /** ayuda opcional; sale en el icono de información junto a la etiqueta */
+  ayuda?: ReactNode
 }
 
-export function CampoColor({ label, value, onChange }: CampoColorProps) {
+export function CampoColor({ label, value, onChange, ayuda }: CampoColorProps) {
   const hexSinNumeral = value.replace('#', '')
 
   function cambiarDesdeTexto(texto: string) {
@@ -15,7 +20,10 @@ export function CampoColor({ label, value, onChange }: CampoColorProps) {
 
   return (
     <div>
-      <p className="mb-2 font-medium text-slate-800">{label}</p>
+      <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+        {label}
+        {ayuda && <Ayuda>{ayuda}</Ayuda>}
+      </p>
       <div className="flex items-center gap-3">
         <div className="flex flex-1 items-center rounded-lg border border-slate-300 px-4 py-3">
           <span className="mr-2 text-slate-400">#</span>

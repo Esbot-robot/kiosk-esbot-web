@@ -1,5 +1,6 @@
 import { useRef, useState, type RefObject } from 'react'
 import { Modal } from '../Modal'
+import { Ayuda } from '../Ayuda'
 import { AparienciaBoton } from './AparienciaBoton'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import type { BotonAdicionalInicial } from '../../types/config'
@@ -95,17 +96,22 @@ export function DialogBotonAdicional({
     campo,
     titulo,
     input,
+    ayudaExtra,
   }: {
     campo: 'video_url' | 'video_trayecto_url'
     titulo: string
     input: RefObject<HTMLInputElement | null>
+    /** se suma a la ayuda de formato, para lo propio de cada video */
+    ayudaExtra?: string
   }) => {
     const cargado = boton[campo]
     const subiendo = subiendoCampo === campo
     return (
       <div className="rounded-lg border border-slate-200 p-4">
-        <p className="font-medium text-slate-800">{titulo}</p>
-        <p className="mt-1 text-sm text-slate-500">MP4 o MOV, máximo 50MB.</p>
+        <p className="flex items-center gap-2 font-medium text-slate-800">
+          {titulo}
+          <Ayuda>MP4 o MOV, máximo 50MB.{ayudaExtra ? ` ${ayudaExtra}` : ''}</Ayuda>
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -158,9 +164,9 @@ export function DialogBotonAdicional({
             onChange={(e) => setBoton((actual) => ({ ...actual, activo: e.target.checked }))}
             className="h-4 w-4 accent-indigo-600"
           />
-          <span>
-            <span className="block font-semibold">Mostrar este botón</span>
-            <span className="block text-sm text-slate-500">Los botones desactivados no aparecen en el robot.</span>
+          <span className="flex items-center gap-2 font-semibold">
+            Mostrar este botón
+            <Ayuda>Los botones desactivados no aparecen en el robot.</Ayuda>
           </span>
         </label>
 
@@ -203,8 +209,10 @@ export function DialogBotonAdicional({
                 onChange={() => setBoton((actual) => ({ ...actual, accion: 'video' }))}
                 className="mr-2 accent-indigo-600"
               />
-              <span className="font-semibold text-slate-800">Reproducir video</span>
-              <span className="mt-1 block text-sm text-slate-500">Pausa el contador hasta que termine.</span>
+              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                Reproducir video
+                <Ayuda>Pausa el contador hasta que termine.</Ayuda>
+              </span>
             </label>
             <label
               className={`cursor-pointer rounded-lg border p-4 ${
@@ -218,8 +226,10 @@ export function DialogBotonAdicional({
                 onChange={() => setBoton((actual) => ({ ...actual, accion: 'ir_ubicacion' }))}
                 className="mr-2 accent-indigo-600"
               />
-              <span className="font-semibold text-slate-800">Ir a ubicación</span>
-              <span className="mt-1 block text-sm text-slate-500">Guía al visitante y retoma el patrullaje.</span>
+              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                Ir a ubicación
+                <Ayuda>Guía al visitante y retoma el patrullaje.</Ayuda>
+              </span>
             </label>
           </div>
         </div>
@@ -228,7 +238,10 @@ export function DialogBotonAdicional({
           <>
             <VideoUpload campo="video_url" titulo="Video que se reproducirá" input={videoInput} />
             <div>
-              <p className="mb-2 font-medium text-slate-800">Texto al terminar el video</p>
+              <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+                Texto al terminar el video
+                <Ayuda>Después de decirlo, continúa el contador que estaba pausado.</Ayuda>
+              </p>
               <textarea
                 value={boton.tts_despues_video}
                 maxLength={MAX_TTS}
@@ -238,9 +251,6 @@ export function DialogBotonAdicional({
                 }
                 className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
               />
-              <p className="mt-1 text-sm text-slate-500">
-                Después de decirlo, continúa el contador que estaba pausado.
-              </p>
             </div>
             <TtsField
               titulo="Despedida antes de reanudar patrullaje"
@@ -264,8 +274,12 @@ export function DialogBotonAdicional({
               value={boton.tts_antes_de_ir}
               onChange={(tts_antes_de_ir) => setBoton((actual) => ({ ...actual, tts_antes_de_ir }))}
             />
-            <VideoUpload campo="video_trayecto_url" titulo="Video durante el trayecto (opcional)" input={trayectoInput} />
-            <p className="-mt-3 text-sm text-slate-500">Si dura menos que el trayecto, se repetirá hasta llegar.</p>
+            <VideoUpload
+              campo="video_trayecto_url"
+              titulo="Video durante el trayecto (opcional)"
+              input={trayectoInput}
+              ayudaExtra="Si dura menos que el trayecto, se repetirá hasta llegar."
+            />
             <TtsField
               titulo="Texto al llegar a la ubicación"
               value={boton.tts_al_llegar}

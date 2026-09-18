@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
+import { Ayuda } from '../Ayuda'
 import { CampoColor } from '../CampoColor'
 import { AparienciaBoton } from './AparienciaBoton'
 import type { BotonEstilo, TextoEstilo } from '../../types/config'
@@ -56,7 +57,10 @@ export function DialogTexto({ titulo, valor, maxCaracteres, onGuardar, onCerrar 
       </div>
       <div className="mt-5 rounded-lg border border-slate-200 p-4">
         <div className="flex items-center justify-between gap-4">
-          <p className="font-medium text-slate-800">Solidez del fondo</p>
+          <p className="flex items-center gap-2 font-medium text-slate-800">
+            Solidez del fondo
+            <Ayuda>0% es transparente y 100% mantiene el color sólido.</Ayuda>
+          </p>
           <span className="font-mono text-sm text-slate-500">{opacidadFondo}%</span>
         </div>
         <input
@@ -67,13 +71,12 @@ export function DialogTexto({ titulo, valor, maxCaracteres, onGuardar, onCerrar 
           onChange={(e) => setOpacidadFondo(Number(e.target.value))}
           className="mt-3 w-full accent-indigo-600"
         />
-        <p className="mt-2 text-sm text-slate-500">0% es transparente y 100% mantiene el color sólido.</p>
       </div>
       <div className="mt-5 rounded-lg border border-slate-200 p-4">
         <label className="flex cursor-pointer items-center justify-between gap-4">
-          <span>
-            <span className="block font-medium text-slate-800">Sombra del texto</span>
-            <span className="block text-sm text-slate-500">Mejora la lectura sobre imágenes.</span>
+          <span className="flex items-center gap-2 font-medium text-slate-800">
+            Sombra del texto
+            <Ayuda>Mejora la lectura sobre imágenes.</Ayuda>
           </span>
           <input
             type="checkbox"
@@ -142,11 +145,9 @@ export function DialogBoton({
           onChange={(e) => setVisible(e.target.checked)}
           className="h-4 w-4 accent-indigo-600"
         />
-        <span>
-          <span className="block font-semibold">Mostrar este botón</span>
-          <span className="block text-sm text-slate-500">
-            Apágalo si el evento no usa el quiz. Al menos un botón debe quedar activo.
-          </span>
+        <span className="flex items-center gap-2 font-semibold">
+          Mostrar este botón
+          <Ayuda>Apágalo si el evento no usa el quiz. Al menos un botón debe quedar activo.</Ayuda>
         </span>
       </label>
 
@@ -225,13 +226,13 @@ export function DialogColor({
   return (
     <Modal
       titulo={titulo}
+      ayuda={textoAyuda}
       onCancelar={onCerrar}
       onAceptar={() => {
         onGuardar(color)
         onCerrar()
       }}
     >
-      {textoAyuda && <p className="mb-4 text-sm text-slate-500">{textoAyuda}</p>}
       <CampoColor label={etiqueta} value={color} onChange={setColor} />
     </Modal>
   )
@@ -265,16 +266,13 @@ export function DialogColoresOpciones({
   return (
     <Modal
       titulo="Colores de las opciones de respuesta"
+      ayuda="Cada botón tiene su color de fondo y de texto en la pantalla del robot. Deja vacío para usar el color original."
       onCancelar={onCerrar}
       onAceptar={() => {
         onGuardar(fondo, texto)
         onCerrar()
       }}
     >
-      <p className="mb-4 text-sm text-slate-500">
-        Cada botón tiene su color de fondo y de texto en la pantalla del robot. Deja vacío para usar
-        el color original.
-      </p>
       <div className="space-y-5">
         {[0, 1, 2].map((i) => (
           <div key={i} className="rounded-lg border border-slate-200 p-4">

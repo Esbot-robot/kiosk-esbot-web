@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { CampoColor } from '../CampoColor'
+import { Ayuda } from '../Ayuda'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import type { BotonEstilo } from '../../types/config'
 
@@ -61,8 +62,10 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
               onChange={() => onChange({ ...valor, forma: 'pildora' })}
               className="mr-2 accent-indigo-600"
             />
-            <span className="font-semibold text-slate-800">Píldora</span>
-            <span className="mt-1 block text-sm text-slate-500">El formato bajo y alargado actual.</span>
+            <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
+              Píldora
+              <Ayuda>El formato bajo y alargado actual.</Ayuda>
+            </span>
           </label>
           <label className={`cursor-pointer rounded-lg border p-4 ${esTarjeta ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}>
             <input
@@ -72,16 +75,20 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
               onChange={() => onChange({ ...valor, forma: 'tarjeta' })}
               className="mr-2 accent-indigo-600"
             />
-            <span className="font-semibold text-slate-800">Tarjeta</span>
-            <span className="mt-1 block text-sm text-slate-500">El doble de alto, con bordes redondeados.</span>
+            <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
+              Tarjeta
+              <Ayuda>El doble de alto, con bordes redondeados.</Ayuda>
+            </span>
           </label>
         </div>
       </div>
 
       {esTarjeta && (
         <div className="rounded-lg border border-slate-200 p-4">
-          <p className="font-medium text-slate-800">Imagen de la tarjeta</p>
-          <p className="mt-1 text-sm text-slate-500">Se mostrará directamente, sin capas, filtros ni oscurecimiento.</p>
+          <p className="flex items-center gap-2 font-medium text-slate-800">
+            Imagen de la tarjeta
+            <Ayuda>Se mostrará directamente, sin capas, filtros ni oscurecimiento.</Ayuda>
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"

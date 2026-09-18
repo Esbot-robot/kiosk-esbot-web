@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Modal } from '../Modal'
+import { Ayuda } from '../Ayuda'
 import { AparienciaBoton } from './AparienciaBoton'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import type { BotonFoto } from '../../types/config'
@@ -17,6 +18,16 @@ const MAX_MARCO_BYTES = 3 * 1024 * 1024
 const MAX_BOTON = 20
 const MAX_TEXTO = 300
 const MAX_WA_MENSAJE = 200
+/** límites físicos de la cabeza del robot según el SDK de temi */
+const MIN_INCLINACION = -30
+const MAX_INCLINACION = 50
+
+/** Deja el valor escrito dentro del rango del robot; vacío o inválido vuelve a 0 */
+function limitarInclinacion(valor: string): number {
+  const grados = Math.round(Number(valor))
+  if (!Number.isFinite(grados)) return 0
+  return Math.min(MAX_INCLINACION, Math.max(MIN_INCLINACION, grados))
+}
 
 /** Así queda el mensaje que enviará el visitante (ejemplo con la foto #47) */
 function ejemploMensaje(plantilla: string): string {
@@ -113,18 +124,16 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       textoAceptar={subiendo ? 'Subiendo marco...' : 'Guardar botón'}
     >
       <div className="max-h-[62vh] space-y-5 overflow-y-auto pr-2">
-        <label className="flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
+        <label className="relative flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
           <input
             type="checkbox"
             checked={foto.activo}
             onChange={(e) => setFoto((actual) => ({ ...actual, activo: e.target.checked }))}
             className="h-4 w-4 accent-indigo-600"
           />
-          <span>
-            <span className="block font-semibold">Mostrar este botón</span>
-            <span className="block text-sm text-slate-500">
-              Los botones desactivados no aparecen en el robot.
-            </span>
+          <span className="flex items-center gap-2 font-semibold">
+            Mostrar este botón
+            <Ayuda>Los botones desactivados no aparecen en el robot.</Ayuda>
           </span>
         </label>
 
@@ -154,11 +163,13 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
         />
 
         {/* Marco de la promo */}
-        <div className="rounded-lg border border-slate-200 p-4">
-          <p className="font-medium text-slate-800">Marco de la promo</p>
-          <p className="mt-1 text-sm text-slate-500">
-            PNG de 1200 × 1800 px (vertical), con el hueco de la foto transparente y sin
-            transparencias por fuera del marco. Máximo 3MB.
+        <div className="relative rounded-lg border border-slate-200 p-4">
+          <p className="flex items-center gap-2 font-medium text-slate-800">
+            Marco de la promo
+            <Ayuda>
+              PNG de 1200 × 1800 px (vertical), con el hueco de la foto transparente y sin
+              transparencias por fuera del marco. Máximo 3MB.
+            </Ayuda>
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
@@ -202,8 +213,14 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
         </div>
 
         {/* Texto que se muestra y se dice */}
-        <div>
-          <p className="mb-2 font-medium text-slate-800">Texto al mostrar la foto</p>
+        <div className="relative">
+          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+            Texto al mostrar la foto
+            <Ayuda>
+              Se muestra en pantalla junto al número y el robot lo dice en voz alta. Debe indicar
+              dónde reclamar la foto y mencionar el número que aparece en pantalla.
+            </Ayuda>
+          </p>
           <textarea
             value={foto.texto}
             maxLength={MAX_TEXTO}
@@ -211,10 +228,6 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
             onChange={(e) => setFoto((actual) => ({ ...actual, texto: e.target.value.slice(0, MAX_TEXTO) }))}
             className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
           />
-          <p className="mt-1 text-sm text-slate-500">
-            Se muestra en pantalla junto al número y el robot lo dice en voz alta. Debe indicar
-            dónde reclamar la foto y mencionar el número que aparece en pantalla.
-          </p>
           <p className="mt-1 text-right text-sm text-slate-400">
             {foto.texto.length} / {MAX_TEXTO} caracteres
           </p>
@@ -222,25 +235,28 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
 
         {/* QR de WhatsApp */}
         <div className="rounded-lg border border-slate-200 p-4">
-          <label className="flex items-center gap-3 text-slate-800">
+          <label className="relative flex items-center gap-3 text-slate-800">
             <input
               type="checkbox"
               checked={foto.whatsapp_activo}
               onChange={(e) => setFoto((actual) => ({ ...actual, whatsapp_activo: e.target.checked }))}
               className="h-4 w-4 accent-indigo-600"
             />
-            <span>
-              <span className="block font-semibold">Mostrar QR de WhatsApp</span>
-              <span className="block text-sm text-slate-500">
-                El visitante lo escanea y envía el mensaje con el número de su foto.
-              </span>
+            <span className="flex items-center gap-2 font-semibold">
+              Mostrar QR de WhatsApp
+              <Ayuda>El visitante lo escanea y envía el mensaje con el número de su foto.</Ayuda>
             </span>
           </label>
 
           {foto.whatsapp_activo && (
             <div className="mt-4 space-y-4">
-              <div>
-                <p className="mb-2 font-medium text-slate-800">Número que recibe los mensajes</p>
+              <div className="relative">
+                <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+                  Número que recibe los mensajes
+                  <Ayuda>
+                    Con indicativo de país y sin espacios ni signos. Colombia: 57 + celular.
+                  </Ayuda>
+                </p>
                 <input
                   value={foto.whatsapp_numero}
                   inputMode="numeric"
@@ -253,13 +269,16 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                   }
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 font-mono focus:border-indigo-500 focus:outline-none"
                 />
-                <p className="mt-1 text-sm text-slate-500">
-                  Con indicativo de país y sin espacios ni signos. Colombia: 57 + celular.
-                </p>
               </div>
 
-              <div>
-                <p className="mb-2 font-medium text-slate-800">Mensaje que enviará el visitante</p>
+              <div className="relative">
+                <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+                  Mensaje que enviará el visitante
+                  <Ayuda>
+                    Escribe <span className="font-mono">{'{numero}'}</span> donde quieras que
+                    aparezca el número de la foto. Si no lo pones, se agrega al final.
+                  </Ayuda>
+                </p>
                 <textarea
                   value={foto.whatsapp_mensaje}
                   maxLength={MAX_WA_MENSAJE}
@@ -272,10 +291,6 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                   }
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
                 />
-                <p className="mt-1 text-sm text-slate-500">
-                  Escribe <span className="font-mono">{'{numero}'}</span> donde quieras que aparezca
-                  el número de la foto. Si no lo pones, se agrega al final.
-                </p>
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   Así lo verá: <span className="font-medium">{ejemploMensaje(foto.whatsapp_mensaje)}</span>
                 </p>
@@ -288,8 +303,11 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
         </div>
 
         {/* Tiempo en pantalla */}
-        <div>
-          <p className="mb-2 font-medium text-slate-800">Tiempo en pantalla</p>
+        <div className="relative">
+          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+            Tiempo en pantalla
+            <Ayuda>Tiempo de lectura y captura del número/QR por parte del visitante.</Ayuda>
+          </p>
           <div className="flex items-center gap-3">
             <input
               type="number"
@@ -306,20 +324,45 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
             />
             <span className="text-slate-600">segundos</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Tiempo de lectura y captura del número/QR por parte del visitante.
+        </div>
+
+        {/* Inclinación de la cabeza: la cámara va en ella, así que define el encuadre */}
+        <div className="relative">
+          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+            Inclinación de la pantalla
+            <Ayuda>
+              Ángulo de la cabeza al tomar la foto. 0 = pantalla derecha, positivo sube la cámara
+              ({MIN_INCLINACION} a {MAX_INCLINACION}).
+            </Ayuda>
           </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={MIN_INCLINACION}
+              max={MAX_INCLINACION}
+              step={5}
+              value={foto.inclinacion_pantalla}
+              onChange={(e) =>
+                setFoto((actual) => ({
+                  ...actual,
+                  inclinacion_pantalla: limitarInclinacion(e.target.value),
+                }))
+              }
+              className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            />
+            <span className="text-slate-600">grados</span>
+          </div>
         </div>
 
         {/* Enlace de la galería para el cliente */}
         {foto.activo && (
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-            <p className="font-medium text-slate-800">Enlace de la galería para el cliente</p>
+          <div className="relative rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <p className="flex items-center gap-2 font-medium text-slate-800">
+              Enlace de la galería para el cliente
+              <Ayuda>Enlace exclusivo para ver galería. Mantener en privado.</Ayuda>
+            </p>
             {enlaceGaleria ? (
               <>
-                <p className="mt-1 text-sm text-slate-600">
-                  Enlace exclusivo para ver galería. Mantener en privado.
-                </p>
                 <div className="mt-3 flex gap-2">
                   <input
                     readOnly
