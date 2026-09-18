@@ -175,6 +175,8 @@ export function Editor() {
           ? { ...base, ...guardado, boton: { ...base.boton, ...guardado.boton } }
           : base
       })
+      // Antes el botón Jugar no se podía apagar: los proyectos viejos lo mantienen encendido.
+      cfg.pantalla_inicial.boton_activo = inicialAnterior.boton_activo ?? true
       // Proyectos anteriores no tenían el botón de foto: se agrega desactivado.
       const fotoBase = botonFotoVacio()
       const fotoGuardada = inicialAnterior.boton_foto
@@ -262,13 +264,18 @@ export function Editor() {
   const rul = config.pantalla_ruleta
   const botonesAdicionales = ini.botones_adicionales ?? botonesAdicionalesVacios()
   const botonFoto = ini.boton_foto ?? botonFotoVacio()
+  const botonJugarActivo = ini.boton_activo ?? true
   const botonesVistaPrevia = [
-    {
-      id: 'jugar',
-      estilo: ini.boton,
-      textoDefecto: 'JUGAR AHORA',
-      editar: () => setDialogo({ tipo: 'boton' } as const),
-    },
+    ...(botonJugarActivo
+      ? [
+          {
+            id: 'jugar',
+            estilo: ini.boton,
+            textoDefecto: 'JUGAR AHORA',
+            editar: () => setDialogo({ tipo: 'boton' } as const),
+          },
+        ]
+      : []),
     ...botonesAdicionales
       .map((boton, index) => ({ boton, index }))
       .filter(({ boton }) => boton.activo)
@@ -345,6 +352,14 @@ export function Editor() {
     if (botonFoto.activo && (!botonFoto.marco_url || !botonFoto.texto.trim())) {
       setPestana('inicial')
       setErrorGuardar('Completa el marco de la promo y el texto del botón "Tomar foto".')
+      return
+    }
+    // Sin ningún botón activo, el visitante toca la pantalla y no tiene qué hacer
+    const hayAlgunBoton =
+      botonJugarActivo || botonFoto.activo || botonesAdicionales.some((boton) => boton.activo)
+    if (!hayAlgunBoton) {
+      setPestana('inicial')
+      setErrorGuardar('Deja al menos un botón activo: Jugar, uno adicional o el de tomar foto.')
       return
     }
     setErrorGuardar('')
@@ -628,7 +643,13 @@ export function Editor() {
                   onClick={() => setDialogo({ tipo: 'color-contador' })}
                 />
                 <hr className="my-5 border-slate-200" />
-                <p className="px-3 pb-2 font-semibold text-slate-800">Botones adicionales</p>
+                <p className="px-3 pb-2 font-semibold text-slate-800">Botones de la pantalla</p>
+                <ItemPanel
+                  icono={<IconoPlay />}
+                  label={ini.boton.texto || 'Botón Jugar (quiz)'}
+                  detalle={botonJugarActivo ? 'Abre la ruleta de preguntas' : 'Desactivado'}
+                  onClick={() => setDialogo({ tipo: 'boton' })}
+                />
                 {botonesAdicionales.map((boton, index) => (
                   <ItemPanel
                     key={boton.id}
@@ -830,7 +851,8 @@ export function Editor() {
           valor={ini.boton}
           projectId={projectId!}
           maxCaracteres={LIMITES.BOTON_MAX}
-          onGuardar={(boton) => setInicial({ boton })}
+          activo={botonJugarActivo}
+          onGuardar={(boton, activo) => setInicial({ boton, boton_activo: activo })}
           onCerrar={() => setDialogo(null)}
         />
       )}

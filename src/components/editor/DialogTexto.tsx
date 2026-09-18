@@ -108,23 +108,48 @@ interface DialogBotonProps {
   valor: BotonEstilo
   projectId: string
   maxCaracteres: number
-  onGuardar: (nuevo: BotonEstilo) => void
+  /** si el botón Jugar se muestra en el robot */
+  activo: boolean
+  onGuardar: (nuevo: BotonEstilo, activo: boolean) => void
   onCerrar: () => void
 }
 
 /** Diálogo "Editar botón" del mockup (incluye color de contorno) */
-export function DialogBoton({ valor, projectId, maxCaracteres, onGuardar, onCerrar }: DialogBotonProps) {
+export function DialogBoton({
+  valor,
+  projectId,
+  maxCaracteres,
+  activo,
+  onGuardar,
+  onCerrar,
+}: DialogBotonProps) {
   const [boton, setBoton] = useState(valor)
+  const [visible, setVisible] = useState(activo)
 
   return (
     <Modal
       titulo="Editar botón"
       onCancelar={onCerrar}
       onAceptar={() => {
-        onGuardar({ ...boton, texto: boton.texto.trim() })
+        onGuardar({ ...boton, texto: boton.texto.trim() }, visible)
         onCerrar()
       }}
     >
+      <label className="mb-5 flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
+        <input
+          type="checkbox"
+          checked={visible}
+          onChange={(e) => setVisible(e.target.checked)}
+          className="h-4 w-4 accent-indigo-600"
+        />
+        <span>
+          <span className="block font-semibold">Mostrar este botón</span>
+          <span className="block text-sm text-slate-500">
+            Apágalo si el evento no usa el quiz. Al menos un botón debe quedar activo.
+          </span>
+        </span>
+      </label>
+
       <p className="mb-2 font-medium text-slate-800">Texto del elemento</p>
       <input
         value={boton.texto}

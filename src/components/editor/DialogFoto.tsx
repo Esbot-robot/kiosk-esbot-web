@@ -307,8 +307,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
             <span className="text-slate-600">segundos</span>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Tiempo para que el visitante lea y fotografíe el número antes de que el robot siga su
-            recorrido.
+            Tiempo de lectura y captura del número/QR por parte del visitante.
           </p>
         </div>
 
@@ -319,8 +318,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
             {enlaceGaleria ? (
               <>
                 <p className="mt-1 text-sm text-slate-600">
-                  Con este enlace el cliente ve las fotos de este evento y las descarga, sin
-                  necesidad de iniciar sesión. No lo publiques.
+                  Enlace exclusivo para ver galería. Mantener en privado.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <input

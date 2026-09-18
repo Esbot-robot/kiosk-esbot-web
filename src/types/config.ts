@@ -104,6 +104,8 @@ export interface PantallaInicial {
   titulo: TextoEstilo
   subtitulo: TextoEstilo
   boton: BotonEstilo
+  /** el botón Jugar (quiz) también se puede apagar: hay eventos que solo quieren fotos */
+  boton_activo: boolean
   /** máximo dos acciones adicionales junto al botón Jugar */
   botones_adicionales: BotonAdicionalInicial[]
   /** acción de foto, independiente de los dos botones adicionales */
@@ -218,6 +220,7 @@ export function configVacia(): EventConfig {
       titulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
       subtitulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
+      boton_activo: true,
       botones_adicionales: botonesAdicionalesVacios(),
       boton_foto: botonFotoVacio(),
       tts_toca_pantalla: '',
