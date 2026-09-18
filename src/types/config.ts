@@ -54,6 +54,49 @@ export interface Pregunta {
   tipo: 'trivia' | 'calificacion'
 }
 
+/**
+ * Botón "Tomar foto" de la pantalla inicial.
+ * El robot toma la foto, la monta dentro del marco, pide un número al
+ * servidor y muestra (y dice) el texto con ese número. La foto se reclama
+ * después en el stand, desde la galería del evento.
+ */
+export interface BotonFoto {
+  activo: boolean
+  boton: BotonEstilo
+  /** PNG 1200×1800 con el hueco de la foto transparente */
+  marco_url: string
+  /** se muestra junto al número y el robot lo dice en voz alta */
+  texto: string
+  /** segundos que la foto y el número quedan en pantalla */
+  segundos_pantalla: number
+  /** muestra un QR que abre WhatsApp con el mensaje ya escrito */
+  whatsapp_activo: boolean
+  /** solo dígitos, con indicativo de país. Ej: 573108676490 */
+  whatsapp_numero: string
+  /** mensaje que el visitante enviará; {numero} se reemplaza por el de la foto */
+  whatsapp_mensaje: string
+}
+
+export function botonFotoVacio(): BotonFoto {
+  return {
+    activo: false,
+    boton: {
+      texto: 'TOMAR FOTO',
+      color_texto: '',
+      color_fondo: '',
+      color_contorno: '',
+      forma: 'pildora',
+      imagen_url: '',
+    },
+    marco_url: '',
+    texto: 'Escanea el QR, envía el mensaje y pásate por nuestro stand a reclamar tu foto.',
+    segundos_pantalla: 10,
+    whatsapp_activo: false,
+    whatsapp_numero: '',
+    whatsapp_mensaje: 'Hola, quiero reclamar mi foto #{numero} en el stand.',
+  }
+}
+
 export interface PantallaInicial {
   fondo_url: string
   /** logo de la empresa, arriba centrado (imgLogo en el robot) */
@@ -63,6 +106,8 @@ export interface PantallaInicial {
   boton: BotonEstilo
   /** máximo dos acciones adicionales junto al botón Jugar */
   botones_adicionales: BotonAdicionalInicial[]
+  /** acción de foto, independiente de los dos botones adicionales */
+  boton_foto: BotonFoto
   tts_toca_pantalla: string
   tts_llega_stand: string
   tts_despedida_stand: string
@@ -174,6 +219,7 @@ export function configVacia(): EventConfig {
       subtitulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
       botones_adicionales: botonesAdicionalesVacios(),
+      boton_foto: botonFotoVacio(),
       tts_toca_pantalla: '',
       tts_llega_stand: '',
       tts_despedida_stand: '',
@@ -208,6 +254,13 @@ export interface Project {
   activo: boolean
   updated_at: string
   created_at: string
+  /**
+   * Token del enlace de galería que se le entrega al cliente.
+   * Vive como columna aparte y NO dentro de config, porque config se publica
+   * en configs/{serial}.json, que es un archivo público.
+   * Lo crea Supabase con un valor por defecto (paso de base de datos).
+   */
+  galeria_token?: string | null
 }
 
 /** Fila de la tabla robots en Supabase (asignación robot → proyecto) */

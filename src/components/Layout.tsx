@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { IconoCarpeta, IconoGrafica, IconoRobotLinea, IconoSalir } from './iconos'
@@ -48,9 +49,12 @@ export function Layout() {
         </div>
       </aside>
 
-      {/* Contenido */}
+      {/* Contenido. El Suspense va aquí, alrededor del Outlet, y no en App:
+          así la barra lateral no desaparece mientras se descarga la página. */}
       <main className="flex-1 overflow-y-auto">
-        <Outlet />
+        <Suspense fallback={<p className="p-12 text-slate-500">Cargando...</p>}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

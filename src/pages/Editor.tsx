@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
 import { Modal } from '../components/Modal'
-import { botonesAdicionalesVacios, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
+import { botonesAdicionalesVacios, botonFotoVacio, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
 import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
+import { DialogFoto } from '../components/editor/DialogFoto'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 
 type Pestana = 'inicial' | 'ruleta'
@@ -18,6 +19,7 @@ type Dialogo =
   | { tipo: 'subtitulo' }
   | { tipo: 'boton' }
   | { tipo: 'boton-adicional'; index: number }
+  | { tipo: 'boton-foto' }
   | { tipo: 'logo' }
   | { tipo: 'tts-inicial'; campo: CampoTtsInicial; titulo: string }
   | { tipo: 'tts-ruleta'; campo: CampoTtsRuleta; titulo: string }
@@ -173,6 +175,12 @@ export function Editor() {
           ? { ...base, ...guardado, boton: { ...base.boton, ...guardado.boton } }
           : base
       })
+      // Proyectos anteriores no tenían el botón de foto: se agrega desactivado.
+      const fotoBase = botonFotoVacio()
+      const fotoGuardada = inicialAnterior.boton_foto
+      cfg.pantalla_inicial.boton_foto = fotoGuardada
+        ? { ...fotoBase, ...fotoGuardada, boton: { ...fotoBase.boton, ...fotoGuardada.boton } }
+        : fotoBase
       setConfig(cfg)
     }
   }, [proyecto])
@@ -253,6 +261,7 @@ export function Editor() {
   const ini = config.pantalla_inicial
   const rul = config.pantalla_ruleta
   const botonesAdicionales = ini.botones_adicionales ?? botonesAdicionalesVacios()
+  const botonFoto = ini.boton_foto ?? botonFotoVacio()
   const botonesVistaPrevia = [
     {
       id: 'jugar',
@@ -269,6 +278,16 @@ export function Editor() {
         textoDefecto: `BOTÓN ${index + 1}`,
         editar: () => setDialogo({ tipo: 'boton-adicional', index } as const),
       })),
+    ...(botonFoto.activo
+      ? [
+          {
+            id: 'foto',
+            estilo: botonFoto.boton,
+            textoDefecto: 'TOMAR FOTO',
+            editar: () => setDialogo({ tipo: 'boton-foto' } as const),
+          },
+        ]
+      : []),
   ]
 
   function setInicial(cambios: Partial<EventConfig['pantalla_inicial']>) {
@@ -281,6 +300,10 @@ export function Editor() {
     const nuevos = [...botonesAdicionales]
     nuevos[index] = boton
     setInicial({ botones_adicionales: nuevos })
+  }
+
+  function setBotonFoto(boton_foto: BotonFoto) {
+    setInicial({ boton_foto })
   }
 
   function guardarPregunta(index: number | null, pregunta: Pregunta) {
@@ -317,6 +340,11 @@ export function Editor() {
           ? `Completa el video, el texto final y la despedida de "${botonIncompleto.boton.texto || 'botón adicional'}".`
           : `Completa la ubicación y los textos de guía de "${botonIncompleto.boton.texto || 'botón adicional'}".`
       )
+      return
+    }
+    if (botonFoto.activo && (!botonFoto.marco_url || !botonFoto.texto.trim())) {
+      setPestana('inicial')
+      setErrorGuardar('Completa el marco de la promo y el texto del botón "Tomar foto".')
       return
     }
     setErrorGuardar('')
@@ -616,6 +644,18 @@ export function Editor() {
                     onClick={() => setDialogo({ tipo: 'boton-adicional', index })}
                   />
                 ))}
+                <ItemPanel
+                  icono={<IconoPlay />}
+                  label={botonFoto.boton.texto || 'Botón tomar foto'}
+                  detalle={
+                    !botonFoto.activo
+                      ? 'Desactivado'
+                      : botonFoto.marco_url
+                        ? 'Toma foto, la enmarca y entrega un número'
+                        : 'Falta cargar el marco de la promo'
+                  }
+                  onClick={() => setDialogo({ tipo: 'boton-foto' })}
+                />
               </div>
             ) : (
               <div>
@@ -800,6 +840,15 @@ export function Editor() {
           valor={botonesAdicionales[dialogo.index]}
           projectId={projectId!}
           onGuardar={(boton) => setBotonAdicional(dialogo.index, boton)}
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'boton-foto' && (
+        <DialogFoto
+          valor={botonFoto}
+          projectId={projectId!}
+          galeriaToken={proyecto?.galeria_token}
+          onGuardar={setBotonFoto}
           onCerrar={() => setDialogo(null)}
         />
       )}
