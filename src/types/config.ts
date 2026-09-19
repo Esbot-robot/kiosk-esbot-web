@@ -71,6 +71,10 @@ export interface BotonFoto {
   segundos_pantalla: number
   /** grados que se inclina la cabeza del robot al tomar la foto (-30 a 50) */
   inclinacion_pantalla: number
+  /** segundos de la cuenta regresiva antes de tomar la foto (3 a 15) */
+  segundos_cuenta: number
+  /** lo que dice el robot al empezar la cuenta regresiva */
+  frase_preparacion: string
   /** muestra un QR que abre WhatsApp con el mensaje ya escrito */
   whatsapp_activo: boolean
   /** solo dígitos, con indicativo de país. Ej: 573108676490 */
@@ -78,6 +82,9 @@ export interface BotonFoto {
   /** mensaje que el visitante enviará; {numero} se reemplaza por el de la foto */
   whatsapp_mensaje: string
 }
+
+/** frase de la cuenta regresiva cuando el evento no define una */
+export const FRASE_PREPARACION_DEFECTO = '¡Ubícate frente a mí y regálame una gran sonrisa!'
 
 export function botonFotoVacio(): BotonFoto {
   return {
@@ -94,6 +101,8 @@ export function botonFotoVacio(): BotonFoto {
     texto: 'Escanea el QR, envía el mensaje y pásate por nuestro stand a reclamar tu foto.',
     segundos_pantalla: 10,
     inclinacion_pantalla: 0,
+    segundos_cuenta: 10,
+    frase_preparacion: FRASE_PREPARACION_DEFECTO,
     whatsapp_activo: false,
     whatsapp_numero: '',
     whatsapp_mensaje: 'Hola, quiero reclamar mi foto #{numero} en el stand.',

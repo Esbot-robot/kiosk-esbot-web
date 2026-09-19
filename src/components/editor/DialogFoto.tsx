@@ -3,7 +3,7 @@ import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
 import { AparienciaBoton } from './AparienciaBoton'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
-import type { BotonFoto } from '../../types/config'
+import { FRASE_PREPARACION_DEFECTO, type BotonFoto } from '../../types/config'
 
 interface DialogFotoProps {
   valor: BotonFoto
@@ -17,6 +17,10 @@ interface DialogFotoProps {
 const MAX_MARCO_BYTES = 3 * 1024 * 1024
 const MAX_BOTON = 20
 const MAX_TEXTO = 300
+const MAX_FRASE = 150
+/** segundos de la cuenta regresiva antes de la foto */
+const MIN_CUENTA = 3
+const MAX_CUENTA = 15
 const MAX_WA_MENSAJE = 200
 /** límites físicos de la cabeza del robot según el SDK de temi */
 const MIN_INCLINACION = -30
@@ -109,6 +113,8 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       ...foto,
       boton: { ...foto.boton, texto },
       texto: foto.texto.trim(),
+      // Vacía = la frase de siempre, para que el robot nunca cuente en silencio
+      frase_preparacion: foto.frase_preparacion.trim() || FRASE_PREPARACION_DEFECTO,
       whatsapp_numero: foto.whatsapp_numero.replace(/\D/g, ''),
       whatsapp_mensaje: foto.whatsapp_mensaje.trim(),
     })
@@ -300,6 +306,57 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
               </div>
             </div>
           )}
+        </div>
+
+        {/* Cuenta regresiva antes de la foto */}
+        <div className="relative">
+          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+            Cuenta regresiva
+            <Ayuda>
+              Segundos que tiene el visitante para ubicarse antes de la foto ({MIN_CUENTA} a{' '}
+              {MAX_CUENTA}).
+            </Ayuda>
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={MIN_CUENTA}
+              max={MAX_CUENTA}
+              value={foto.segundos_cuenta}
+              onChange={(e) =>
+                setFoto((actual) => ({
+                  ...actual,
+                  segundos_cuenta: Math.min(MAX_CUENTA, Math.max(MIN_CUENTA, Number(e.target.value) || 10)),
+                }))
+              }
+              className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            />
+            <span className="text-slate-600">segundos</span>
+          </div>
+        </div>
+
+        {/* Frase que dice el robot al empezar la cuenta */}
+        <div className="relative">
+          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+            Frase de preparación
+            <Ayuda>
+              La dice el robot al empezar la cuenta regresiva. Si la dejas vacía, usa la frase por
+              defecto.
+            </Ayuda>
+          </p>
+          <textarea
+            value={foto.frase_preparacion}
+            maxLength={MAX_FRASE}
+            rows={2}
+            placeholder={FRASE_PREPARACION_DEFECTO}
+            onChange={(e) =>
+              setFoto((actual) => ({ ...actual, frase_preparacion: e.target.value.slice(0, MAX_FRASE) }))
+            }
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+          />
+          <p className="mt-1 text-right text-sm text-slate-400">
+            {foto.frase_preparacion.length} / {MAX_FRASE} caracteres
+          </p>
         </div>
 
         {/* Tiempo en pantalla */}
