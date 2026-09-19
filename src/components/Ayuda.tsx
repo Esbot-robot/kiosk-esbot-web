@@ -62,7 +62,9 @@ export function Ayuda({ children, ancho = 'w-72' }: AyudaProps) {
       {abierto && (
         <span
           role="tooltip"
-          className={`absolute left-0 top-full z-30 mt-1 ${ancho} rounded-lg bg-slate-800 px-3 py-2 text-sm font-normal leading-snug text-white shadow-lg`}
+          // max-w-[65vw]: en teléfono el globo no se sale por la derecha
+          // de la pantalla (en computador no cambia nada: 65vw >> w-72)
+          className={`absolute left-0 top-full z-30 mt-1 ${ancho} max-w-[65vw] rounded-lg bg-slate-800 px-3 py-2 text-sm font-normal leading-snug text-white shadow-lg`}
         >
           {children}
         </span>

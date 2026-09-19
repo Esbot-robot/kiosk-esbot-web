@@ -25,7 +25,7 @@ export function Modal({
   textoAceptar = 'Aceptar',
 }: ModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <h3 className="flex items-center gap-3 border-b border-slate-100 px-8 py-6 text-2xl font-semibold text-slate-900">
           {titulo}

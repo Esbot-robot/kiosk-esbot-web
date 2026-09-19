@@ -67,8 +67,9 @@ export function Robots() {
   })
 
   return (
-    <div className="px-12 py-10">
-      <h2 className="text-4xl font-bold text-slate-900">Robots</h2>
+    // En teléfono menos margen y título más chico; desde md, como siempre
+    <div className="px-4 py-6 sm:px-8 md:px-12 md:py-10">
+      <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Robots</h2>
       <p className="mt-2 text-slate-600">
         Estado en vivo de cada robot: en servicio, batería y última señal de la app.
       </p>
