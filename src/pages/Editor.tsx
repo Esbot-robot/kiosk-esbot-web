@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
+import { avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
 import { botonesAdicionalesVacios, botonFotoVacio, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
@@ -211,6 +212,7 @@ export function Editor() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setGuardadoOk(true)
       setTimeout(() => setGuardadoOk(false), 2500)
+      void avisoGuardado()
     },
   })
 

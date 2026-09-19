@@ -1,8 +1,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* Montserrat en todo el panel (antes solo en el login).
+   Se define como la fuente "sans" de Tailwind: así la toman el html, el body
+   y la clase font-sans, y font-mono (colores hex, número de WhatsApp) sigue
+   siendo monoespaciada. Los pesos cargados arriba (400-700) cubren todos los
+   que usa el panel: font-normal, font-medium, font-semibold y font-bold. */
+@theme {
+  --font-sans: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
 body {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Aviso "Cambios guardados" (SweetAlert2, ver src/lib/alertas.ts).
+   SweetAlert2 mide popup, icono y título en em: al pasar el popup de 1rem a
+   0.75rem todo queda al 75% (ancho 32em -> 384 px, icono 80 -> 60 px,
+   título 30 -> 22,5 px). La fuente se fija explícita para no depender de
+   que el popup la herede. */
+.alerta-guardado {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
 }
 
 .login-montserrat {
