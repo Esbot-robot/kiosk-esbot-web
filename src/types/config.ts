@@ -113,8 +113,13 @@ export interface PantallaInicial {
   fondo_url: string
   /** logo de la empresa, arriba centrado (imgLogo en el robot) */
   logo_url: string
+  /** false = el robot oculta el elemento pero conserva su espacio,
+   *  para que el resto de la pantalla no se mueva */
+  logo_visible: boolean
   titulo: TextoEstilo
+  titulo_visible: boolean
   subtitulo: TextoEstilo
+  subtitulo_visible: boolean
   boton: BotonEstilo
   /** el botón Jugar (quiz) también se puede apagar: hay eventos que solo quieren fotos */
   boton_activo: boolean
@@ -229,8 +234,11 @@ export function configVacia(): EventConfig {
     pantalla_inicial: {
       fondo_url: '',
       logo_url: '',
+      logo_visible: true,
       titulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
+      titulo_visible: true,
       subtitulo: { texto: '', color_texto: '', color_fondo: '', opacidad_fondo: 100, sombra_activa: false, color_sombra: '#000000', intensidad_sombra: 'leve' },
+      subtitulo_visible: true,
       boton: { texto: '', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
       boton_activo: true,
       botones_adicionales: botonesAdicionalesVacios(),

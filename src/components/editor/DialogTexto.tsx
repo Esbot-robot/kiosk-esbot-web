@@ -9,12 +9,15 @@ interface DialogTextoProps {
   titulo: string
   valor: TextoEstilo
   maxCaracteres: number
-  onGuardar: (nuevo: TextoEstilo) => void
+  /** si el texto se muestra en el robot */
+  visible: boolean
+  onGuardar: (nuevo: TextoEstilo, visible: boolean) => void
   onCerrar: () => void
 }
 
 /** Diálogo "Editar título" / "Editar subtítulo" del mockup */
-export function DialogTexto({ titulo, valor, maxCaracteres, onGuardar, onCerrar }: DialogTextoProps) {
+export function DialogTexto({ titulo, valor, maxCaracteres, visible, onGuardar, onCerrar }: DialogTextoProps) {
+  const [mostrar, setMostrar] = useState(visible)
   const [texto, setTexto] = useState(valor.texto)
   const [colorTexto, setColorTexto] = useState(valor.color_texto)
   const [colorFondo, setColorFondo] = useState(valor.color_fondo)
@@ -36,10 +39,17 @@ export function DialogTexto({ titulo, valor, maxCaracteres, onGuardar, onCerrar 
           sombra_activa: sombraActiva,
           color_sombra: colorSombra,
           intensidad_sombra: intensidadSombra,
-        })
+        }, mostrar)
         onCerrar()
       }}
     >
+      <InterruptorMostrar
+        etiqueta="Mostrar este texto"
+        ayuda="Apagado, el robot lo oculta pero deja su espacio vacío: el resto de la pantalla no se mueve."
+        valor={mostrar}
+        onChange={setMostrar}
+      />
+
       <p className="mb-2 font-medium text-slate-800">Texto del elemento</p>
       <textarea
         value={texto}
@@ -107,6 +117,31 @@ export function DialogTexto({ titulo, valor, maxCaracteres, onGuardar, onCerrar 
   )
 }
 
+interface InterruptorMostrarProps {
+  etiqueta: string
+  ayuda: string
+  valor: boolean
+  onChange: (valor: boolean) => void
+}
+
+/** Casilla "Mostrar este …" que va arriba en los diálogos de la pantalla inicial */
+export function InterruptorMostrar({ etiqueta, ayuda, valor, onChange }: InterruptorMostrarProps) {
+  return (
+    <label className="mb-5 flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
+      <input
+        type="checkbox"
+        checked={valor}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 accent-indigo-600"
+      />
+      <span className="flex items-center gap-2 font-semibold">
+        {etiqueta}
+        <Ayuda>{ayuda}</Ayuda>
+      </span>
+    </label>
+  )
+}
+
 interface DialogBotonProps {
   valor: BotonEstilo
   projectId: string
@@ -138,18 +173,12 @@ export function DialogBoton({
         onCerrar()
       }}
     >
-      <label className="mb-5 flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
-        <input
-          type="checkbox"
-          checked={visible}
-          onChange={(e) => setVisible(e.target.checked)}
-          className="h-4 w-4 accent-indigo-600"
-        />
-        <span className="flex items-center gap-2 font-semibold">
-          Mostrar este botón
-          <Ayuda>Apágalo si el evento no usa el quiz. Al menos un botón debe quedar activo.</Ayuda>
-        </span>
-      </label>
+      <InterruptorMostrar
+        etiqueta="Mostrar este botón"
+        ayuda="Apágalo si el evento no usa el quiz. Al menos un botón debe quedar activo."
+        valor={visible}
+        onChange={setVisible}
+      />
 
       <p className="mb-2 font-medium text-slate-800">Texto del elemento</p>
       <input

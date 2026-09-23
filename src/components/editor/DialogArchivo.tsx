@@ -3,6 +3,7 @@ import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { IconoNube } from '../iconos'
+import { InterruptorMostrar } from './DialogTexto'
 
 interface DialogArchivoProps {
   titulo: string
@@ -10,6 +11,9 @@ interface DialogArchivoProps {
   projectId: string
   /** texto de ayuda bajo la zona de subida; si no se pasa, usa el del tipo */
   nota?: string
+  /** si se pasa, el diálogo muestra la casilla "Mostrar" y guarda su valor
+   *  aunque no se suba un archivo nuevo */
+  mostrar?: { etiqueta: string; ayuda: string; valor: boolean; onGuardar: (valor: boolean) => void }
   onSubido: (urlPublica: string) => void
   onCerrar: () => void
 }
@@ -30,8 +34,10 @@ const CONFIG_TIPO = {
 } as const
 
 /** Diálogo "Cambiar imagen de fondo" / "Cargar video para patrullaje" del mockup */
-export function DialogArchivo({ titulo, tipo, projectId, nota, onSubido, onCerrar }: DialogArchivoProps) {
+export function DialogArchivo({ titulo, tipo, projectId, nota, mostrar, onSubido, onCerrar }: DialogArchivoProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [visible, setVisible] = useState(mostrar?.valor ?? true)
+  const cambioVisible = mostrar !== undefined && visible !== mostrar.valor
   const [archivo, setArchivo] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [subiendo, setSubiendo] = useState(false)
@@ -49,12 +55,18 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, onSubido, onCerra
   }
 
   async function subir() {
-    if (!archivo) return
+    if (!archivo) {
+      // Solo se cambió la casilla "Mostrar": no hay nada que subir
+      if (cambioVisible) mostrar?.onGuardar(visible)
+      onCerrar()
+      return
+    }
     setSubiendo(true)
     setError('')
     try {
       const url = await subirArchivo('media', rutaMedia(projectId, archivo.name), archivo)
       onSubido(url)
+      if (cambioVisible) mostrar?.onGuardar(visible)
       onCerrar()
     } catch (e) {
       const detalle = e instanceof Error ? e.message : JSON.stringify(e)
@@ -70,9 +82,17 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, onSubido, onCerra
       titulo={titulo}
       onCancelar={onCerrar}
       onAceptar={subir}
-      aceptarDeshabilitado={!archivo || subiendo}
+      aceptarDeshabilitado={(!archivo && !cambioVisible) || subiendo}
       textoAceptar={subiendo ? 'Subiendo...' : 'Aceptar'}
     >
+      {mostrar && (
+        <InterruptorMostrar
+          etiqueta={mostrar.etiqueta}
+          ayuda={mostrar.ayuda}
+          valor={visible}
+          onChange={setVisible}
+        />
+      )}
       <div
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {

@@ -75,6 +75,15 @@ function Lapiz({ onClick, title }: { onClick: () => void; title?: string }) {
   )
 }
 
+/** Marca un elemento apagado en la vista previa: el robot no lo muestra */
+function EtiquetaOculto() {
+  return (
+    <span className="shrink-0 rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-white">
+      Oculto
+    </span>
+  )
+}
+
 function ItemPanel({
   icono,
   label,
@@ -178,6 +187,10 @@ export function Editor() {
       })
       // Antes el botón Jugar no se podía apagar: los proyectos viejos lo mantienen encendido.
       cfg.pantalla_inicial.boton_activo = inicialAnterior.boton_activo ?? true
+      // Antes el logo y los textos no se podían ocultar: los proyectos viejos los muestran.
+      cfg.pantalla_inicial.logo_visible = inicialAnterior.logo_visible ?? true
+      cfg.pantalla_inicial.titulo_visible = inicialAnterior.titulo_visible ?? true
+      cfg.pantalla_inicial.subtitulo_visible = inicialAnterior.subtitulo_visible ?? true
       // Proyectos anteriores no tenían el botón de foto: se agrega desactivado.
       const fotoBase = botonFotoVacio()
       const fotoGuardada = inicialAnterior.boton_foto
@@ -441,20 +454,24 @@ export function Editor() {
               <div className="flex h-full flex-col items-center pt-8">
                 {/* Logo de la empresa (imgLogo en el robot) */}
                 <div className="flex items-center gap-2">
-                  {ini.logo_url ? (
-                    <img src={ini.logo_url} alt="" className="h-20 max-w-72 object-contain" />
-                  ) : (
-                    <div className="flex h-20 w-56 items-center justify-center rounded-lg border-2 border-dashed border-white/50 text-sm text-white/70">
-                      Logo de la empresa
-                    </div>
-                  )}
+                  {/* Oculto: se ve tenue para poder editarlo; en el robot queda el espacio vacío */}
+                  <div className={ini.logo_visible ? '' : 'opacity-25'}>
+                    {ini.logo_url ? (
+                      <img src={ini.logo_url} alt="" className="h-20 max-w-72 object-contain" />
+                    ) : (
+                      <div className="flex h-20 w-56 items-center justify-center rounded-lg border-2 border-dashed border-white/50 text-sm text-white/70">
+                        Logo de la empresa
+                      </div>
+                    )}
+                  </div>
+                  {!ini.logo_visible && <EtiquetaOculto />}
                   <Lapiz title="Cambiar logo" onClick={() => setDialogo({ tipo: 'logo' })} />
                 </div>
 
                 {/* Título y subtítulo: franjas de lado a lado, como en el robot */}
                 <div className="relative mt-6 w-full">
                   <p
-                    className="w-full px-16 py-2 text-center text-2xl font-bold"
+                    className={`w-full px-16 py-2 text-center text-2xl font-bold ${ini.titulo_visible ? '' : 'opacity-25'}`}
                     style={{
                       color: ini.titulo.color_texto || '#1e2a4a',
                       backgroundColor: colorConOpacidad(ini.titulo.color_fondo, ini.titulo.opacidad_fondo),
@@ -463,14 +480,15 @@ export function Editor() {
                   >
                     {ini.titulo.texto || 'Título (clic en el lápiz)'}
                   </p>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                    {!ini.titulo_visible && <EtiquetaOculto />}
                     <Lapiz title="Editar título" onClick={() => setDialogo({ tipo: 'titulo' })} />
                   </div>
                 </div>
 
                 <div className="relative w-full">
                   <p
-                    className="w-full px-16 py-2 text-center text-xl font-semibold"
+                    className={`w-full px-16 py-2 text-center text-xl font-semibold ${ini.subtitulo_visible ? '' : 'opacity-25'}`}
                     style={{
                       color: ini.subtitulo.color_texto || '#1e2a4a',
                       backgroundColor: colorConOpacidad(ini.subtitulo.color_fondo, ini.subtitulo.opacidad_fondo),
@@ -479,7 +497,8 @@ export function Editor() {
                   >
                     {ini.subtitulo.texto || 'Subtítulo'}
                   </p>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                    {!ini.subtitulo_visible && <EtiquetaOculto />}
                     <Lapiz title="Editar subtítulo" onClick={() => setDialogo({ tipo: 'subtitulo' })} />
                   </div>
                 </div>
@@ -835,7 +854,8 @@ export function Editor() {
           titulo="Editar titulo"
           valor={ini.titulo}
           maxCaracteres={LIMITES.TITULO_MAX}
-          onGuardar={(titulo) => setInicial({ titulo })}
+          visible={ini.titulo_visible}
+          onGuardar={(titulo, titulo_visible) => setInicial({ titulo, titulo_visible })}
           onCerrar={() => setDialogo(null)}
         />
       )}
@@ -844,7 +864,8 @@ export function Editor() {
           titulo="Editar subtitulo"
           valor={ini.subtitulo}
           maxCaracteres={LIMITES.SUBTITULO_MAX}
-          onGuardar={(subtitulo) => setInicial({ subtitulo })}
+          visible={ini.subtitulo_visible}
+          onGuardar={(subtitulo, subtitulo_visible) => setInicial({ subtitulo, subtitulo_visible })}
           onCerrar={() => setDialogo(null)}
         />
       )}
@@ -900,6 +921,12 @@ export function Editor() {
           tipo="imagen"
           projectId={projectId!}
           nota="Resolución recomendada: 512 × 512 px, PNG con fondo transparente"
+          mostrar={{
+            etiqueta: 'Mostrar el logo',
+            ayuda: 'Apagado, el robot lo oculta pero deja su espacio vacío: el resto de la pantalla no se mueve.',
+            valor: ini.logo_visible,
+            onGuardar: (logo_visible) => setInicial({ logo_visible }),
+          }}
           onSubido={(url) => setInicial({ logo_url: url })}
           onCerrar={() => setDialogo(null)}
         />
