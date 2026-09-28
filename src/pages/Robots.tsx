@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { describirError } from '../lib/errores'
 import { Modal } from '../components/Modal'
 import { Ayuda } from '../components/Ayuda'
 import robotPng from '../assets/icons/robot.png'
@@ -240,7 +241,7 @@ function ControlRecorrido({ robot, enServicio }: { robot: RobotStatus; enServici
       {estado && <p className={`mt-2 text-sm font-medium ${estado.color}`}>{estado.texto}</p>}
       {cambiar.error && (
         <p className="mt-2 text-sm font-medium text-rose-600">
-          No se pudo cambiar: {cambiar.error instanceof Error ? cambiar.error.message : 'error desconocido'}
+          No se pudo cambiar. {describirError(cambiar.error)}
         </p>
       )}
 

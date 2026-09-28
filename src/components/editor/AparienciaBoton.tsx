@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { CampoColor } from '../CampoColor'
 import { Ayuda } from '../Ayuda'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
+import { describirError } from '../../lib/errores'
 import type { BotonEstilo } from '../../types/config'
 
 interface AparienciaBotonProps {
@@ -36,8 +37,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
       const imagen_url = await subirArchivo('media', rutaMedia(projectId, file.name), file)
       onChange({ ...valor, imagen_url })
     } catch (e) {
-      const detalle = e instanceof Error ? e.message : 'Error desconocido'
-      setError(`No se pudo subir la imagen: ${detalle}`)
+      setError(`No se pudo subir la imagen. ${describirError(e)}`)
     } finally {
       setSubiendo(false)
     }

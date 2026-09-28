@@ -3,6 +3,7 @@ import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
 import { AparienciaBoton } from './AparienciaBoton'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
+import { describirError } from '../../lib/errores'
 import { FRASE_PREPARACION_DEFECTO, type BotonFoto } from '../../types/config'
 
 interface DialogFotoProps {
@@ -64,11 +65,10 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
     }
     setSubiendo(true)
     try {
-      const marco_url = await subirArchivo('media', rutaMedia(projectId, file.name), file, 'image/png')
+      const marco_url = await subirArchivo('media', rutaMedia(projectId, file.name), file, { contentType: 'image/png' })
       setFoto((actual) => ({ ...actual, marco_url }))
     } catch (e) {
-      const detalle = e instanceof Error ? e.message : 'Error desconocido'
-      setError(`No se pudo subir el marco: ${detalle}`)
+      setError(`No se pudo subir el marco. ${describirError(e)}`)
     } finally {
       setSubiendo(false)
     }

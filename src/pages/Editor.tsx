@@ -11,6 +11,7 @@ import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
 import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
 import { DialogFoto } from '../components/editor/DialogFoto'
+import { describirError } from '../lib/errores'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 
 type Pestana = 'inicial' | 'ruleta'
@@ -121,7 +122,7 @@ export function Editor() {
   const [errorGuardar, setErrorGuardar] = useState('')
   const [confirmarBorrar, setConfirmarBorrar] = useState(false)
 
-  const { data: proyecto, isLoading } = useQuery({
+  const { data: proyecto, isLoading, error: errorCarga, refetch } = useQuery({
     queryKey: ['project', projectId],
     queryFn: async (): Promise<Project> => {
       const { data, error } = await supabase
@@ -271,6 +272,20 @@ export function Editor() {
     },
   })
 
+  // Sin esto, un fallo de red dejaba "Cargando proyecto..." para siempre
+  if (errorCarga && !config) {
+    return (
+      <div className="p-12">
+        <p className="font-medium text-red-600">No se pudo cargar el proyecto. {describirError(errorCarga)}</p>
+        <button
+          onClick={() => void refetch()}
+          className="mt-4 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700"
+        >
+          Reintentar
+        </button>
+      </div>
+    )
+  }
   if (isLoading || !config) {
     return <p className="p-12 text-slate-500">Cargando proyecto...</p>
   }
@@ -801,7 +816,7 @@ export function Editor() {
             </div>
             {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
             {guardar.isError && (
-              <p className="mt-2 text-sm text-red-600">Error al guardar. Intenta de nuevo.</p>
+              <p className="mt-2 text-sm text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
             )}
           </div>
         </aside>
@@ -843,7 +858,7 @@ export function Editor() {
           )}
 
           {borrar.isError && (
-            <p className="mt-3 text-sm text-red-600">No se pudo eliminar. Intenta de nuevo.</p>
+            <p className="mt-3 text-sm text-red-600">No se pudo eliminar. {describirError(borrar.error)}</p>
           )}
         </Modal>
       )}
@@ -920,6 +935,7 @@ export function Editor() {
           titulo="Cambiar logo de la empresa"
           tipo="imagen"
           projectId={projectId!}
+          urlActual={ini.logo_url}
           nota="Resolución recomendada: 512 × 512 px, PNG con fondo transparente"
           mostrar={{
             etiqueta: 'Mostrar el logo',
@@ -936,6 +952,7 @@ export function Editor() {
           titulo="Cambiar imagen de fondo"
           tipo="imagen"
           projectId={projectId!}
+          urlActual={dialogo.pantalla === 'inicial' ? ini.fondo_url : rul.fondo_url}
           onSubido={(url) =>
             dialogo.pantalla === 'inicial' ? setInicial({ fondo_url: url }) : setRuleta({ fondo_url: url })
           }
@@ -947,6 +964,7 @@ export function Editor() {
           titulo="Cargar video para patrullaje"
           tipo="video"
           projectId={projectId!}
+          urlActual={ini.video_patrullaje_url}
           onSubido={(url) => setInicial({ video_patrullaje_url: url })}
           onCerrar={() => setDialogo(null)}
         />

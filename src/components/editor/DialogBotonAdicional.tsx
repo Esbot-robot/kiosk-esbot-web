@@ -1,8 +1,10 @@
-import { useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
+import { BarraSubida } from '../BarraSubida'
 import { AparienciaBoton } from './AparienciaBoton'
-import { rutaMedia, subirArchivo } from '../../lib/storage'
+import { formatoMB, nombreDesdeUrl, rutaMedia, subirArchivo, type ProgresoSubida } from '../../lib/storage'
+import { describirError } from '../../lib/errores'
 import type { BotonAdicionalInicial } from '../../types/config'
 
 interface DialogBotonAdicionalProps {
@@ -28,8 +30,13 @@ export function DialogBotonAdicional({
   const [boton, setBoton] = useState(() => structuredClone(valor))
   const [error, setError] = useState('')
   const [subiendoCampo, setSubiendoCampo] = useState('')
+  const [progreso, setProgreso] = useState<ProgresoSubida | null>(null)
+  const cancelador = useRef<AbortController | null>(null)
   const videoInput = useRef<HTMLInputElement>(null)
   const trayectoInput = useRef<HTMLInputElement>(null)
+
+  // Si el diálogo se cierra a mitad de la subida, la subida se cancela
+  useEffect(() => () => cancelador.current?.abort(), [])
 
   async function subirVideo(campo: 'video_url' | 'video_trayecto_url', file?: File) {
     setError('')
@@ -39,17 +46,24 @@ export function DialogBotonAdicional({
       return
     }
     if (file.size > MAX_VIDEO_BYTES) {
-      setError(`El video pesa ${(file.size / 1024 / 1024).toFixed(1)}MB. El máximo es 50MB.`)
+      setError(`El video pesa ${formatoMB(file.size)}. El máximo es 50MB.`)
       return
     }
+    const controlador = new AbortController()
+    cancelador.current = controlador
     setSubiendoCampo(campo)
+    setProgreso(null)
     try {
-      const url = await subirArchivo('media', rutaMedia(projectId, file.name), file)
+      const url = await subirArchivo('media', rutaMedia(projectId, file.name), file, {
+        onProgreso: setProgreso,
+        signal: controlador.signal,
+      })
       setBoton((actual) => ({ ...actual, [campo]: url }))
     } catch (e) {
-      const detalle = e instanceof Error ? e.message : 'Error desconocido'
-      setError(`No se pudo subir el video: ${detalle}`)
+      if (controlador.signal.aborted) return
+      setError(`No se pudo subir el video. ${describirError(e)}`)
     } finally {
+      cancelador.current = null
       setSubiendoCampo('')
     }
   }
@@ -121,9 +135,9 @@ export function DialogBotonAdicional({
           >
             {subiendo ? 'Subiendo...' : cargado ? 'Reemplazar video' : 'Cargar video'}
           </button>
-          {cargado && (
+          {cargado && !subiendo && (
             <>
-              <span className="text-sm text-emerald-700">Video cargado</span>
+              <span className="break-all text-sm text-emerald-700">{nombreDesdeUrl(cargado)}</span>
               <button
                 type="button"
                 onClick={() => setBoton((actual) => ({ ...actual, [campo]: '' }))}
@@ -134,6 +148,11 @@ export function DialogBotonAdicional({
             </>
           )}
         </div>
+        {subiendo && (
+          <div className="mt-3">
+            <BarraSubida progreso={progreso} />
+          </div>
+        )}
         <input
           ref={input}
           type="file"

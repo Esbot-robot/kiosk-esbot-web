@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { describirError } from '../lib/errores'
 import { configVacia, type Project } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
 import { IconoFijar, IconoReloj } from '../components/iconos'
@@ -109,7 +110,7 @@ export function Projects() {
         {isLoading && <p className="mt-10 text-slate-500">Cargando proyectos...</p>}
         {error && (
           <p className="mt-10 text-red-600">
-            Error cargando proyectos. ¿Está bien configurado el .env?
+            No se pudieron cargar los proyectos. {describirError(error)}
           </p>
         )}
 

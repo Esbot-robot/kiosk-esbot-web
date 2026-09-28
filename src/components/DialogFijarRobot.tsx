@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Modal } from './Modal'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
+import { describirError } from '../lib/errores'
 import type { Project } from '../types/config'
 
 interface DialogFijarRobotProps {
@@ -73,7 +74,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
       setError('')
       invalidar()
     },
-    onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo fijar el proyecto.'),
+    onError: (e) => setError(`No se pudo fijar el proyecto. ${describirError(e)}`),
   })
 
   const quitar = useMutation({
@@ -83,6 +84,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
       await eliminarConfigRobot(s)
     },
     onSuccess: invalidar,
+    onError: (e) => setError(`No se pudo quitar el robot. ${describirError(e)}`),
   })
 
   return (

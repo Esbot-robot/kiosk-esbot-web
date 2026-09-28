@@ -1,7 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
-import { rutaMedia, subirArchivo } from '../../lib/storage'
+import { BarraSubida } from '../BarraSubida'
+import {
+  formatoMB,
+  nombreDesdeUrl,
+  pesoDesdeUrl,
+  rutaMedia,
+  subirArchivo,
+  type ProgresoSubida,
+} from '../../lib/storage'
+import { describirError } from '../../lib/errores'
 import { IconoNube } from '../iconos'
 import { InterruptorMostrar } from './DialogTexto'
 
@@ -9,6 +18,8 @@ interface DialogArchivoProps {
   titulo: string
   tipo: 'imagen' | 'video'
   projectId: string
+  /** URL del archivo que ya tiene el proyecto: se muestra como si estuviera elegido */
+  urlActual?: string
   /** texto de ayuda bajo la zona de subida; si no se pasa, usa el del tipo */
   nota?: string
   /** si se pasa, el diálogo muestra la casilla "Mostrar" y guarda su valor
@@ -34,21 +45,48 @@ const CONFIG_TIPO = {
 } as const
 
 /** Diálogo "Cambiar imagen de fondo" / "Cargar video para patrullaje" del mockup */
-export function DialogArchivo({ titulo, tipo, projectId, nota, mostrar, onSubido, onCerrar }: DialogArchivoProps) {
+export function DialogArchivo({
+  titulo,
+  tipo,
+  projectId,
+  urlActual,
+  nota,
+  mostrar,
+  onSubido,
+  onCerrar,
+}: DialogArchivoProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const cancelador = useRef<AbortController | null>(null)
   const [visible, setVisible] = useState(mostrar?.valor ?? true)
   const cambioVisible = mostrar !== undefined && visible !== mostrar.valor
   const [archivo, setArchivo] = useState<File | null>(null)
+  const [pesoActual, setPesoActual] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [subiendo, setSubiendo] = useState(false)
+  const [progreso, setProgreso] = useState<ProgresoSubida | null>(null)
   const [arrastrando, setArrastrando] = useState(false)
   const cfg = CONFIG_TIPO[tipo]
+
+  // El peso del archivo actual no está en la config: se le pregunta a Storage
+  useEffect(() => {
+    if (!urlActual) return
+    let vigente = true
+    void pesoDesdeUrl(urlActual).then((peso) => {
+      if (vigente) setPesoActual(peso)
+    })
+    return () => {
+      vigente = false
+    }
+  }, [urlActual])
+
+  // Si el diálogo se cierra a mitad de la subida, la subida se cancela
+  useEffect(() => () => cancelador.current?.abort(), [])
 
   function seleccionar(f: File | undefined) {
     setError('')
     if (!f) return
     if (f.size > cfg.maxMB * 1024 * 1024) {
-      setError(`El archivo pesa ${(f.size / 1024 / 1024).toFixed(1)}MB — el máximo es ${cfg.maxMB}MB`)
+      setError(`El archivo pesa ${formatoMB(f.size)} — el máximo es ${cfg.maxMB}MB`)
       return
     }
     setArchivo(f)
@@ -61,26 +99,42 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, mostrar, onSubido
       onCerrar()
       return
     }
+    const controlador = new AbortController()
+    cancelador.current = controlador
     setSubiendo(true)
+    setProgreso(null)
     setError('')
     try {
-      const url = await subirArchivo('media', rutaMedia(projectId, archivo.name), archivo)
+      const url = await subirArchivo('media', rutaMedia(projectId, archivo.name), archivo, {
+        onProgreso: setProgreso,
+        signal: controlador.signal,
+      })
       onSubido(url)
       if (cambioVisible) mostrar?.onGuardar(visible)
       onCerrar()
     } catch (e) {
-      const detalle = e instanceof Error ? e.message : JSON.stringify(e)
-      setError(`Error subiendo el archivo: ${detalle}`)
+      if (controlador.signal.aborted) return
+      setError(`No se pudo subir el archivo. ${describirError(e)}`)
       console.error(e)
     } finally {
+      cancelador.current = null
       setSubiendo(false)
     }
   }
 
+  function cancelar() {
+    cancelador.current?.abort()
+    onCerrar()
+  }
+
+  // Lo que se muestra en la zona de subida: el archivo elegido o, si no, el actual
+  const nombreMostrado = archivo?.name ?? (urlActual ? nombreDesdeUrl(urlActual) : '')
+  const pesoMostrado = archivo ? archivo.size : pesoActual
+
   return (
     <Modal
       titulo={titulo}
-      onCancelar={onCerrar}
+      onCancelar={cancelar}
       onAceptar={subir}
       aceptarDeshabilitado={(!archivo && !cambioVisible) || subiendo}
       textoAceptar={subiendo ? 'Subiendo...' : 'Aceptar'}
@@ -94,28 +148,28 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, mostrar, onSubido
         />
       )}
       <div
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !subiendo && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault()
-          setArrastrando(true)
+          if (!subiendo) setArrastrando(true)
         }}
         onDragLeave={() => setArrastrando(false)}
         onDrop={(e) => {
           e.preventDefault()
           setArrastrando(false)
-          seleccionar(e.dataTransfer.files[0])
+          if (!subiendo) seleccionar(e.dataTransfer.files[0])
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-8 py-16 text-center transition-colors ${
-          arrastrando ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400'
-        }`}
+        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-8 py-16 text-center transition-colors ${
+          subiendo ? 'cursor-default border-slate-300' : 'cursor-pointer'
+        } ${arrastrando ? 'border-indigo-500 bg-indigo-50' : subiendo ? '' : 'border-slate-300 hover:border-indigo-400'}`}
       >
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100">
           <IconoNube />
         </div>
-        {archivo ? (
-          <p className="mt-4 font-medium text-slate-800">
-            {archivo.name}{' '}
-            <span className="text-slate-400">({(archivo.size / 1024 / 1024).toFixed(1)}MB)</span>
+        {nombreMostrado ? (
+          <p className="mt-4 break-all font-medium text-slate-800">
+            {nombreMostrado}{' '}
+            {pesoMostrado !== null && <span className="text-slate-400">({formatoMB(pesoMostrado)})</span>}
           </p>
         ) : (
           <p className="mt-4 text-lg text-slate-700">
@@ -130,6 +184,11 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, mostrar, onSubido
           <Ayuda>{nota ?? cfg.extra}</Ayuda>
         </p>
       </div>
+      {subiendo && (
+        <div className="mt-4">
+          <BarraSubida progreso={progreso} />
+        </div>
+      )}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <input
@@ -137,7 +196,10 @@ export function DialogArchivo({ titulo, tipo, projectId, nota, mostrar, onSubido
         type="file"
         accept={cfg.accept}
         className="hidden"
-        onChange={(e) => seleccionar(e.target.files?.[0])}
+        onChange={(e) => {
+          seleccionar(e.target.files?.[0])
+          e.target.value = ''
+        }}
       />
     </Modal>
   )

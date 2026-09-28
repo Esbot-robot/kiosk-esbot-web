@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { describirError } from '../lib/errores'
 import loginBg from '../assets/login_bg.png'
 import logoLogin from '../assets/logo-login.png'
 
@@ -82,7 +83,9 @@ export function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setCargando(false)
     if (error) {
-      setError('Credenciales incorrectas')
+      // Antes todo fallo decía "Credenciales incorrectas", también sin internet
+      const credenciales = error.code === 'invalid_credentials' || error.status === 400
+      setError(credenciales ? 'Credenciales incorrectas' : describirError(error))
       return
     }
     navigate('/proyectos')

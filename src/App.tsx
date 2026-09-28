@@ -2,6 +2,7 @@ import { lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { RequireAuth } from './components/RequireAuth'
 import { Layout } from './components/Layout'
+import { AvisoSinConexion } from './components/AvisoSinConexion'
 import { Login } from './pages/Login'
 import { Galeria } from './pages/Galeria'
 
@@ -19,25 +20,28 @@ const Robots = lazy(() => import('./pages/Robots').then((m) => ({ default: m.Rob
 
 export default function App() {
   return (
-    <Routes>
-      {/* Públicas: sin sesión */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/galeria" element={<Galeria />} />
+    <>
+      <AvisoSinConexion />
+      <Routes>
+        {/* Públicas: sin sesión */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/galeria" element={<Galeria />} />
 
-      {/* Panel: todo lo de adentro exige sesión */}
-      <Route
-        element={
-          <RequireAuth>
-            <Layout />
-          </RequireAuth>
-        }
-      >
-        <Route path="/proyectos" element={<Projects />} />
-        <Route path="/analitica" element={<Analitica />} />
-        <Route path="/robots" element={<Robots />} />
-        <Route path="/editor/:projectId" element={<Editor />} />
-        <Route path="*" element={<Navigate to="/proyectos" replace />} />
-      </Route>
-    </Routes>
+        {/* Panel: todo lo de adentro exige sesión */}
+        <Route
+          element={
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
+          }
+        >
+          <Route path="/proyectos" element={<Projects />} />
+          <Route path="/analitica" element={<Analitica />} />
+          <Route path="/robots" element={<Robots />} />
+          <Route path="/editor/:projectId" element={<Editor />} />
+          <Route path="*" element={<Navigate to="/proyectos" replace />} />
+        </Route>
+      </Routes>
+    </>
   )
 }
