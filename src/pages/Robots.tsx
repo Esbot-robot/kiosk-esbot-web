@@ -44,7 +44,7 @@ function estadoVersion(r: RobotStatus, versionProyecto: number | undefined) {
   const v = r.version_config
   if (v == null) return { texto: 'Versión de config sin reportar', color: 'text-slate-400' }
   if (versionProyecto === undefined) return { texto: `Config v${v} · sin proyecto fijado`, color: 'text-slate-500' }
-  if (v === versionProyecto) return { texto: `Config v${v} · al día`, color: 'text-emerald-700' }
+  if (v === versionProyecto) return { texto: `Config v${v} · Sincronizado`, color: 'text-emerald-700' }
   return {
     texto: `Config v${v} · falta cargar la v${versionProyecto} (reinicia la app)`,
     color: 'text-amber-700',
