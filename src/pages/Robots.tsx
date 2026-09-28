@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import { Modal } from '../components/Modal'
 import { Ayuda } from '../components/Ayuda'
+import { DialogRuta } from '../components/DialogRuta'
 import robotPng from '../assets/icons/robot.png'
 import cargandoPng from '../assets/icons/charging_icon.png'
 
@@ -25,6 +26,10 @@ interface RobotStatus {
   quieto_confirmado?: boolean
   /** versión de la config que el robot tiene aplicada; null en apps anteriores */
   version_config?: number | null
+  /** ubicaciones del mapa del robot; null si su app aún no las envía */
+  ubicaciones_mapa?: string[] | null
+  /** ruta de patrullaje, guardada aquí o en el admin del robot */
+  ruta?: string[] | null
 }
 
 /** versión actual del proyecto fijado a cada serial */
@@ -210,11 +215,52 @@ export function Robots() {
                 </div>
               </div>
 
+              <ControlRuta robot={r} enServicio={enServicio} />
               <ControlRecorrido robot={r} enServicio={enServicio} />
             </div>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/** Ruta de patrullaje del robot: resumen en la tarjeta y botón para editarla */
+function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: boolean }) {
+  const [editando, setEditando] = useState(false)
+  const ruta = robot.ruta ?? []
+
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-sm text-slate-500">
+          Ruta
+          <Ayuda>
+            Ubicaciones que el robot recorre en orden. Se puede cambiar aquí o en el admin del robot, y los dos lados ven el último cambio guardado. El robot la guarda en su memoria: sin internet sigue patrullando con la última que recibió.
+          </Ayuda>
+        </span>
+        <button
+          type="button"
+          onClick={() => setEditando(true)}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          {ruta.length ? 'Editar ruta' : 'Configurar ruta'}
+        </button>
+      </div>
+      <p className={`mt-2 text-sm ${ruta.length ? 'font-medium text-slate-700' : 'text-slate-400'}`}>
+        {ruta.length ? ruta.join(' → ') : 'Sin ruta guardada'}
+      </p>
+
+      {editando && (
+        <DialogRuta
+          serial={robot.serial}
+          nombre={robot.nombre || 'Robot'}
+          ubicacionesMapa={robot.ubicaciones_mapa ?? null}
+          rutaActual={ruta}
+          enServicio={enServicio}
+          onCerrar={() => setEditando(false)}
+        />
+      )}
     </div>
   )
 }
