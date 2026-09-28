@@ -1,47 +1,44 @@
-import { lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router-dom'
 import { RequireAuth } from './components/RequireAuth'
 import { Layout } from './components/Layout'
 import { AvisoSinConexion } from './components/AvisoSinConexion'
 import { Login } from './pages/Login'
 import { Galeria } from './pages/Galeria'
+import { Analitica, Editor, Projects, Robots } from './paginas'
 
 /**
- * Las páginas del panel se cargan solo cuando alguien entra a ellas.
- * Quien abre /galeria desde el celular en un evento no descarga el editor
- * ni el generador de PDF de Analítica, que son lo más pesado del proyecto.
- * lazy() va aquí afuera: si estuviera dentro del componente, React crearía
- * un componente nuevo en cada dibujado y volvería a montar la página.
+ * Router "de datos" (createBrowserRouter) y no <BrowserRouter>: es el único
+ * que permite useBlocker, con el que el editor frena la salida a Analítica o
+ * Robots cuando hay cambios sin guardar.
  */
-const Projects = lazy(() => import('./pages/Projects').then((m) => ({ default: m.Projects })))
-const Editor = lazy(() => import('./pages/Editor').then((m) => ({ default: m.Editor })))
-const Analitica = lazy(() => import('./pages/Analitica').then((m) => ({ default: m.Analitica })))
-const Robots = lazy(() => import('./pages/Robots').then((m) => ({ default: m.Robots })))
+export const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route
+      element={
+        <>
+          <AvisoSinConexion />
+          <Outlet />
+        </>
+      }
+    >
+      {/* Públicas: sin sesión */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/galeria" element={<Galeria />} />
 
-export default function App() {
-  return (
-    <>
-      <AvisoSinConexion />
-      <Routes>
-        {/* Públicas: sin sesión */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/galeria" element={<Galeria />} />
-
-        {/* Panel: todo lo de adentro exige sesión */}
-        <Route
-          element={
-            <RequireAuth>
-              <Layout />
-            </RequireAuth>
-          }
-        >
-          <Route path="/proyectos" element={<Projects />} />
-          <Route path="/analitica" element={<Analitica />} />
-          <Route path="/robots" element={<Robots />} />
-          <Route path="/editor/:projectId" element={<Editor />} />
-          <Route path="*" element={<Navigate to="/proyectos" replace />} />
-        </Route>
-      </Routes>
-    </>
+      {/* Panel: todo lo de adentro exige sesión */}
+      <Route
+        element={
+          <RequireAuth>
+            <Layout />
+          </RequireAuth>
+        }
+      >
+        <Route path="/proyectos" element={<Projects />} />
+        <Route path="/analitica" element={<Analitica />} />
+        <Route path="/robots" element={<Robots />} />
+        <Route path="/editor/:projectId" element={<Editor />} />
+        <Route path="*" element={<Navigate to="/proyectos" replace />} />
+      </Route>
+    </Route>
   )
-}
+)

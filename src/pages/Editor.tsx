@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
@@ -121,6 +121,9 @@ export function Editor() {
   const [guardadoOk, setGuardadoOk] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState('')
   const [confirmarBorrar, setConfirmarBorrar] = useState(false)
+  /** nombre + config tal como están en Supabase, para saber si hay cambios sin guardar */
+  const [guardadoJson, setGuardadoJson] = useState('')
+  const eliminado = useRef(false)
 
   const { data: proyecto, isLoading, error: errorCarga, refetch } = useQuery({
     queryKey: ['project', projectId],
@@ -199,6 +202,7 @@ export function Editor() {
         ? { ...fotoBase, ...fotoGuardada, boton: { ...fotoBase.boton, ...fotoGuardada.boton } }
         : fotoBase
       setConfig(cfg)
+      setGuardadoJson(JSON.stringify({ nombre: proyecto.nombre, config: cfg }))
     }
   }, [proyecto])
 
@@ -212,6 +216,7 @@ export function Editor() {
         .eq('id', projectId)
       if (error) throw error
       setConfig(nuevaConfig)
+      setGuardadoJson(JSON.stringify({ nombre, config: nuevaConfig }))
 
       // Republicar el JSON de los robots que tengan este proyecto fijado
       const { data: robots } = await supabase
@@ -268,11 +273,34 @@ export function Editor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['robots'] })
+      // el proyecto ya no existe: sus cambios sin guardar no deben frenar la salida
+      eliminado.current = true
       navigate('/proyectos')
     },
   })
 
   // Sin esto, un fallo de red dejaba "Cargando proyecto..." para siempre
+  const hayCambios = config !== null && guardadoJson !== '' && JSON.stringify({ nombre, config }) !== guardadoJson
+
+  // Cerrar o recargar la pestaña con cambios sin guardar los perdería: el
+  // navegador pide confirmación (el texto del aviso lo pone el navegador)
+  useEffect(() => {
+    if (!hayCambios) return
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [hayCambios])
+
+  // Ir a otra sección del panel (Analítica, Robots, atrás del navegador) no
+  // recarga la página, así que beforeunload no se entera: lo frena el router
+  const salida = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hayCambios && !eliminado.current && currentLocation.pathname !== nextLocation.pathname
+  )
+
   if (errorCarga && !config) {
     return (
       <div className="p-12">
@@ -814,6 +842,9 @@ export function Editor() {
                 {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
               </button>
             </div>
+            {hayCambios && !guardar.isPending && (
+              <p className="mt-2 text-sm font-medium text-amber-700">Tienes cambios sin guardar</p>
+            )}
             {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
             {guardar.isError && (
               <p className="mt-2 text-sm text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
@@ -821,6 +852,21 @@ export function Editor() {
           </div>
         </aside>
       </div>
+
+      {/* ─── Salir con cambios sin guardar ─── */}
+      {salida.state === 'blocked' && (
+        <Modal
+          titulo="Tienes cambios sin guardar"
+          textoAceptar="Salir sin guardar"
+          onCancelar={() => salida.reset()}
+          onAceptar={() => salida.proceed()}
+        >
+          <p className="text-slate-700">
+            Si sales ahora, se perderán los cambios que hiciste en este proyecto. Para conservarlos,
+            cancela y dale <span className="font-semibold">Guardar</span>.
+          </p>
+        </Modal>
+      )}
 
       {/* ─── Confirmar eliminación ─── */}
       {confirmarBorrar && (

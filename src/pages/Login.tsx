@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import loginBg from '../assets/login_bg.png'
@@ -75,6 +75,14 @@ export function Login() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Llegada desde "Cerrar Sesión" del menú (ver Layout)
+  useEffect(() => {
+    if ((location.state as { cerrarSesion?: boolean } | null)?.cerrarSesion) {
+      void supabase.auth.signOut()
+    }
+  }, [location.state])
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault()

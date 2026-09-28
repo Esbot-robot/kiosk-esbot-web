@@ -1,6 +1,5 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
 import { IconoCarpeta, IconoCerrar, IconoGrafica, IconoMenu, IconoRobotLinea, IconoSalir } from './iconos'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
@@ -39,9 +38,13 @@ export function Layout() {
     return () => window.removeEventListener('keydown', alTeclear)
   }, [menuAbierto])
 
-  async function cerrarSesion() {
-    await supabase.auth.signOut()
-    navigate('/login')
+  /**
+   * Primero se navega y la sesión la cierra el login al abrirse. Al revés, con
+   * cambios sin guardar en el editor, el aviso saldría con la sesión ya cerrada
+   * y "Cancelar" dejaría el editor abierto sin poder guardar.
+   */
+  function cerrarSesion() {
+    navigate('/login', { state: { cerrarSesion: true } })
   }
 
   return (

@@ -23,6 +23,27 @@ interface RobotStatus {
   quieto?: boolean
   /** lo que el robot tiene aplicado, según su último latido */
   quieto_confirmado?: boolean
+  /** versión de la config que el robot tiene aplicada; null en apps anteriores */
+  version_config?: number | null
+}
+
+/** versión actual del proyecto fijado a cada serial */
+type VersionPorSerial = Record<string, number>
+
+/**
+ * Compara la versión que reporta el robot con la del proyecto fijado.
+ * El robot solo descarga la config al arrancar, así que "pendiente" casi
+ * siempre se arregla reiniciando la app; si sigue, es el internet del robot.
+ */
+function estadoVersion(r: RobotStatus, versionProyecto: number | undefined) {
+  const v = r.version_config
+  if (v == null) return { texto: 'Versión de config sin reportar', color: 'text-slate-400' }
+  if (versionProyecto === undefined) return { texto: `Config v${v} · sin proyecto fijado`, color: 'text-slate-500' }
+  if (v === versionProyecto) return { texto: `Config v${v} · al día`, color: 'text-emerald-700' }
+  return {
+    texto: `Config v${v} · falta cargar la v${versionProyecto} (reinicia la app)`,
+    color: 'text-amber-700',
+  }
 }
 
 function edadMs(iso: string, ahora: number): number {
@@ -65,6 +86,29 @@ export function Robots() {
       return data as RobotStatus[]
     },
     refetchInterval: REFRESCO_PANEL_MS,
+  })
+
+  // La versión cambia solo al guardar un proyecto: no hace falta pedirla cada 2 s
+  const { data: versiones } = useQuery({
+    queryKey: ['versiones-robots'],
+    queryFn: async (): Promise<VersionPorSerial> => {
+      const [asignados, proyectos] = await Promise.all([
+        supabase.from('robots').select('serial, project_id'),
+        supabase.from('projects').select('id, version:config->version'),
+      ])
+      if (asignados.error) throw asignados.error
+      if (proyectos.error) throw proyectos.error
+      const porProyecto = new Map(
+        (proyectos.data as { id: string; version: number | null }[]).map((p) => [p.id, Number(p.version ?? 1)])
+      )
+      const resultado: VersionPorSerial = {}
+      for (const { serial, project_id } of asignados.data as { serial: string; project_id: string | null }[]) {
+        const version = project_id ? porProyecto.get(project_id) : undefined
+        if (version !== undefined) resultado[serial] = version
+      }
+      return resultado
+    },
+    refetchInterval: 10_000,
   })
 
   return (
@@ -123,6 +167,10 @@ export function Robots() {
                       <span className="text-slate-500">Desconectado · {haceCuanto(r.updated_at, ahora)}</span>
                     )}
                   </p>
+                  {(() => {
+                    const version = estadoVersion(r, versiones?.[r.serial])
+                    return <p className={`mt-1 text-sm font-medium ${version.color}`}>{version.texto}</p>
+                  })()}
                 </div>
               </div>
 
