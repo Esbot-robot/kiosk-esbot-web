@@ -79,33 +79,41 @@ export function Projects() {
 
   return (
     <div>
-      {/* Barra de búsqueda */}
-      <div className="border-b border-slate-200 bg-white px-12 py-4">
+      {/* Barra de búsqueda: en teléfono ocupa todo el ancho */}
+      <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-8 md:px-12 md:py-4">
         <input
           type="search"
           placeholder="Buscar proyectos..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="w-96 rounded-full border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm focus:border-indigo-400 focus:outline-none"
+          className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm focus:border-indigo-400 focus:outline-none md:w-96"
         />
       </div>
 
-      <div className="px-12 py-10">
-        <div className="flex items-center justify-between">
+      {/* Mismos márgenes que Robots. Abajo, espacio extra en teléfono para
+          que el botón flotante no tape la última tarjeta */}
+      <div className="px-4 pb-28 pt-6 sm:px-8 md:px-12 md:py-10">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-4xl font-bold text-slate-900">Proyectos</h2>
+            <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Proyectos</h2>
             <p className="mt-2 text-slate-600">
               Gestiona y personaliza tus módulos interactivos desde un solo lugar.
             </p>
           </div>
+          {/* En teléfono este botón se cambia por el flotante de abajo */}
           <button
             onClick={() => crearProyecto.mutate()}
             disabled={crearProyecto.isPending}
-            className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+            className="hidden shrink-0 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:block"
           >
             + Nuevo proyecto
           </button>
         </div>
+        {crearProyecto.error && (
+          <p className="mt-4 text-sm text-red-600">
+            No se pudo crear el proyecto. {describirError(crearProyecto.error)}
+          </p>
+        )}
 
         {isLoading && <p className="mt-10 text-slate-500">Cargando proyectos...</p>}
         {error && (
@@ -170,6 +178,20 @@ export function Projects() {
           </p>
         )}
       </div>
+
+      {/* Nuevo proyecto en teléfono: botón redondo flotante abajo a la derecha.
+          z-30 queda por debajo del menú lateral (z-40/50) cuando se abre */}
+      <button
+        onClick={() => crearProyecto.mutate()}
+        disabled={crearProyecto.isPending}
+        aria-label="Nuevo proyecto"
+        title="Nuevo proyecto"
+        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 transition-colors hover:bg-indigo-700 active:scale-95 disabled:opacity-50 md:hidden"
+      >
+        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
 
       {proyectoAFijar && (
         <DialogFijarRobot proyecto={proyectoAFijar} onCerrar={() => setProyectoAFijar(null)} />

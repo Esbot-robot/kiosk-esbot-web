@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
+import { eliminarConfigRobot, nombreDesdeUrl, publicarConfigRobot } from '../lib/storage'
 import { avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
 import { botonesAdicionalesVacios, botonFotoVacio, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
@@ -69,10 +69,90 @@ function Lapiz({ onClick, title }: { onClick: () => void; title?: string }) {
     <button
       onClick={onClick}
       title={title ?? 'Editar'}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#2f3b52] shadow-md ring-2 ring-slate-400/70 transition-transform hover:scale-110"
+      className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#2f3b52] shadow-md ring-2 ring-slate-400/70 transition-transform hover:scale-110 md:flex"
     >
       <IconoLapiz />
     </button>
+  )
+}
+
+/** ancho al que se dibuja la vista previa; más angosto, se reduce en proporción */
+const ANCHO_VISTA = 768
+
+/**
+ * La vista previa se dibuja siempre a 768 px (16:10, como la pantalla del temi)
+ * y se reduce con zoom al espacio disponible. Así se ve igual que en el robot
+ * en cualquier pantalla: los textos y botones no se amontonan en un teléfono.
+ */
+function VistaEscalada({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [escala, setEscala] = useState(1)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const medir = () => setEscala(Math.min(1, el.clientWidth / ANCHO_VISTA))
+    medir()
+    const observador = new ResizeObserver(medir)
+    observador.observe(el)
+    return () => observador.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} className="w-full max-w-3xl">
+      <div style={{ width: ANCHO_VISTA, zoom: escala }}>{children}</div>
+    </div>
+  )
+}
+
+/**
+ * Acción del engranaje flotante (teléfono). Sube desde el engranaje y aparece;
+ * "orden" escalona la animación: la más cercana al engranaje sale primero.
+ */
+function AccionFlotante({
+  visible,
+  orden,
+  etiqueta,
+  onClick,
+  disabled,
+  className,
+  children,
+}: {
+  visible: boolean
+  orden: number
+  etiqueta: string
+  onClick: () => void
+  disabled?: boolean
+  className: string
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 transition-all duration-200 ease-out ${
+        visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0'
+      }`}
+      style={{ transitionDelay: visible ? `${orden * 60}ms` : '0ms' }}
+      aria-hidden={!visible}
+    >
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        tabIndex={visible ? 0 : -1}
+        aria-label={etiqueta}
+        className={`mr-1 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-colors active:scale-95 disabled:opacity-50 ${className}`}
+      >
+        {children}
+      </button>
+    </div>
+  )
+}
+
+/** Ítem del panel que en computador se edita con el lápiz de la vista previa */
+function IconoEditar() {
+  return (
+    <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#2f3b52]">
+      <IconoLapiz className="h-3 w-3" />
+    </span>
   )
 }
 
@@ -121,6 +201,8 @@ export function Editor() {
   const [guardadoOk, setGuardadoOk] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState('')
   const [confirmarBorrar, setConfirmarBorrar] = useState(false)
+  /** teléfono: el engranaje despliega Guardar y Eliminar */
+  const [accionesAbiertas, setAccionesAbiertas] = useState(false)
   /** nombre + config tal como están en Supabase, para saber si hay cambios sin guardar */
   const [guardadoJson, setGuardadoJson] = useState('')
   const eliminado = useRef(false)
@@ -453,12 +535,12 @@ export function Editor() {
   return (
     <div className="flex h-full flex-col">
       {/* Barra superior: nombre + pestañas */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white pl-10">
-        <div className="py-2">
+      <div className="flex flex-col border-b border-slate-200 bg-white md:flex-row md:items-center md:justify-between md:pl-10">
+        <div className="px-2 py-2 md:px-0">
           <input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="w-96 rounded px-2 text-2xl font-bold text-indigo-600 focus:bg-slate-50 focus:outline-none"
+            className="w-full rounded px-2 text-2xl font-bold text-indigo-600 focus:bg-slate-50 focus:outline-none md:w-96"
             title="Nombre del proyecto (clic para editar)"
           />
           <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
@@ -468,7 +550,7 @@ export function Editor() {
             <button
               key={p}
               onClick={() => setPestana(p)}
-              className={`px-8 py-5 font-medium transition-colors ${
+              className={`flex-1 px-4 py-4 font-medium transition-colors md:flex-none md:px-8 md:py-5 ${
                 pestana === p
                   ? 'border-b-2 border-indigo-600 bg-slate-50 text-indigo-600'
                   : 'text-slate-600 hover:text-slate-900'
@@ -480,9 +562,10 @@ export function Editor() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        {/* ─── Preview (columna izquierda) ─── */}
-        <div className="flex flex-1 items-center justify-center overflow-y-auto p-10">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-visible">
+        {/* ─── Preview (columna izquierda; en teléfono va arriba) ─── */}
+        <div className="flex shrink-0 items-center justify-center p-4 md:flex-1 md:shrink md:overflow-y-auto md:p-10">
+          <VistaEscalada>
           {pestana === 'inicial' ? (
             <div
               className="relative aspect-[16/10] w-full max-w-3xl overflow-hidden rounded-xl shadow-lg"
@@ -653,11 +736,61 @@ export function Editor() {
               </div>
             </div>
           )}
+          </VistaEscalada>
         </div>
 
-        {/* ─── Panel derecho ─── */}
-        <aside className="flex w-96 flex-col border-l border-slate-200 bg-white">
-          <div className="flex-1 overflow-y-auto p-6">
+        {/* ─── Panel derecho (en teléfono va debajo de la vista previa) ─── */}
+        <aside className="flex w-full flex-col border-t border-slate-200 bg-white md:w-96 md:border-l md:border-t-0">
+          <div className="p-4 pb-44 md:flex-1 md:overflow-y-auto md:p-6">
+            {/* En teléfono no hay lápices en la vista previa: lo que solo se
+                editaba con ellos aparece aquí */}
+            <div className="mb-5 space-y-1 border-b border-slate-200 pb-5 md:hidden">
+              <p className="px-3 pb-1 font-semibold text-slate-800">Pantalla</p>
+              {pestana === 'inicial' ? (
+                <>
+                  <ItemPanel
+                    icono={<IconoEditar />}
+                    label="Imagen de fondo"
+                    detalle={ini.fondo_url ? nombreDesdeUrl(ini.fondo_url) : 'Vacío'}
+                    onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'inicial' })}
+                  />
+                  <ItemPanel
+                    icono={<IconoEditar />}
+                    label="Logo de la empresa"
+                    detalle={`${ini.logo_url ? nombreDesdeUrl(ini.logo_url) : 'Vacío'}${ini.logo_visible ? '' : ' · Oculto'}`}
+                    onClick={() => setDialogo({ tipo: 'logo' })}
+                  />
+                  <ItemPanel
+                    icono={<IconoEditar />}
+                    label="Título"
+                    detalle={`${ini.titulo.texto || 'Vacío'}${ini.titulo_visible ? '' : ' · Oculto'}`}
+                    onClick={() => setDialogo({ tipo: 'titulo' })}
+                  />
+                  <ItemPanel
+                    icono={<IconoEditar />}
+                    label="Subtítulo"
+                    detalle={`${ini.subtitulo.texto || 'Vacío'}${ini.subtitulo_visible ? '' : ' · Oculto'}`}
+                    onClick={() => setDialogo({ tipo: 'subtitulo' })}
+                  />
+                </>
+              ) : (
+                <>
+                  <ItemPanel
+                    icono={<IconoEditar />}
+                    label="Imagen de fondo"
+                    detalle={rul.fondo_url ? nombreDesdeUrl(rul.fondo_url) : 'Vacío'}
+                    onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'ruleta' })}
+                  />
+                  <ItemPanel
+                    icono={<IconoEditar />}
+                    label="Colores de las opciones"
+                    detalle="Fondo y texto de los botones de respuesta"
+                    onClick={() => setDialogo({ tipo: 'colores-opciones' })}
+                  />
+                </>
+              )}
+            </div>
+
             <h3 className="flex items-center gap-3 text-xl font-bold text-slate-900">
               <IconoOnda /> Configuración de voces (TTS)
             </h3>
@@ -823,7 +956,9 @@ export function Editor() {
             )}
           </div>
 
-          <div className="border-t border-slate-200 p-6">
+          {/* Computador: al final del panel. En teléfono se cambian por los
+              botones flotantes de abajo */}
+          <div className="hidden border-t border-slate-200 p-6 md:block">
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmarBorrar(true)}
@@ -852,6 +987,88 @@ export function Editor() {
           </div>
         </aside>
       </div>
+
+      {/* ─── Teléfono: engranaje flotante abajo a la derecha. Al tocarlo gira y
+          despliega hacia arriba Guardar y Eliminar, uno tras otro.
+          z-30 queda por debajo del menú lateral (z-40/50) cuando se abre ─── */}
+      {accionesAbiertas && (
+        // tocar fuera cierra las acciones
+        <div className="fixed inset-0 z-20 md:hidden" onClick={() => setAccionesAbiertas(false)} aria-hidden="true" />
+      )}
+      <div className="fixed bottom-6 right-6 z-30 flex flex-col items-end gap-3 md:hidden">
+        <AccionFlotante
+          visible={accionesAbiertas}
+          orden={1}
+          etiqueta="Eliminar"
+          onClick={() => {
+            setAccionesAbiertas(false)
+            setConfirmarBorrar(true)
+          }}
+          disabled={guardar.isPending || borrar.isPending}
+          className="border border-red-200 bg-white text-red-600 hover:bg-red-50"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+          </svg>
+        </AccionFlotante>
+        <AccionFlotante
+          visible={accionesAbiertas}
+          orden={0}
+          etiqueta={guardar.isPending ? 'Guardando…' : 'Guardar'}
+          onClick={() => {
+            setAccionesAbiertas(false)
+            intentarGuardar()
+          }}
+          disabled={guardar.isPending}
+          className="bg-indigo-600 text-white shadow-indigo-600/30 hover:bg-indigo-700"
+        >
+          <IconoGuardar className="h-5 w-5" />
+        </AccionFlotante>
+
+        <button
+          onClick={() => setAccionesAbiertas((abiertas) => !abiertas)}
+          aria-label={accionesAbiertas ? 'Cerrar acciones' : 'Guardar o eliminar'}
+          aria-expanded={accionesAbiertas}
+          className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg transition-colors hover:bg-slate-700 active:scale-95 ${
+            guardar.isPending ? 'animate-pulse' : ''
+          }`}
+        >
+          {guardadoOk ? (
+            <span className="text-2xl font-bold">✓</span>
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-7 w-7 transition-transform duration-300 ${accionesAbiertas ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          )}
+          {/* punto ámbar: hay cambios sin guardar */}
+          {hayCambios && !guardar.isPending && (
+            <span className="absolute right-0.5 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-amber-400" />
+          )}
+        </button>
+      </div>
+
+      {/* Avisos del guardado en teléfono: flotan a la izquierda de los botones */}
+      {(errorGuardar || guardar.isError || (hayCambios && !guardar.isPending)) && (
+        <div className="fixed bottom-6 left-4 right-24 z-30 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg md:hidden">
+          {errorGuardar ? (
+            <p className="text-red-600">{errorGuardar}</p>
+          ) : guardar.isError ? (
+            <p className="text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
+          ) : (
+            <p className="font-medium text-amber-700">Tienes cambios sin guardar</p>
+          )}
+        </div>
+      )}
 
       {/* ─── Salir con cambios sin guardar ─── */}
       {salida.state === 'blocked' && (

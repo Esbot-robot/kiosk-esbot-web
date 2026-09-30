@@ -87,10 +87,10 @@ function etiquetaLarga(clave: string, gran: Granularidad): string {
 }
 
 const TIPOS_EVENTO = [
-  { tipo: 'toque_pantalla', nombre: 'Toque pantalla', tarjeta: 'Total toques de pantalla', color: COLOR_TOQUE },
-  { tipo: 'boton_jugar', nombre: 'Botón jugar', tarjeta: 'Total toques botón jugar', color: COLOR_JUGAR },
-  { tipo: 'boton_video', nombre: 'Botón video', tarjeta: 'Total toques botón video', color: COLOR_VIDEO },
-  { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', tarjeta: 'Total guías a ubicación', color: COLOR_UBICACION },
+  { tipo: 'toque_pantalla', nombre: 'Toque pantalla', color: COLOR_TOQUE },
+  { tipo: 'boton_jugar', nombre: 'Botón jugar', color: COLOR_JUGAR },
+  { tipo: 'boton_video', nombre: 'Botón video', color: COLOR_VIDEO },
+  { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', color: COLOR_UBICACION },
 ] as const
 
 const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
@@ -116,7 +116,7 @@ export function Analitica() {
   const granularidad: Granularidad =
     new Date(hasta).getTime() - new Date(desde).getTime() <= 48 * 3600_000 ? 'hora' : 'dia'
 
-  // Gráfica y tarjetas: Postgres agrupa y cuenta — al navegador solo
+  // Gráfica y totales: Postgres agrupa y cuenta — al navegador solo
   // viajan los totales por bucket, sin importar cuántos eventos haya.
   const { data: agregados, isLoading } = useQuery({
     queryKey: ['events-agg', desde, hasta, robot, granularidad],
@@ -294,16 +294,19 @@ export function Analitica() {
   }
 
   return (
-    <div className="px-12 py-10">
+    // Mismos márgenes que Robots y Proyectos. Abajo, espacio extra en teléfono
+    // para que el botón flotante del PDF no tape el final de la página
+    <div className="px-4 pb-28 pt-6 sm:px-8 md:px-12 md:py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-bold text-slate-900">Analítica</h2>
+          <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Analítica</h2>
           <p className="mt-2 text-slate-600">
             Interacción de los visitantes con el robot en el evento.
           </p>
+          {/* En teléfono este botón se cambia por el flotante de abajo */}
           <button
             onClick={descargarReporte}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+            className="mt-3 hidden items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 md:inline-flex"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -314,13 +317,13 @@ export function Analitica() {
         </div>
 
         {/* Filtros: una sola fila, arriba de las gráficas */}
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
           <label className="text-sm text-slate-600">
             ID del Robot
             <select
               value={robot}
               onChange={(e) => setRobot(e.target.value)}
-              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800"
+              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 sm:w-auto"
             >
               <option value="todos">Todos los robots</option>
               {(robots ?? []).map((r) => (
@@ -337,7 +340,7 @@ export function Analitica() {
               value={desde}
               max={hasta}
               onChange={(e) => setDesde(e.target.value)}
-              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800"
+              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 sm:w-auto"
             />
           </label>
           <label className="text-sm text-slate-600">
@@ -347,29 +350,14 @@ export function Analitica() {
               value={hasta}
               min={desde}
               onChange={(e) => setHasta(e.target.value)}
-              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800"
+              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 sm:w-auto"
             />
           </label>
         </div>
       </div>
 
-      {/* Tarjetas de totales */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {TIPOS_EVENTO.map((tipo, index) => (
-          <div key={tipo.tipo} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tipo.color }} />
-              {tipo.tarjeta}
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {isLoading ? '—' : (totales[index] ?? 0).toLocaleString('es-CO')}
-            </p>
-          </div>
-        ))}
-      </div>
-
       {/* Gráfica */}
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-xl md:mt-8 border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold text-slate-900">
@@ -380,11 +368,15 @@ export function Analitica() {
               {granularidad === 'hora' && ' — rango corto: agrupado por hora'}
             </p>
           </div>
-          <div className="flex items-center gap-5 text-sm text-slate-600">
-            {TIPOS_EVENTO.map((tipo) => (
+          {/* Leyenda con el total de cada tipo en el rango (antes eran tarjetas aparte) */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-600">
+            {TIPOS_EVENTO.map((tipo, index) => (
               <span key={tipo.tipo} className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tipo.color }} />
                 {tipo.nombre}
+                <span className="font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {isLoading ? '—' : (totales[index] ?? 0).toLocaleString('es-CO')}
+                </span>
               </span>
             ))}
           </div>
@@ -410,7 +402,7 @@ export function Analitica() {
       </div>
 
       {/* Detalle de cada evento individual */}
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <h3 className="font-semibold text-slate-900">
           Detalle de eventos{' '}
           <span className="font-normal text-slate-400">
@@ -419,8 +411,9 @@ export function Analitica() {
         </h3>
         <p className="text-sm text-slate-500">Cada toque individual con su fecha y hora exacta.</p>
 
-        <div className="mt-4 max-h-96 overflow-y-auto rounded-lg border border-slate-100">
-          <table className="w-full text-sm">
+        {/* 7 columnas no caben en un teléfono: la tabla se desliza de lado */}
+        <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-slate-100">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">Evento</th>
@@ -472,7 +465,7 @@ export function Analitica() {
 
         {/* Paginación: 100 filas por página, cargadas del servidor */}
         {(detalle?.total ?? 0) > FILAS_POR_PAGINA && (
-          <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+          <div className="mt-4 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <span>
               Mostrando {(pagina * FILAS_POR_PAGINA + 1).toLocaleString('es-CO')}–
               {Math.min((pagina + 1) * FILAS_POR_PAGINA, detalle!.total).toLocaleString('es-CO')} de{' '}
@@ -515,6 +508,21 @@ export function Analitica() {
           </button>
         </div>
       </div>
+
+      {/* Reporte PDF en teléfono: botón redondo flotante abajo a la derecha.
+          z-30 queda por debajo del menú lateral (z-40/50) cuando se abre */}
+      <button
+        onClick={descargarReporte}
+        aria-label="Descargar reporte PDF"
+        title="Descargar reporte PDF"
+        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 transition-colors hover:bg-indigo-700 active:scale-95 md:hidden"
+      >
+        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+      </button>
     </div>
   )
 }
@@ -546,7 +554,7 @@ function GraficaLineas({
   const ticksY = [0, Math.round(maxY / 2), maxY]
   const paso = Math.max(1, Math.ceil(buckets.length / 8))
 
-  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+  function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     const px = ((e.clientX - rect.left) / rect.width) * ANCHO
     const i = Math.round(((px - M.left) / plotW) * (buckets.length - 1))
@@ -554,93 +562,100 @@ function GraficaLineas({
   }
 
   return (
-    <div className="relative mt-4">
-      <svg
-        viewBox={`0 0 ${ANCHO} ${ALTO}`}
-        className="w-full"
-        onMouseMove={onMove}
-        onMouseLeave={() => setHover(null)}
-      >
-        {/* grid horizontal recesivo */}
-        {ticksY.map((t) => (
-          <g key={t}>
-            <line x1={M.left} x2={ANCHO - M.right} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth="1" />
-            <text x={M.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill={INK_MUTED}>
-              {t.toLocaleString('es-CO')}
-            </text>
-          </g>
-        ))}
-
-        {/* etiquetas eje x */}
-        {buckets.map((b, i) =>
-          i % paso === 0 ? (
-            <text key={b} x={x(i)} y={ALTO - 8} textAnchor="middle" fontSize="11" fill={INK_MUTED}>
-              {etiquetaBucket(b, granularidad)}
-            </text>
-          ) : null
-        )}
-
-        {/* crosshair */}
-        {hover !== null && (
-          <line
-            x1={x(hover)}
-            x2={x(hover)}
-            y1={M.top}
-            y2={M.top + plotH}
-            stroke={INK_MUTED}
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-        )}
-
-        {/* líneas de las series (2px) */}
-        {series.map((serie) => (
-          <polyline
-            key={serie.nombre}
-            points={serie.valores.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
-            fill="none"
-            stroke={serie.color}
-            strokeWidth="2"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        ))}
-
-        {/* marcadores en el punto bajo el cursor (≥8px) */}
-        {hover !== null &&
-          series.map((serie) => (
-            <circle
-              key={serie.nombre}
-              cx={x(hover)}
-              cy={y(serie.valores[hover])}
-              r="5"
-              fill={serie.color}
-              stroke="#ffffff"
-              strokeWidth="2"
-            />
-          ))}
-      </svg>
-
-      {/* tooltip */}
-      {hover !== null && (
-        <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-lg"
-          style={{
-            left: `${(x(hover) / ANCHO) * 100}%`,
-            top: 0,
+    // En teléfono la gráfica mantiene un ancho mínimo legible y se desliza de
+    // lado; el detalle aparece al tocar un punto (y se queda hasta tocar otro)
+    <div className="mt-4 overflow-x-auto">
+      <div className="relative min-w-[640px]">
+        <svg
+          viewBox={`0 0 ${ANCHO} ${ALTO}`}
+          className="w-full touch-pan-x"
+          onPointerMove={onMove}
+          onPointerDown={onMove}
+          onPointerLeave={(e) => {
+            if (e.pointerType === 'mouse') setHover(null)
           }}
         >
-          <p className="text-sm font-bold whitespace-nowrap text-slate-900">
-            {etiquetaLarga(buckets[hover], granularidad)}
-          </p>
-          {series.map((serie) => (
-            <p key={serie.nombre} className="mt-1 flex items-center gap-2 text-sm whitespace-nowrap text-slate-600">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: serie.color }} />
-              {serie.nombre}: <span className="font-semibold text-slate-900">{serie.valores[hover]}</span>
-            </p>
+          {/* grid horizontal recesivo */}
+          {ticksY.map((t) => (
+            <g key={t}>
+              <line x1={M.left} x2={ANCHO - M.right} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth="1" />
+              <text x={M.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill={INK_MUTED}>
+                {t.toLocaleString('es-CO')}
+              </text>
+            </g>
           ))}
-        </div>
-      )}
+
+          {/* etiquetas eje x */}
+          {buckets.map((b, i) =>
+            i % paso === 0 ? (
+              <text key={b} x={x(i)} y={ALTO - 8} textAnchor="middle" fontSize="11" fill={INK_MUTED}>
+                {etiquetaBucket(b, granularidad)}
+              </text>
+            ) : null
+          )}
+
+          {/* crosshair */}
+          {hover !== null && (
+            <line
+              x1={x(hover)}
+              x2={x(hover)}
+              y1={M.top}
+              y2={M.top + plotH}
+              stroke={INK_MUTED}
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+          )}
+
+          {/* líneas de las series (2px) */}
+          {series.map((serie) => (
+            <polyline
+              key={serie.nombre}
+              points={serie.valores.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+              fill="none"
+              stroke={serie.color}
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* marcadores en el punto bajo el cursor (≥8px) */}
+          {hover !== null &&
+            series.map((serie) => (
+              <circle
+                key={serie.nombre}
+                cx={x(hover)}
+                cy={y(serie.valores[hover])}
+                r="5"
+                fill={serie.color}
+                stroke="#ffffff"
+                strokeWidth="2"
+              />
+            ))}
+        </svg>
+
+        {/* tooltip */}
+        {hover !== null && (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-lg"
+            style={{
+              left: `${(x(hover) / ANCHO) * 100}%`,
+              top: 0,
+            }}
+          >
+            <p className="text-sm font-bold whitespace-nowrap text-slate-900">
+              {etiquetaLarga(buckets[hover], granularidad)}
+            </p>
+            {series.map((serie) => (
+              <p key={serie.nombre} className="mt-1 flex items-center gap-2 text-sm whitespace-nowrap text-slate-600">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: serie.color }} />
+                {serie.nombre}: <span className="font-semibold text-slate-900">{serie.valores[hover]}</span>
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
