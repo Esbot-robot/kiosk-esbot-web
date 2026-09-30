@@ -296,7 +296,9 @@ export function Analitica() {
   return (
     // Mismos márgenes que Robots y Proyectos. Abajo, espacio extra en teléfono
     // para que el botón flotante del PDF no tape el final de la página
-    <div className="px-4 pb-28 pt-6 sm:px-8 md:px-12 md:py-10">
+    // overflow-x-hidden: si algo llegara a ser más ancho que la pantalla, la
+    // página no se desliza de lado (la gráfica y la tabla tienen su propio scroll)
+    <div className="overflow-x-hidden px-4 pb-28 pt-6 sm:px-8 md:px-12 md:py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Analítica</h2>
@@ -340,7 +342,7 @@ export function Analitica() {
               value={desde}
               max={hasta}
               onChange={(e) => setDesde(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 sm:w-auto"
+              className="mt-1 block w-full min-w-0 max-w-full rounded-lg max-sm:appearance-none border border-slate-300 bg-white px-3 py-2 text-left text-slate-800 sm:w-auto"
             />
           </label>
           <label className="text-sm text-slate-600">
@@ -350,7 +352,7 @@ export function Analitica() {
               value={hasta}
               min={desde}
               onChange={(e) => setHasta(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 sm:w-auto"
+              className="mt-1 block w-full min-w-0 max-w-full rounded-lg max-sm:appearance-none border border-slate-300 bg-white px-3 py-2 text-left text-slate-800 sm:w-auto"
             />
           </label>
         </div>
