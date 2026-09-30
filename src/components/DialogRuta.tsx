@@ -56,7 +56,7 @@ export function DialogRuta({ serial, nombre, ubicacionesMapa, rutaActual, enServ
       aceptarDeshabilitado={ruta.length === 0 || guardar.isPending}
       textoAceptar={guardar.isPending ? 'Guardando...' : 'Guardar ruta'}
     >
-      <div className="max-h-[60vh] space-y-6 overflow-y-auto pr-1">
+      <div className="space-y-6">
         {/* Ruta elegida, en orden */}
         <div>
           <p className="mb-2 font-medium text-slate-800">Recorrido (en orden)</p>

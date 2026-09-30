@@ -128,8 +128,9 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       onAceptar={guardar}
       aceptarDeshabilitado={subiendo}
       textoAceptar={subiendo ? 'Subiendo marco...' : 'Guardar botón'}
+      aviso={error}
     >
-      <div className="max-h-[62vh] space-y-5 overflow-y-auto pr-2">
+      <div className="space-y-5">
         <label className="relative flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
           <input
             type="checkbox"
@@ -445,7 +446,6 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
           </div>
         )}
 
-        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
       </div>
     </Modal>
   )

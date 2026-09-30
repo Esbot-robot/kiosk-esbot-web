@@ -174,8 +174,9 @@ export function DialogBotonAdicional({
       onAceptar={guardar}
       aceptarDeshabilitado={Boolean(subiendoCampo)}
       textoAceptar={subiendoCampo ? 'Subiendo video...' : 'Guardar botón'}
+      aviso={error}
     >
-      <div className="max-h-[62vh] space-y-5 overflow-y-auto pr-2">
+      <div className="space-y-5">
         <label className="flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
           <input
             type="checkbox"
@@ -311,7 +312,6 @@ export function DialogBotonAdicional({
             />
           </>
         )}
-        {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
       </div>
     </Modal>
   )
