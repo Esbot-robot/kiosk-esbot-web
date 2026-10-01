@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
-import { LIMITES, type Pregunta } from '../../types/config'
+import { CampoColor } from '../CampoColor'
+import { LIMITES, PALETA_RULETA, type Pregunta } from '../../types/config'
 
 interface DialogPreguntaProps {
   titulo: string
   valor: Pregunta | null
+  /** color para una pregunta nueva: el primero libre de la paleta */
+  colorSugerido: string
   puedeEliminar: boolean
   onGuardar: (nueva: Pregunta) => void
   onEliminar: () => void
@@ -16,6 +19,7 @@ interface DialogPreguntaProps {
 export function DialogPregunta({
   titulo,
   valor,
+  colorSugerido,
   puedeEliminar,
   onGuardar,
   onEliminar,
@@ -25,10 +29,12 @@ export function DialogPregunta({
   const [opciones, setOpciones] = useState<string[]>(valor?.opciones ?? ['', ''])
   const [correcta, setCorrecta] = useState(valor?.correcta ?? 0)
   const [tipo, setTipo] = useState<'trivia' | 'calificacion'>(valor?.tipo ?? 'trivia')
+  const [color, setColor] = useState(valor?.color || colorSugerido)
   const esCalificacion = tipo === 'calificacion'
 
   const valida =
     texto.trim().length > 0 &&
+    /^#[0-9a-f]{6}$/i.test(color) &&
     opciones.length >= LIMITES.OPCIONES_MIN &&
     opciones.every((o) => o.trim().length > 0)
 
@@ -57,10 +63,35 @@ export function DialogPregunta({
           opciones: opciones.map((o) => o.trim()),
           correcta: esCalificacion ? 0 : correcta,
           tipo,
+          color: color.toUpperCase(),
         })
         onCerrar()
       }}
     >
+      {/* Color de su sección en la rueda */}
+      <div className="mb-5 rounded-lg border border-slate-200 p-4">
+        <p className="mb-3 flex items-center gap-2 font-medium text-slate-800">
+          Color en la ruleta
+          <Ayuda>Cuando la rueda se detiene en este color, sale esta pregunta. Cada pregunta debería tener un color distinto.</Ayuda>
+        </p>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {PALETA_RULETA.map((c) => (
+            <button
+              key={c}
+              type="button"
+              title={c}
+              aria-label={`Color ${c}`}
+              onClick={() => setColor(c)}
+              className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                color.toUpperCase() === c ? 'border-slate-900 ring-2 ring-slate-900/20' : 'border-white shadow'
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+        <CampoColor label="Otro color" value={color} onChange={setColor} />
+      </div>
+
       {/* Tipo de pregunta */}
       <p className="mb-2 font-medium text-slate-800">Tipo de pregunta</p>
       <div className="mb-5 grid grid-cols-2 gap-3">

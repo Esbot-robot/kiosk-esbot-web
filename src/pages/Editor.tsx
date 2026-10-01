@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, nombreDesdeUrl, publicarConfigRobot } from '../lib/storage'
 import { avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
-import { botonesAdicionalesVacios, botonFotoVacio, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
+import { botonesAdicionalesVacios, botonFotoVacio, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
@@ -74,6 +74,17 @@ function Lapiz({ onClick, title }: { onClick: () => void; title?: string }) {
       <IconoLapiz />
     </button>
   )
+}
+
+/** fondo de la ruleta de la vista previa: una sección por pregunta con su color */
+function fondoRuleta(preguntas: Pregunta[]): string {
+  if (preguntas.length === 0) return '#cbd5e1'
+  const paso = 360 / preguntas.length
+  const tramos = preguntas.map((p, i) => {
+    const color = p.color || PALETA_RULETA[i % PALETA_RULETA.length]
+    return `${color} ${i * paso}deg ${(i + 1) * paso}deg`
+  })
+  return `conic-gradient(${tramos.join(', ')})`
 }
 
 /** ancho al que se dibuja la vista previa; más angosto, se reduce en proporción */
@@ -240,9 +251,12 @@ export function Editor() {
         cfg.pantalla_ruleta.colores_texto_opciones = ['', '', '']
       }
       // Preguntas viejas sin tipo → trivia por defecto
-      for (const preg of cfg.pantalla_ruleta.preguntas) {
+      cfg.pantalla_ruleta.preguntas.forEach((preg, i) => {
         if (!preg.tipo) preg.tipo = 'trivia'
-      }
+        // Antes la rueda tenía 3 colores fijos: cada pregunta recibe el de su
+        // posición, así los proyectos de 3 preguntas se ven igual que antes
+        if (!preg.color) preg.color = PALETA_RULETA[i % PALETA_RULETA.length]
+      })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((cfg.pantalla_ruleta as any).tts_agradecimiento === undefined) {
         cfg.pantalla_ruleta.tts_agradecimiento = '¡Gracias por tu opinión!'
@@ -689,14 +703,19 @@ export function Editor() {
                 />
               </div>
               <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-                {/* Ruleta simulada (el diseño real vive en la app) */}
-                <div
-                  className="h-44 w-44 rounded-full border-8 border-yellow-500 shadow-xl"
-                  style={{
-                    background:
-                      'conic-gradient(#4648d4 0deg 120deg, #2196f3 120deg 240deg, #f44336 240deg 360deg)',
-                  }}
-                />
+                {/* Ruleta: una sección por pregunta con su color, en el mismo orden
+                    que en el robot (la 1 empieza arriba, sentido horario). La
+                    flecha del marco del robot está abajo */}
+                <div className="relative">
+                  <div
+                    className="h-44 w-44 rounded-full border-8 border-yellow-500 shadow-xl"
+                    style={{ background: fondoRuleta(rul.preguntas) }}
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -bottom-3 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[10px] border-b-[16px] border-x-transparent border-b-red-600"
+                  />
+                </div>
                 <p className="px-10 text-center text-xl font-bold text-white">
                   {rul.preguntas[0]?.texto || 'Aquí aparecerá la pregunta'}
                 </p>
@@ -936,8 +955,13 @@ export function Editor() {
                   <p className="font-semibold text-slate-800">Preguntas</p>
                   <button
                     onClick={() => setDialogo({ tipo: 'pregunta', index: null })}
-                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-indigo-50"
-                    title="Agregar pregunta"
+                    disabled={rul.preguntas.length >= LIMITES.PREGUNTAS_MAX}
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-indigo-50 disabled:opacity-30"
+                    title={
+                      rul.preguntas.length >= LIMITES.PREGUNTAS_MAX
+                        ? `Máximo ${LIMITES.PREGUNTAS_MAX} preguntas (una sección de la ruleta por pregunta)`
+                        : 'Agregar pregunta'
+                    }
                   >
                     <IconoMas />
                   </button>
@@ -946,7 +970,13 @@ export function Editor() {
                   {rul.preguntas.map((pregunta, i) => (
                     <ItemPanel
                       key={i}
-                      icono={<IconoVolumen />}
+                      icono={
+                        <span
+                          aria-hidden="true"
+                          className="mt-1 block h-4 w-4 rounded-full border border-white shadow"
+                          style={{ backgroundColor: pregunta.color || PALETA_RULETA[i % PALETA_RULETA.length] }}
+                        />
+                      }
                       label={`${i + 1} pregunta`}
                       detalle={`Preg: ${pregunta.texto}`}
                       onClick={() => setDialogo({ tipo: 'pregunta', index: i })}
@@ -1280,6 +1310,7 @@ export function Editor() {
               : `Configuración - ${dialogo.index + 1} pregunta`
           }
           valor={dialogo.index === null ? null : rul.preguntas[dialogo.index]}
+          colorSugerido={colorLibreRuleta(rul.preguntas.map((p) => p.color))}
           puedeEliminar={dialogo.index !== null && rul.preguntas.length > LIMITES.PREGUNTAS_MIN}
           onGuardar={(pregunta) => guardarPregunta(dialogo.index, pregunta)}
           onEliminar={() => dialogo.index !== null && eliminarPregunta(dialogo.index)}

@@ -52,6 +52,21 @@ export interface Pregunta {
   correcta: number
   /** 'trivia' = tiene respuesta correcta · 'calificacion' = opinión, sin correcta */
   tipo: 'trivia' | 'calificacion'
+  /** color de su sección en la ruleta; cuando la rueda se detiene en él, sale esta pregunta */
+  color?: string
+}
+
+/**
+ * Colores por defecto de las secciones de la ruleta, en orden. Los 3 primeros
+ * son los de la rueda anterior, en el orden en que caían las preguntas 1-3.
+ * Igual a RuletaDrawable.PALETA de la app.
+ */
+export const PALETA_RULETA = ['#F7931E', '#6B3E26', '#6A2CA0', '#1BAF7A', '#2A78D6', '#E34948', '#EDA100', '#E05BA8']
+
+/** primer color de la paleta que no usa ninguna otra pregunta */
+export function colorLibreRuleta(usados: (string | undefined)[]): string {
+  const ocupados = new Set(usados.filter(Boolean).map((c) => c!.toUpperCase()))
+  return PALETA_RULETA.find((c) => !ocupados.has(c)) ?? PALETA_RULETA[usados.length % PALETA_RULETA.length]
 }
 
 /**
@@ -224,6 +239,8 @@ export const LIMITES = {
   OPCIONES_MIN: 2,
   OPCIONES_MAX: 3,
   PREGUNTAS_MIN: 2,
+  /** una sección por pregunta: con más de 8 la rueda queda muy cortada en el temi */
+  PREGUNTAS_MAX: 8,
 } as const
 
 /** Config vacía para crear un proyecto nuevo */
