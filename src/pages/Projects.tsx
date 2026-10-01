@@ -73,6 +73,23 @@ export function Projects() {
     },
   })
 
+  /**
+   * Copia del proyecto con toda su configuración. Comparte los archivos del
+   * original (videos, logo, fondos, marco): no ocupa más almacenamiento, y al
+   * eliminar un proyecto solo se borran los archivos que ningún otro usa.
+   * No se copian los robots fijados, ni fotos ni analítica: son de cada evento.
+   */
+  const duplicar = useMutation({
+    mutationFn: async (original: Project) => {
+      const { error } = await supabase
+        .from('projects')
+        .insert({ nombre: `Copia de ${original.nombre}`, config: { ...structuredClone(original.config), version: 1 } })
+      if (error) throw error
+    },
+    // la copia aparece de primera en la lista (orden: última edición)
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+  })
+
   const filtrados = (proyectos ?? []).filter((p) =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase())
   )
@@ -112,6 +129,11 @@ export function Projects() {
         {crearProyecto.error && (
           <p className="mt-4 text-sm text-red-600">
             No se pudo crear el proyecto. {describirError(crearProyecto.error)}
+          </p>
+        )}
+        {duplicar.error && (
+          <p className="mt-4 text-sm text-red-600">
+            No se pudo duplicar el proyecto. {describirError(duplicar.error)}
           </p>
         )}
 
@@ -156,16 +178,33 @@ export function Projects() {
                 <p className="flex items-center gap-1.5 text-sm text-slate-500">
                   <IconoReloj /> {tiempoRelativo(proyecto.updated_at)}
                 </p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setProyectoAFijar(proyecto)
-                  }}
-                  title="Fijar proyecto a robot"
-                  className="rounded-lg px-2 py-1 transition-colors hover:bg-indigo-50"
-                >
-                  <IconoFijar />
-                </button>
+                <div className="flex items-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      duplicar.mutate(proyecto)
+                    }}
+                    disabled={duplicar.isPending}
+                    title="Duplicar proyecto"
+                    aria-label="Duplicar proyecto"
+                    className="rounded-lg px-2 py-1 text-blue-700 transition-colors hover:bg-indigo-50 disabled:opacity-40"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setProyectoAFijar(proyecto)
+                    }}
+                    title="Fijar proyecto a robot"
+                    className="rounded-lg px-2 py-1 transition-colors hover:bg-indigo-50"
+                  >
+                    <IconoFijar />
+                  </button>
+                </div>
               </div>
             </div>
             )

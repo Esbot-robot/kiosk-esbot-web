@@ -339,18 +339,27 @@ export function Editor() {
       const seriales = robotsFijados ?? []
       for (const s of seriales) await eliminarConfigRobot(s)
       await supabase.from('robots').delete().eq('project_id', projectId)
-      // 2. borrar los archivos (fondos/logo/video) del proyecto — best effort
+      // 2. borrar el proyecto
+      const { error } = await supabase.from('projects').delete().eq('id', projectId)
+      if (error) throw error
+      // 3. borrar sus archivos (fondos/logo/video) — best effort. Solo los que
+      //    ningún otro proyecto usa: una copia duplicada comparte los del original
       try {
-        const { data: files } = await supabase.storage.from('media').list(projectId)
-        if (files && files.length) {
-          await supabase.storage.from('media').remove(files.map((f) => `${projectId}/${f.name}`))
+        const { data: otros } = await supabase.from('projects').select('config')
+        const enUso = JSON.stringify((otros ?? []).map((p) => p.config))
+        const archivos: string[] = []
+        for (let offset = 0; ; offset += 100) {
+          const { data: pagina } = await supabase.storage.from('media').list(projectId, { limit: 100, offset })
+          archivos.push(...(pagina ?? []).map((f) => `${projectId}/${f.name}`))
+          if (!pagina || pagina.length < 100) break
+        }
+        const libres = archivos.filter((ruta) => !enUso.includes(ruta))
+        for (let i = 0; i < libres.length; i += 100) {
+          await supabase.storage.from('media').remove(libres.slice(i, i + 100))
         }
       } catch {
         // si falla la limpieza de media no se bloquea el borrado del proyecto
       }
-      // 3. borrar el proyecto
-      const { error } = await supabase.from('projects').delete().eq('id', projectId)
-      if (error) throw error
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -1096,7 +1105,7 @@ export function Editor() {
         >
           <p className="text-slate-700">
             Vas a eliminar el proyecto <span className="font-semibold">"{nombre}"</span>. Esta acción
-            no se puede deshacer y se borrarán también sus imágenes y videos.
+            no se puede deshacer y se borrarán también sus imágenes y videos (excepto los que use otro proyecto, como una copia duplicada).
           </p>
 
           {(robotsFijados?.length ?? 0) > 0 ? (

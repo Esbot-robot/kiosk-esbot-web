@@ -30,6 +30,12 @@ interface RobotStatus {
   ubicaciones_mapa?: string[] | null
   /** ruta de patrullaje, guardada aquí o en el admin del robot */
   ruta?: string[] | null
+  /** última orden del panel: 'actualizar' | 'reiniciar' */
+  comando?: string | null
+  /** número de esa orden (milisegundos del servidor) */
+  comando_id?: number | null
+  /** número de la última orden que el robot ejecutó */
+  comando_hecho_id?: number | null
 }
 
 /** versión actual del proyecto fijado a cada serial */
@@ -216,11 +222,107 @@ export function Robots() {
               </div>
 
               <ControlRuta robot={r} enServicio={enServicio} />
+              <ControlComandos robot={r} enServicio={enServicio} ahora={ahora} />
               <ControlRecorrido robot={r} enServicio={enServicio} />
             </div>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/** tiempo que se muestra "✓ hecho" después de que el robot confirma */
+const MOSTRAR_HECHO_MS = 60_000
+
+/**
+ * Órdenes al robot por el latido: buscar la config ya y reiniciar la app.
+ * Mientras el robot no confirma, se muestra "Actualizando…" / "Reiniciando…".
+ * Reiniciar solo sirve si la app sigue enviando latidos: si se cerró o se
+ * colgó del todo, el robot aparece "Desconectado" y hay que ir hasta él.
+ */
+function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enServicio: boolean; ahora: number }) {
+  const queryClient = useQueryClient()
+  const [confirmarReinicio, setConfirmarReinicio] = useState(false)
+  const pedidoId = robot.comando_id ?? 0
+  const hechoId = robot.comando_hecho_id ?? 0
+  const pendiente = pedidoId > hechoId
+  const reinicio = robot.comando === 'reiniciar'
+
+  const enviar = useMutation({
+    mutationFn: async (comando: 'actualizar' | 'reiniciar') => {
+      const { error } = await supabase.rpc('enviar_comando', { p_serial: robot.serial, p_comando: comando })
+      if (error) throw error
+    },
+    // refresca ya, sin esperar los 2 s del intervalo
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['robot-status'] }),
+  })
+
+  let estado: { texto: string; color: string } | null = null
+  if (pendiente) {
+    estado = enServicio
+      ? { texto: reinicio ? 'Reiniciando la app…' : 'Buscando actualización…', color: 'text-amber-700' }
+      : { texto: 'Se hará cuando el robot vuelva a conectarse', color: 'text-slate-500' }
+  } else if (pedidoId > 0 && pedidoId === hechoId && ahora - pedidoId < MOSTRAR_HECHO_MS) {
+    estado = { texto: reinicio ? '✓ App reiniciada' : '✓ Actualización solicitada', color: 'text-emerald-700' }
+  }
+
+  const ocupado = pendiente || enviar.isPending
+
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-sm text-slate-500">
+          App del robot
+          <Ayuda>
+            Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
+          </Ayuda>
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => enviar.mutate('actualizar')}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            Actualizar config
+          </button>
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => setConfirmarReinicio(true)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            Reiniciar app
+          </button>
+        </div>
+      </div>
+
+      {estado && <p className={`mt-2 text-sm font-medium ${estado.color}`}>{estado.texto}</p>}
+      {enviar.error && (
+        <p className="mt-2 text-sm font-medium text-rose-600">No se pudo enviar la orden. {describirError(enviar.error)}</p>
+      )}
+
+      {confirmarReinicio && (
+        <Modal
+          titulo="¿Reiniciar la app del robot?"
+          textoAceptar="Sí, reiniciar"
+          onCancelar={() => setConfirmarReinicio(false)}
+          onAceptar={() => {
+            enviar.mutate('reiniciar')
+            setConfirmarReinicio(false)
+          }}
+        >
+          <p className="text-slate-700">
+            La app de <span className="font-semibold">{robot.nombre || 'el robot'}</span> se cerrará y volverá a abrir en unos segundos. Si está atendiendo a alguien, la interacción se corta. Al abrir sigue con su ruta (o quieto, si lo detuviste).
+          </p>
+          {!enServicio && (
+            <p className="mt-3 text-sm text-amber-700">
+              Este robot no está en línea: se reiniciará cuando vuelva a conectarse.
+            </p>
+          )}
+        </Modal>
+      )}
     </div>
   )
 }
