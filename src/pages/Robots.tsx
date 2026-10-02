@@ -7,6 +7,7 @@ import { Ayuda } from '../components/Ayuda'
 import { DialogRuta } from '../components/DialogRuta'
 import robotPng from '../assets/icons/robot.png'
 import cargandoPng from '../assets/icons/charging_icon.png'
+import { Cargando } from '../components/Cargando'
 
 /* El latido de la app llega cada 3s; si el último tiene más de 6s
    (2 latidos perdidos), el robot se muestra como "Sin reporte".
@@ -130,7 +131,7 @@ export function Robots() {
         Estado en vivo de cada robot: en servicio, batería y última señal de la app.
       </p>
 
-      {isLoading && <p className="mt-10 text-slate-500">Cargando robots...</p>}
+      {isLoading && <Cargando texto="Cargando robots…" />}
 
       {!isLoading && (robots ?? []).length === 0 && (
         <p className="mt-10 text-slate-500">

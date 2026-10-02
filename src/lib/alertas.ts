@@ -11,15 +11,43 @@
  * en la misma proporción).
  */
 
-/** "Cambios guardados": arriba a la derecha y se cierra solo en 1,5 s */
+/**
+ * "Cambios guardados": toast arriba a la derecha, 3 s con barra de tiempo.
+ * Pasar el mouse por encima lo pausa, para alcanzar a leerlo.
+ */
 export async function avisoGuardado(titulo = 'Cambios guardados') {
+  const { default: Swal } = await import('sweetalert2')
+  return Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    customClass: { popup: 'alerta-toast' },
+    didOpen: (toast) => {
+      toast.onmouseenter = Swal.stopTimer
+      toast.onmouseleave = Swal.resumeTimer
+    },
+  }).fire({
+    icon: 'success',
+    title: titulo,
+  })
+}
+
+/**
+ * Error (no se pudo guardar, sin conexión): ventana arriba a la derecha, 6 s
+ * con barra de tiempo, porque trae la causa y hay que alcanzar a leerla.
+ */
+export async function avisoError(titulo: string, texto?: string) {
   const { default: Swal } = await import('sweetalert2')
   return Swal.fire({
     position: 'top-end',
-    icon: 'success',
+    icon: 'error',
     title: titulo,
+    text: texto,
     showConfirmButton: false,
-    timer: 1500,
+    timer: 6000,
+    timerProgressBar: true,
     customClass: { popup: 'alerta-guardado' },
   })
 }

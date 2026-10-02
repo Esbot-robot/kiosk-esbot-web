@@ -24,6 +24,11 @@ body {
   font-size: 0.75rem;
 }
 
+/* toast de "Cambios guardados": tamaño propio de SweetAlert, letra del panel */
+.alerta-toast {
+  font-family: var(--font-sans);
+}
+
 .login-montserrat {
   font-family: 'Montserrat', system-ui, sans-serif;
 }
@@ -40,4 +45,15 @@ body {
   -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
   animation-name: login-autofill-start;
   animation-duration: 0.01s;
+}
+
+/* Animación de carga (components/Cargando.tsx): gira a saltos de 45°, uno por
+   punto, así parece que el punto grande avanza por el círculo */
+@keyframes cargando-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cargando-giro {
+  animation: cargando-giro 0.9s steps(8) infinite;
 }

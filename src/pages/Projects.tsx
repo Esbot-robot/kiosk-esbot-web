@@ -7,6 +7,7 @@ import { configVacia, type Project } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
 import { IconoFijar, IconoReloj } from '../components/iconos'
 import robotPng from '../assets/icons/robot.png'
+import { Cargando } from '../components/Cargando'
 
 async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -137,7 +138,7 @@ export function Projects() {
           </p>
         )}
 
-        {isLoading && <p className="mt-10 text-slate-500">Cargando proyectos...</p>}
+        {isLoading && <Cargando texto="Cargando proyectos…" />}
         {error && (
           <p className="mt-10 text-red-600">
             No se pudieron cargar los proyectos. {describirError(error)}

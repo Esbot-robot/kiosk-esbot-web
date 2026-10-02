@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { Cargando } from './Cargando'
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   // undefined = todavía consultando; null = sin sesión
@@ -15,8 +16,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (session === undefined) {
     return (
-      <div className="flex h-screen items-center justify-center text-slate-500">
-        Cargando...
+      <div className="flex h-screen items-center justify-center">
+        <Cargando className="" />
       </div>
     )
   }

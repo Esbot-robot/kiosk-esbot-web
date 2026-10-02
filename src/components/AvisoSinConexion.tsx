@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { anonKey, url } from '../lib/supabase'
+import { avisoError } from '../lib/alertas'
 
 type Estado = 'ok' | 'sin-red' | 'sin-servidor'
 
@@ -45,6 +46,10 @@ export function AvisoSinConexion() {
       clearTimeout(temporizador)
       setRecuperada(nuevo === 'ok')
       if (nuevo === 'ok') temporizador = setTimeout(() => setRecuperada(false), 3000)
+      // Al perder la conexión, además de la franja (que se queda), el aviso
+      // emergente de error para que no pase desapercibido
+      if (nuevo === 'sin-red') void avisoError('Sin conexión a internet', 'Los cambios no se guardarán hasta que vuelva la red.')
+      if (nuevo === 'sin-servidor') void avisoError('Sin conexión con el servidor', 'La red está conectada pero no llega a internet. Los cambios no se guardarán.')
       setEstado(nuevo)
     }
     const comprobar = async () => {

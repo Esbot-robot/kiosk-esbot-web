@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { generarReportePdf, type PreguntaDist } from '../lib/reportePdf'
+import { Cargando } from '../components/Cargando'
 
 const FILAS_POR_PAGINA = 100
 
@@ -385,7 +386,7 @@ export function Analitica() {
         </div>
 
         {isLoading ? (
-          <p className="py-16 text-center text-slate-400">Cargando eventos...</p>
+          <Cargando texto="Cargando eventos…" className="py-16" />
         ) : totalInteracciones === 0 ? (
           <p className="py-16 text-center text-slate-400">
             Sin eventos en este rango. Los robots registran toques automáticamente.

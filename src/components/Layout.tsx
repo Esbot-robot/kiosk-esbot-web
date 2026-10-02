@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { IconoCarpeta, IconoCerrar, IconoGrafica, IconoMenu, IconoRobotLinea, IconoSalir } from './iconos'
+import { Cargando } from './Cargando'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 px-6 py-4 text-base transition-colors ${
@@ -119,7 +120,7 @@ export function Layout() {
       {/* Contenido. El Suspense va aquí, alrededor del Outlet, y no en App:
           así la barra lateral no desaparece mientras se descarga la página. */}
       <main className="min-w-0 flex-1 overflow-y-auto">
-        <Suspense fallback={<p className="p-6 text-slate-500 md:p-12">Cargando...</p>}>
+        <Suspense fallback={<Cargando className="py-24" />}>
           <Outlet />
         </Suspense>
       </main>

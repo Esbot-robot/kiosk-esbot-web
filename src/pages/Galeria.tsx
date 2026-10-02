@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { Cargando } from '../components/Cargando'
 
 /**
  * Galería del evento para el cliente.
@@ -137,7 +138,7 @@ export function Galeria() {
       </header>
 
       <main className="px-4 py-4">
-        {isLoading && <p className="py-12 text-center text-slate-500">Cargando fotos...</p>}
+        {isLoading && <Cargando texto="Cargando fotos…" />}
 
         {!isLoading && filtradas.length === 0 && (
           <p className="py-12 text-center text-slate-500">

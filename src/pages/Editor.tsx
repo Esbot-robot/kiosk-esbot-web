@@ -3,7 +3,7 @@ import { useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, nombreDesdeUrl, publicarConfigRobot } from '../lib/storage'
-import { avisoGuardado } from '../lib/alertas'
+import { avisoError, avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
 import { botonesAdicionalesVacios, botonFotoVacio, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
@@ -13,6 +13,7 @@ import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
 import { DialogFoto } from '../components/editor/DialogFoto'
 import { describirError } from '../lib/errores'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
+import { Cargando } from '../components/Cargando'
 
 type Pestana = 'inicial' | 'ruleta'
 
@@ -323,6 +324,7 @@ export function Editor() {
         await publicarConfigRobot(robot.serial, nuevaConfig)
       }
     },
+    onError: (e) => void avisoError('No se pudo guardar', describirError(e)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setGuardadoOk(true)
@@ -420,7 +422,7 @@ export function Editor() {
     )
   }
   if (isLoading || !config) {
-    return <p className="p-12 text-slate-500">Cargando proyecto...</p>
+    return <Cargando texto="Cargando proyecto…" className="py-24" />
   }
 
   const ini = config.pantalla_inicial
@@ -563,7 +565,7 @@ export function Editor() {
           <input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="w-full rounded px-2 text-2xl font-bold text-indigo-600 focus:bg-slate-50 focus:outline-none md:w-96"
+            className="w-full rounded px-2 text-2xl font-bold text-slate-800 focus:bg-slate-50 focus:outline-none md:w-96"
             title="Nombre del proyecto (clic para editar)"
           />
           <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
@@ -852,7 +854,7 @@ export function Editor() {
                 <ItemPanel
                   icono={<IconoPlay />}
                   label="Video para patrullaje"
-                  detalle={ini.video_patrullaje_url ? 'Video cargado ✓' : 'Vacío'}
+                  detalle={ini.video_patrullaje_url ? 'Video cargado' : 'Vacío'}
                   onClick={() => setDialogo({ tipo: 'video' })}
                 />
                 <ItemPanel
