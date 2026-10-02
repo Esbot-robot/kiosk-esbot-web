@@ -14,6 +14,16 @@ body {
   font-family: var(--font-sans);
 }
 
+/* En computador todo el panel se ve al 80% (como el zoom del navegador al
+   80%): Tailwind mide letras, márgenes y anchos en rem, así que todo se
+   reduce en la misma proporción. En teléfono queda al 100% para leer bien.
+   El zoom del navegador sigue funcionando encima de esto. */
+@media (min-width: 768px) {
+  html {
+    font-size: 80%;
+  }
+}
+
 /* Aviso "Cambios guardados" (SweetAlert2, ver src/lib/alertas.ts).
    SweetAlert2 mide popup, icono y título en em: al pasar el popup de 1rem a
    0.75rem todo queda al 75% (ancho 32em -> 384 px, icono 80 -> 60 px,

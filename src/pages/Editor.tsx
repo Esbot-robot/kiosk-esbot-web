@@ -88,13 +88,20 @@ function fondoRuleta(preguntas: Pregunta[]): string {
   return `conic-gradient(${tramos.join(', ')})`
 }
 
-/** ancho al que se dibuja la vista previa; más angosto, se reduce en proporción */
-const ANCHO_VISTA = 768
+/**
+ * Ancho del lienzo de la vista previa, en rem: 48rem = 768 px al tamaño base
+ * normal (16 px). Va en rem y no en px porque los textos y botones de adentro
+ * también van en rem: así guardan la misma proporción aunque el panel cambie
+ * su tamaño base (en computador se ve al 80%, ver index.css).
+ */
+const ANCHO_VISTA_REM = 48
 
 /**
- * La vista previa se dibuja siempre a 768 px (16:10, como la pantalla del temi)
- * y se reduce con zoom al espacio disponible. Así se ve igual que en el robot
- * en cualquier pantalla: los textos y botones no se amontonan en un teléfono.
+ * La vista previa se dibuja siempre sobre el mismo lienzo (16:10, como la
+ * pantalla del temi) y se escala con zoom al espacio disponible, hasta 48rem
+ * (max-w-3xl: el mismo ancho del lienzo, así en computador queda a escala 1).
+ * Así se ve igual que en el robot en cualquier pantalla: los textos y botones
+ * no se amontonan en un teléfono ni quedan pequeños en computador.
  */
 function VistaEscalada({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -103,8 +110,13 @@ function VistaEscalada({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const medir = () => setEscala(Math.min(1, el.clientWidth / ANCHO_VISTA))
+    const medir = () => {
+      const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      setEscala(el.clientWidth / (ANCHO_VISTA_REM * remPx))
+    }
     medir()
+    // el ancho del recuadro cambia también cuando cambia el tamaño base
+    // (al cruzar el ancho de computador), así que esto cubre los dos casos
     const observador = new ResizeObserver(medir)
     observador.observe(el)
     return () => observador.disconnect()
@@ -112,7 +124,7 @@ function VistaEscalada({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={ref} className="w-full max-w-3xl">
-      <div style={{ width: ANCHO_VISTA, zoom: escala }}>{children}</div>
+      <div style={{ width: `${ANCHO_VISTA_REM}rem`, zoom: escala }}>{children}</div>
     </div>
   )
 }

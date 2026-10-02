@@ -42,7 +42,7 @@ function CampoFlotante({ id, etiqueta, tipo, valor, onChange }: CampoFlotantePro
         className={`pointer-events-none absolute left-0 font-semibold transition-all duration-200 ease-out ${
           flotando
             ? 'top-0 text-xs text-[#506798]'
-            : 'top-7 text-[15px] text-[#6d7ea6]'
+            : 'top-7 text-[0.9375rem] text-[#6d7ea6]'
         }`}
       >
         {etiqueta}
@@ -106,10 +106,10 @@ export function Login() {
     >
       <form
         onSubmit={entrar}
-        className="login-montserrat w-full max-w-[360px] rounded-[18px] bg-white px-8 py-9 shadow-[0_18px_44px_rgba(21,43,88,0.22)] sm:px-10"
+        className="login-montserrat w-full max-w-[22.5rem] rounded-[18px] bg-white px-8 py-9 shadow-[0_18px_44px_rgba(21,43,88,0.22)] sm:px-10"
       >
         <div className="flex flex-col items-center text-center">
-          <img src={logoLogin} alt="Esbot" className="h-[66px] w-[66px] object-contain" />
+          <img src={logoLogin} alt="Esbot" className="h-[4.125rem] w-[4.125rem] object-contain" />
           <h1 className="mt-5 text-2xl font-bold tracking-[-0.03em] text-[#002d73]">Login</h1>
           <p className="mt-1 text-sm font-semibold text-[#7786aa]">Kiosk Esbot</p>
         </div>
