@@ -275,7 +275,7 @@ export function Analitica() {
   }, [agregados, desde, hasta, granularidad])
 
   function descargarReporte() {
-    generarReportePdf({
+    void generarReportePdf({
       robotLabel: robot,
       desde,
       hasta,
