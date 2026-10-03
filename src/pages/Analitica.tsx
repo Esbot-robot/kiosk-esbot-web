@@ -295,28 +295,16 @@ export function Analitica() {
   }
 
   return (
-    // Mismos márgenes que Robots y Proyectos. Abajo, espacio extra en teléfono
-    // para que el botón flotante del PDF no tape el final de la página
+    // Mismos márgenes que Robots y Proyectos.
     // overflow-x-hidden: si algo llegara a ser más ancho que la pantalla, la
     // página no se desliza de lado (la gráfica y la tabla tienen su propio scroll)
-    <div className="overflow-x-hidden px-4 pb-28 pt-6 sm:px-8 md:px-12 md:py-10">
+    <div className="overflow-x-hidden px-4 pb-16 pt-6 sm:px-8 md:px-12 md:py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Analítica</h2>
           <p className="mt-2 text-slate-600">
-            Interacción de los visitantes con el robot en el evento.
+            Registro de interacciones
           </p>
-          {/* En teléfono este botón se cambia por el flotante de abajo */}
-          <button
-            onClick={descargarReporte}
-            className="mt-3 hidden items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 md:inline-flex"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-            Descargar reporte PDF
-          </button>
         </div>
 
         {/* Filtros: una sola fila, arriba de las gráficas */}
@@ -402,6 +390,21 @@ export function Analitica() {
             }))}
           />
         )}
+
+        {/* Reporte PDF con la gráfica, los totales y las respuestas del rango */}
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={descargarReporte}
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Exportar PDF
+          </button>
+        </div>
       </div>
 
       {/* Detalle de cada evento individual */}
@@ -512,20 +515,6 @@ export function Analitica() {
         </div>
       </div>
 
-      {/* Reporte PDF en teléfono: botón redondo flotante abajo a la derecha.
-          z-30 queda por debajo del menú lateral (z-40/50) cuando se abre */}
-      <button
-        onClick={descargarReporte}
-        aria-label="Descargar reporte PDF"
-        title="Descargar reporte PDF"
-        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 transition-colors hover:bg-indigo-700 active:scale-95 md:hidden"
-      >
-        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-      </button>
     </div>
   )
 }

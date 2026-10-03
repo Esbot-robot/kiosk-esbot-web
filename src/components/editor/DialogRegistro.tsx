@@ -50,7 +50,7 @@ export function DialogRegistro({ valor, projectId, onGuardar, onCerrar }: Dialog
       ayuda="El robot muestra un QR que abre el formulario en el celular del visitante. Si alguien se registra antes de que acabe el tiempo, se despide con su nombre y sigue su ruta."
       onCancelar={onCerrar}
       onAceptar={guardar}
-      textoAceptar="Guardar botón"
+      textoAceptar="Guardar"
       aviso={error}
     >
       <div className="space-y-5">
@@ -134,7 +134,7 @@ export function DialogRegistro({ valor, projectId, onGuardar, onCerrar }: Dialog
           onSinNombre={(despedida) => cambiar({ despedida })}
         />
 
-        <ConfigFormulario valor={registro.formulario} onChange={(formulario) => cambiar({ formulario })} />
+        <ConfigFormulario origen="registro" valor={registro.formulario} onChange={(formulario) => cambiar({ formulario })} />
       </div>
     </Modal>
   )

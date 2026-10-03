@@ -167,6 +167,7 @@ export function DialogBoton({
   return (
     <Modal
       titulo="Editar botón"
+      textoAceptar="Guardar"
       onCancelar={onCerrar}
       onAceptar={() => {
         onGuardar({ ...boton, texto: boton.texto.trim() }, visible)

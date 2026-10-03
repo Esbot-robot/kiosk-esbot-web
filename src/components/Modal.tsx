@@ -46,14 +46,14 @@ export function Modal({
           <div className="flex justify-end gap-3">
             <button
               onClick={onCancelar}
-              className="rounded-lg px-6 py-3 font-medium text-slate-600 transition-colors hover:bg-slate-100"
+              className="px-6 py-3 font-medium text-slate-600 transition-colors hover:bg-slate-100"
             >
               Cancelar
             </button>
             <button
               onClick={onAceptar}
               disabled={aceptarDeshabilitado}
-              className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:px-8"
+              className="bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:px-8"
             >
               {textoAceptar}
             </button>

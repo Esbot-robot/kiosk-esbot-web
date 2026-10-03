@@ -173,7 +173,7 @@ export function DialogBotonAdicional({
       onCancelar={onCerrar}
       onAceptar={guardar}
       aceptarDeshabilitado={Boolean(subiendoCampo)}
-      textoAceptar={subiendoCampo ? 'Subiendo video...' : 'Guardar botón'}
+      textoAceptar={subiendoCampo ? 'Subiendo video...' : 'Guardar'}
       aviso={error}
     >
       <div className="space-y-5">

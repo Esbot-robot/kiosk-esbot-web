@@ -6,3 +6,8 @@ export function colorTextoSobre(hex: string): string {
   // Luminancia percibida (ITU-R BT.601): sobre 150 el fondo es claro
   return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#111827' : '#ffffff'
 }
+
+/** Fondo del botón del formulario: degradado del color elegido a una versión más oscura */
+export function fondoBoton(hex: string): string {
+  return `linear-gradient(90deg, ${hex}, color-mix(in srgb, ${hex} 70%, black))`
+}

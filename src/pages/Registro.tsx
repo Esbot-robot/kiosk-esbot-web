@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { colorTextoSobre } from '../lib/colores'
+import { colorTextoSobre, fondoBoton } from '../lib/colores'
+import { leerVistaPrevia } from '../lib/formulario'
 import { Cargando } from '../components/Cargando'
 import { COLOR_FORMULARIO_DEFECTO, TEXTO_AUTORIZACION_DEFECTO, type FormularioRegistro } from '../types/config'
 
@@ -13,6 +14,8 @@ import { COLOR_FORMULARIO_DEFECTO, TEXTO_AUTORIZACION_DEFECTO, type FormularioRe
  *   #r.<token del proyecto>.<sesión> -> viene del botón de registro
  * Al enviar, el robot (que está preguntando por esa sesión) se despide con el
  * nombre; si venía de la foto, aquí mismo se descarga.
+ *   #vista.<datos>                   -> vista previa desde el editor: no
+ *                                       consulta la base ni guarda nada
  */
 
 interface InfoFormulario {
@@ -52,11 +55,12 @@ function guardarEnviado(clave: string, nombre: string) {
 
 export function Registro() {
   const [clave] = useState(() => window.location.hash.replace('#', '').trim())
-  const [enviadoComo, setEnviadoComo] = useState<string | null>(() => leerEnviado(clave))
+  const [vista] = useState(() => leerVistaPrevia(clave))
+  const [enviadoComo, setEnviadoComo] = useState<string | null>(() => (vista ? null : leerEnviado(clave)))
 
-  const { data: info, status, refetch } = useQuery({
+  const consulta = useQuery({
     queryKey: ['formulario', clave],
-    enabled: clave.length > 0,
+    enabled: clave.length > 0 && !vista,
     retry: 2,
     queryFn: async (): Promise<InfoFormulario | null> => {
       const { data, error } = await supabase.rpc('formulario_info', { p_clave: clave })
@@ -69,6 +73,12 @@ export function Registro() {
         ? REVISION_FOTO_MS
         : false,
   })
+  const { refetch } = consulta
+  // La vista previa no consulta nada: la foto es de ejemplo y ya está "lista"
+  const info: InfoFormulario | null | undefined = vista
+    ? { origen: vista.origen, formulario: vista.formulario, foto_numero: vista.origen === 'foto' ? 47 : undefined, foto_estado: 'lista' }
+    : consulta.data
+  const status = vista ? 'success' : consulta.status
 
   const form = info?.formulario ?? {}
   const color = /^#[0-9a-fA-F]{6}$/.test(form.color ?? '') ? form.color! : COLOR_FORMULARIO_DEFECTO
@@ -87,14 +97,14 @@ export function Registro() {
         <button
           onClick={() => void refetch()}
           className="mt-4 rounded-full px-8 py-3 text-sm font-semibold uppercase"
-          style={{ backgroundColor: color, color: colorTextoSobre(color) }}
+          style={{ backgroundImage: fondoBoton(color), color: colorTextoSobre(color) }}
         >
           Reintentar
         </button>
       </div>
     )
   } else if (enviadoComo !== null) {
-    contenido = <Exito info={info} nombre={enviadoComo} color={color} />
+    contenido = <Exito info={info} nombre={enviadoComo} color={color} vistaPrevia={!!vista} />
   } else {
     contenido = (
       <Formulario
@@ -102,8 +112,9 @@ export function Registro() {
         form={form}
         color={color}
         fotoNumero={info.foto_numero}
+        vistaPrevia={!!vista}
         onEnviado={(nombre) => {
-          guardarEnviado(clave, nombre)
+          if (!vista) guardarEnviado(clave, nombre)
           setEnviadoComo(nombre)
         }}
       />
@@ -112,6 +123,18 @@ export function Registro() {
 
   return (
     <div className="min-h-dvh bg-slate-100 px-4 py-6">
+      {vista && (
+        <div className="mx-auto mb-4 flex w-full max-w-sm items-center justify-between gap-3 rounded-xl bg-amber-100 px-4 py-2.5 text-sm text-amber-900">
+          <span>
+            <b>Vista previa:</b> los datos no se guardan.
+          </span>
+          {enviadoComo !== null && (
+            <button onClick={() => setEnviadoComo(null)} className="shrink-0 font-semibold underline">
+              Volver
+            </button>
+          )}
+        </div>
+      )}
       <main className="mx-auto w-full max-w-sm rounded-2xl bg-white px-5 py-7 shadow-sm">{contenido}</main>
     </div>
   )
@@ -131,12 +154,14 @@ function Formulario({
   form,
   color,
   fotoNumero,
+  vistaPrevia,
   onEnviado,
 }: {
   clave: string
   form: Partial<FormularioRegistro>
   color: string
   fotoNumero?: number
+  vistaPrevia: boolean
   onEnviado: (nombre: string) => void
 }) {
   const [nombre, setNombre] = useState('')
@@ -165,6 +190,13 @@ function Formulario({
     if (Object.keys(encontrados).length > 0) return
 
     setEnviando(true)
+    if (vistaPrevia) {
+      // Simula el envío: valida igual, pero no guarda ni avisa al robot
+      await new Promise((r) => setTimeout(r, 600))
+      setEnviando(false)
+      onEnviado(nombre.trim().split(/\s+/)[0])
+      return
+    }
     try {
       const { data, error } = await supabase.rpc('registrar_contacto', {
         p_clave: clave,
@@ -280,7 +312,7 @@ function Formulario({
         disabled={enviando}
         className="mt-6 w-full rounded-full py-3.5 text-sm font-semibold uppercase tracking-wide transition-opacity disabled:opacity-60"
         style={{
-          backgroundImage: `linear-gradient(90deg, ${color}, color-mix(in srgb, ${color} 70%, black))`,
+          backgroundImage: fondoBoton(color),
           color: colorTextoSobre(color),
         }}
       >
@@ -336,7 +368,17 @@ function Campo({
   )
 }
 
-function Exito({ info, nombre, color }: { info: InfoFormulario; nombre: string; color: string }) {
+function Exito({
+  info,
+  nombre,
+  color,
+  vistaPrevia,
+}: {
+  info: InfoFormulario
+  nombre: string
+  color: string
+  vistaPrevia: boolean
+}) {
   const [inicio] = useState(() => Date.now())
   const [tarda, setTarda] = useState(false)
   const lista = info.origen === 'foto' && info.foto_estado === 'lista' && info.foto_id
@@ -363,7 +405,9 @@ function Exito({ info, nombre, color }: { info: InfoFormulario; nombre: string; 
       {info.origen === 'registro' && <p className="mt-2 text-sm text-slate-500">Tus datos quedaron registrados.</p>}
 
       {info.origen === 'foto' &&
-        (lista ? (
+        (vistaPrevia ? (
+          <FotoEjemplo numero={info.foto_numero} color={color} />
+        ) : lista ? (
           <DescargaFoto id={info.foto_id!} numero={info.foto_numero} color={color} />
         ) : tarda ? (
           <p className="mt-4 text-sm text-slate-500">
@@ -409,7 +453,7 @@ function DescargaFoto({ id, numero, color }: { id: string; numero?: number; colo
         onClick={() => void descargar()}
         className="mt-4 w-full rounded-full py-3.5 text-sm font-semibold uppercase tracking-wide"
         style={{
-          backgroundImage: `linear-gradient(90deg, ${color}, color-mix(in srgb, ${color} 70%, black))`,
+          backgroundImage: fondoBoton(color),
           color: colorTextoSobre(color),
         }}
       >
@@ -417,6 +461,28 @@ function DescargaFoto({ id, numero, color }: { id: string; numero?: number; colo
       </button>
       <p className="mt-3 text-xs text-slate-400">
         {error || 'Si no se descarga, mantén presionada la foto para guardarla.'}
+      </p>
+    </div>
+  )
+}
+
+/** En la vista previa no hay foto real: un recuadro del mismo tamaño */
+function FotoEjemplo({ numero, color }: { numero?: number; color: string }) {
+  const [aviso, setAviso] = useState(false)
+  return (
+    <div className="mt-4">
+      <div className="flex aspect-[2/3] w-full items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+        Aquí aparecerá la foto #{numero}
+      </div>
+      <button
+        onClick={() => setAviso(true)}
+        className="mt-4 w-full rounded-full py-3.5 text-sm font-semibold uppercase tracking-wide"
+        style={{ backgroundImage: fondoBoton(color), color: colorTextoSobre(color) }}
+      >
+        Descargar foto
+      </button>
+      <p className="mt-3 text-xs text-slate-400">
+        {aviso ? 'En la vista previa no hay foto para descargar.' : 'Si no se descarga, mantén presionada la foto para guardarla.'}
       </p>
     </div>
   )

@@ -155,7 +155,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       onCancelar={onCerrar}
       onAceptar={guardar}
       aceptarDeshabilitado={subiendo}
-      textoAceptar={subiendo ? 'Subiendo marco...' : 'Guardar botón'}
+      textoAceptar={subiendo ? 'Subiendo marco...' : 'Guardar'}
       aviso={error}
     >
       <div className="space-y-5">
@@ -356,6 +356,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                 Ver contactos registrados →
               </Link>
               <ConfigFormulario
+                origen="foto"
                 valor={foto.formulario}
                 onChange={(formulario) => setFoto((actual) => ({ ...actual, formulario }))}
               />

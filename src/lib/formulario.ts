@@ -24,3 +24,30 @@ export function limpiarFormulario(f: FormularioRegistro): FormularioRegistro {
     politica_url: f.politica_url.trim(),
   }
 }
+
+/**
+ * Enlace de vista previa del formulario: los textos y el color viajan dentro
+ * de la dirección (después del #), así se ve lo que está en el diálogo aunque
+ * no se haya guardado. No consulta la base ni guarda nada.
+ */
+export function enlaceVistaPrevia(origen: 'foto' | 'registro', formulario: FormularioRegistro): string {
+  const bytes = new TextEncoder().encode(JSON.stringify({ o: origen, f: formulario }))
+  let binario = ''
+  bytes.forEach((b) => (binario += String.fromCharCode(b)))
+  const datos = btoa(binario).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return `${window.location.origin}/registro#vista.${datos}`
+}
+
+/** Lee un enlace de vista previa; null si la clave no es de vista previa o está dañada */
+export function leerVistaPrevia(clave: string): { origen: 'foto' | 'registro'; formulario: Partial<FormularioRegistro> } | null {
+  if (!clave.startsWith('vista.')) return null
+  try {
+    const datos = clave.slice('vista.'.length).replace(/-/g, '+').replace(/_/g, '/')
+    const binario = atob(datos)
+    const json = new TextDecoder().decode(Uint8Array.from(binario, (c) => c.charCodeAt(0)))
+    const { o, f } = JSON.parse(json) as { o: string; f: Partial<FormularioRegistro> }
+    return { origen: o === 'foto' ? 'foto' : 'registro', formulario: f ?? {} }
+  } catch {
+    return null
+  }
+}
