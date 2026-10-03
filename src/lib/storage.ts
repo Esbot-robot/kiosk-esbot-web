@@ -131,11 +131,27 @@ export async function pesoDesdeUrl(urlPublica: string): Promise<number | null> {
 }
 
 /**
+ * Dirección pública del panel, donde vive el formulario de registro. Fija y no
+ * window.location.origin: si se guarda desde localhost, los QR del robot
+ * apuntarían al computador de quien guardó.
+ */
+export const URL_PUBLICA = (import.meta.env.VITE_URL_PUBLICA as string | undefined) || 'https://kiosk-esbot-web.pages.dev'
+
+/**
  * Publica el JSON que el robot descargará con un GET simple:
  * https://.../storage/v1/object/public/configs/{serial}.json
+ *
+ * Además de la config va lo que el robot necesita para armar el QR del
+ * formulario: el token del proyecto (columna aparte en projects) y la
+ * dirección del formulario.
  */
-export async function publicarConfigRobot(serial: string, config: EventConfig): Promise<string> {
-  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+export async function publicarConfigRobot(
+  serial: string,
+  config: EventConfig,
+  registroToken?: string | null
+): Promise<string> {
+  const publicada = { ...config, registro_token: registroToken ?? '', formulario_url: `${URL_PUBLICA}/registro` }
+  const blob = new Blob([JSON.stringify(publicada, null, 2)], { type: 'application/json' })
   return subirArchivo('configs', `${serial}.json`, blob, { contentType: 'application/json' })
 }
 

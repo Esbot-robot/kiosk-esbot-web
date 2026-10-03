@@ -5,12 +5,13 @@ import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, nombreDesdeUrl, publicarConfigRobot } from '../lib/storage'
 import { avisoError, avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
-import { botonesAdicionalesVacios, botonFotoVacio, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
+import { botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
 import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
 import { DialogFoto } from '../components/editor/DialogFoto'
+import { DialogRegistro } from '../components/editor/DialogRegistro'
 import { describirError } from '../lib/errores'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 import { Cargando } from '../components/Cargando'
@@ -23,6 +24,7 @@ type Dialogo =
   | { tipo: 'boton' }
   | { tipo: 'boton-adicional'; index: number }
   | { tipo: 'boton-foto' }
+  | { tipo: 'boton-registro' }
   | { tipo: 'logo' }
   | { tipo: 'tts-inicial'; campo: CampoTtsInicial; titulo: string }
   | { tipo: 'tts-ruleta'; campo: CampoTtsRuleta; titulo: string }
@@ -308,8 +310,26 @@ export function Editor() {
       const fotoBase = botonFotoVacio()
       const fotoGuardada = inicialAnterior.boton_foto
       cfg.pantalla_inicial.boton_foto = fotoGuardada
-        ? { ...fotoBase, ...fotoGuardada, boton: { ...fotoBase.boton, ...fotoGuardada.boton } }
+        ? {
+            ...fotoBase,
+            ...fotoGuardada,
+            boton: { ...fotoBase.boton, ...fotoGuardada.boton },
+            // Antes solo existía el interruptor de WhatsApp
+            entrega: fotoGuardada.entrega ?? (fotoGuardada.whatsapp_activo ? 'whatsapp' : 'ninguna'),
+            formulario: { ...fotoBase.formulario, ...fotoGuardada.formulario },
+          }
         : fotoBase
+      // Proyectos anteriores no tenían el botón de registro: se agrega desactivado.
+      const registroBase = botonRegistroVacio()
+      const registroGuardado = inicialAnterior.boton_registro
+      cfg.pantalla_inicial.boton_registro = registroGuardado
+        ? {
+            ...registroBase,
+            ...registroGuardado,
+            boton: { ...registroBase.boton, ...registroGuardado.boton },
+            formulario: { ...registroBase.formulario, ...registroGuardado.formulario },
+          }
+        : registroBase
       setConfig(cfg)
       setGuardadoJson(JSON.stringify({ nombre: proyecto.nombre, config: cfg }))
     }
@@ -333,7 +353,7 @@ export function Editor() {
         .select('serial')
         .eq('project_id', projectId)
       for (const robot of robots ?? []) {
-        await publicarConfigRobot(robot.serial, nuevaConfig)
+        await publicarConfigRobot(robot.serial, nuevaConfig, proyecto?.registro_token)
       }
     },
     onError: (e) => void avisoError('No se pudo guardar', describirError(e)),
@@ -441,6 +461,7 @@ export function Editor() {
   const rul = config.pantalla_ruleta
   const botonesAdicionales = ini.botones_adicionales ?? botonesAdicionalesVacios()
   const botonFoto = ini.boton_foto ?? botonFotoVacio()
+  const botonRegistro = ini.boton_registro ?? botonRegistroVacio()
   const botonJugarActivo = ini.boton_activo ?? true
   const botonesVistaPrevia = [
     ...(botonJugarActivo
@@ -472,6 +493,16 @@ export function Editor() {
           },
         ]
       : []),
+    ...(botonRegistro.activo
+      ? [
+          {
+            id: 'registro',
+            estilo: botonRegistro.boton,
+            textoDefecto: 'REGÍSTRATE',
+            editar: () => setDialogo({ tipo: 'boton-registro' } as const),
+          },
+        ]
+      : []),
   ]
 
   function setInicial(cambios: Partial<EventConfig['pantalla_inicial']>) {
@@ -488,6 +519,10 @@ export function Editor() {
 
   function setBotonFoto(boton_foto: BotonFoto) {
     setInicial({ boton_foto })
+  }
+
+  function setBotonRegistro(boton_registro: BotonRegistro) {
+    setInicial({ boton_registro })
   }
 
   function guardarPregunta(index: number | null, pregunta: Pregunta) {
@@ -533,10 +568,13 @@ export function Editor() {
     }
     // Sin ningún botón activo, el visitante toca la pantalla y no tiene qué hacer
     const hayAlgunBoton =
-      botonJugarActivo || botonFoto.activo || botonesAdicionales.some((boton) => boton.activo)
+      botonJugarActivo ||
+      botonFoto.activo ||
+      botonRegistro.activo ||
+      botonesAdicionales.some((boton) => boton.activo)
     if (!hayAlgunBoton) {
       setPestana('inicial')
-      setErrorGuardar('Deja al menos un botón activo: Jugar, uno adicional o el de tomar foto.')
+      setErrorGuardar('Deja al menos un botón activo: Jugar, uno adicional, el de tomar foto o el de registro.')
       return
     }
     setErrorGuardar('')
@@ -916,6 +954,12 @@ export function Editor() {
                   }
                   onClick={() => setDialogo({ tipo: 'boton-foto' })}
                 />
+                <ItemPanel
+                  icono={<IconoPlay />}
+                  label={botonRegistro.boton.texto || 'Botón de registro'}
+                  detalle={botonRegistro.activo ? 'Muestra un QR al formulario de registro' : 'Desactivado'}
+                  onClick={() => setDialogo({ tipo: 'boton-registro' })}
+                />
               </div>
             ) : (
               <div>
@@ -1225,6 +1269,14 @@ export function Editor() {
           projectId={projectId!}
           galeriaToken={proyecto?.galeria_token}
           onGuardar={setBotonFoto}
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'boton-registro' && (
+        <DialogRegistro
+          valor={botonRegistro}
+          projectId={projectId!}
+          onGuardar={setBotonRegistro}
           onCerrar={() => setDialogo(null)}
         />
       )}

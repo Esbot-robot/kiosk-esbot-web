@@ -67,7 +67,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
         .from('robots')
         .upsert({ serial: s, project_id: proyecto.id })
       if (e1) throw e1
-      await publicarConfigRobot(s, proyecto.config)
+      await publicarConfigRobot(s, proyecto.config, proyecto.registro_token)
     },
     onSuccess: () => {
       setSerial('')

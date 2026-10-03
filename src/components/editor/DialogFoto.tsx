@@ -1,10 +1,19 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
 import { AparienciaBoton } from './AparienciaBoton'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
-import { FRASE_PREPARACION_DEFECTO, type BotonFoto } from '../../types/config'
+import { CampoTexto, ConfigFormulario } from './ConfigFormulario'
+import { limpiarFormulario, MAX_DESPEDIDA, validarFormulario } from '../../lib/formulario'
+import {
+  FRASE_PREPARACION_DEFECTO,
+  SEGUNDOS_PANTALLA_MAX,
+  SEGUNDOS_PANTALLA_MIN,
+  type BotonFoto,
+  type EntregaFoto,
+} from '../../types/config'
 
 interface DialogFotoProps {
   valor: BotonFoto
@@ -23,6 +32,12 @@ const MAX_FRASE = 150
 const MIN_CUENTA = 3
 const MAX_CUENTA = 15
 const MAX_WA_MENSAJE = 200
+
+const ENTREGAS: { valor: EntregaFoto; label: string; detalle: string }[] = [
+  { valor: 'ninguna', label: 'Sin QR', detalle: 'Solo el número de la foto' },
+  { valor: 'whatsapp', label: 'WhatsApp', detalle: 'El visitante envía un mensaje con su número' },
+  { valor: 'registro', label: 'Formulario de registro', detalle: 'Deja sus datos y descarga la foto' },
+]
 /** límites físicos de la cabeza del robot según el SDK de temi */
 const MIN_INCLINACION = -30
 const MAX_INCLINACION = 50
@@ -98,7 +113,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       setError('Escribe el texto que el robot mostrará y dirá con el número.')
       return
     }
-    if (foto.activo && foto.whatsapp_activo) {
+    if (foto.activo && foto.entrega === 'whatsapp') {
       const soloDigitos = foto.whatsapp_numero.replace(/\D/g, '')
       if (soloDigitos.length < 10 || soloDigitos.length > 15) {
         setError('Escribe el número de WhatsApp con indicativo de país, solo dígitos. Ej: 573108676490')
@@ -109,8 +124,21 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
         return
       }
     }
+    if (foto.activo && foto.entrega === 'registro') {
+      const errorFormulario = validarFormulario(foto.formulario, foto.despedida_nombre)
+      if (errorFormulario) {
+        setError(errorFormulario)
+        return
+      }
+    }
     onGuardar({
       ...foto,
+      // Las apps anteriores solo conocen whatsapp_activo: con registro no
+      // muestran QR, que es lo más seguro mientras se actualizan
+      whatsapp_activo: foto.entrega === 'whatsapp',
+      despedida: foto.despedida.trim(),
+      despedida_nombre: foto.despedida_nombre.trim(),
+      formulario: limpiarFormulario(foto.formulario),
       boton: { ...foto.boton, texto },
       texto: foto.texto.trim(),
       // Vacía = la frase de siempre, para que el robot nunca cuente en silencio
@@ -240,22 +268,36 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
           </p>
         </div>
 
-        {/* QR de WhatsApp */}
+        {/* QR que acompaña la foto */}
         <div className="rounded-lg border border-slate-200 p-4">
-          <label className="relative flex items-center gap-3 text-slate-800">
-            <input
-              type="checkbox"
-              checked={foto.whatsapp_activo}
-              onChange={(e) => setFoto((actual) => ({ ...actual, whatsapp_activo: e.target.checked }))}
-              className="h-4 w-4 accent-indigo-600"
-            />
-            <span className="flex items-center gap-2 font-semibold">
-              Mostrar QR de WhatsApp
-              <Ayuda>El visitante lo escanea y envía el mensaje con el número de su foto.</Ayuda>
-            </span>
-          </label>
+          <p className="flex items-center gap-2 font-semibold text-slate-800">
+            QR con la foto
+            <Ayuda>Se muestra junto al número en la pantalla de resultado.</Ayuda>
+          </p>
+          <div className="mt-3 space-y-2">
+            {ENTREGAS.map(({ valor, label, detalle }) => (
+              <label
+                key={valor}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
+                  foto.entrega === valor ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="entrega-foto"
+                  checked={foto.entrega === valor}
+                  onChange={() => setFoto((actual) => ({ ...actual, entrega: valor }))}
+                  className="mt-1 h-4 w-4 accent-indigo-600"
+                />
+                <span>
+                  <span className="block font-medium text-slate-800">{label}</span>
+                  <span className="block text-sm text-slate-500">{detalle}</span>
+                </span>
+              </label>
+            ))}
+          </div>
 
-          {foto.whatsapp_activo && (
+          {foto.entrega === 'whatsapp' && (
             <div className="mt-4 space-y-4">
               <div className="relative">
                 <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
@@ -305,6 +347,31 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                   {foto.whatsapp_mensaje.length} / {MAX_WA_MENSAJE} caracteres
                 </p>
               </div>
+            </div>
+          )}
+
+          {foto.entrega === 'registro' && (
+            <div className="mt-4 space-y-4">
+              <Link to={`/contactos?proyecto=${projectId}`} className="inline-block text-sm font-semibold text-indigo-600 hover:underline">
+                Ver contactos registrados →
+              </Link>
+              <ConfigFormulario
+                valor={foto.formulario}
+                onChange={(formulario) => setFoto((actual) => ({ ...actual, formulario }))}
+              />
+              <CampoTexto
+                label="Despedida con nombre"
+                ayuda={
+                  <>
+                    La dice el robot si alguien se registra antes de que acabe el tiempo en pantalla.
+                    Escribe <span className="font-mono">{'{nombre}'}</span> donde va el primer nombre.
+                  </>
+                }
+                valor={foto.despedida_nombre}
+                max={MAX_DESPEDIDA}
+                filas={2}
+                onChange={(despedida_nombre) => setFoto((actual) => ({ ...actual, despedida_nombre }))}
+              />
             </div>
           )}
         </div>
@@ -364,18 +431,24 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
         <div className="relative">
           <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
             Tiempo en pantalla
-            <Ayuda>Tiempo de lectura y captura del número/QR por parte del visitante.</Ayuda>
+            <Ayuda>
+              Tiempo de lectura y captura del número/QR por parte del visitante ({SEGUNDOS_PANTALLA_MIN} a{' '}
+              {SEGUNDOS_PANTALLA_MAX}). Con formulario conviene dar más tiempo para llenarlo.
+            </Ayuda>
           </p>
           <div className="flex items-center gap-3">
             <input
               type="number"
-              min={5}
-              max={30}
+              min={SEGUNDOS_PANTALLA_MIN}
+              max={SEGUNDOS_PANTALLA_MAX}
               value={foto.segundos_pantalla}
               onChange={(e) =>
                 setFoto((actual) => ({
                   ...actual,
-                  segundos_pantalla: Math.min(30, Math.max(5, Number(e.target.value) || 10)),
+                  segundos_pantalla: Math.min(
+                    SEGUNDOS_PANTALLA_MAX,
+                    Math.max(SEGUNDOS_PANTALLA_MIN, Number(e.target.value) || 10)
+                  ),
                 }))
               }
               className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
@@ -383,6 +456,19 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
             <span className="text-slate-600">segundos</span>
           </div>
         </div>
+
+        <CampoTexto
+          label={foto.entrega === 'registro' ? 'Despedida sin nombre' : 'Despedida'}
+          ayuda={
+            foto.entrega === 'registro'
+              ? 'La dice el robot al acabar el tiempo si nadie se registró. Vacía = no dice nada.'
+              : 'La dice el robot al acabar el tiempo en pantalla, antes de seguir su ruta. Vacía = no dice nada.'
+          }
+          valor={foto.despedida}
+          max={MAX_DESPEDIDA}
+          filas={2}
+          onChange={(despedida) => setFoto((actual) => ({ ...actual, despedida }))}
+        />
 
         {/* Inclinación de la cabeza: la cámara va en ella, así que define el encuadre */}
         <div className="relative">

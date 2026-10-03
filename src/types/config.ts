@@ -96,6 +96,77 @@ export interface BotonFoto {
   whatsapp_numero: string
   /** mensaje que el visitante enviará; {numero} se reemplaza por el de la foto */
   whatsapp_mensaje: string
+  /**
+   * Qué QR sale con la foto. whatsapp_activo se mantiene sincronizado
+   * (true solo con 'whatsapp') para las apps que aún no conocen este campo.
+   */
+  entrega: EntregaFoto
+  /** lo dice el robot al acabar el tiempo en pantalla, en los tres modos */
+  despedida: string
+  /** con registro: lo dice si alguien se registró antes de acabar el tiempo */
+  despedida_nombre: string
+  formulario: FormularioRegistro
+}
+
+export type EntregaFoto = 'ninguna' | 'whatsapp' | 'registro'
+
+/** Textos y color del formulario público que abre el QR */
+export interface FormularioRegistro {
+  titulo: string
+  subtitulo: string
+  /** botón, etiquetas y borde de los campos al enfocarlos */
+  color: string
+  texto_autorizacion: string
+  /** enlace opcional a la política de datos del cliente */
+  politica_url: string
+}
+
+export const COLOR_FORMULARIO_DEFECTO = '#8E24AA'
+export const TEXTO_AUTORIZACION_DEFECTO =
+  'Autorizo el tratamiento de mis datos personales de acuerdo con la política de tratamiento de datos (Ley 1581 de 2012).'
+
+export function formularioVacio(titulo: string, subtitulo: string): FormularioRegistro {
+  return {
+    titulo,
+    subtitulo,
+    color: COLOR_FORMULARIO_DEFECTO,
+    texto_autorizacion: TEXTO_AUTORIZACION_DEFECTO,
+    politica_url: '',
+  }
+}
+
+/**
+ * Botón de registro de la pantalla inicial (uno por proyecto).
+ * El robot muestra un QR al formulario con cuenta regresiva; si alguien se
+ * registra antes de acabar, se despide con su nombre y retoma la patrulla.
+ */
+export interface BotonRegistro {
+  activo: boolean
+  boton: BotonEstilo
+  /** se muestra junto al QR y el robot lo dice en voz alta */
+  texto: string
+  segundos_pantalla: number
+  /** {nombre} se reemplaza por el primer nombre de quien se registró */
+  despedida_nombre: string
+  /** si se acaba el tiempo y nadie se registró */
+  despedida: string
+  formulario: FormularioRegistro
+}
+
+/** límites del tiempo en pantalla de la foto y del registro */
+export const SEGUNDOS_PANTALLA_MIN = 5
+export const SEGUNDOS_PANTALLA_MAX = 60
+
+export function botonRegistroVacio(): BotonRegistro {
+  return {
+    activo: false,
+    boton: { texto: 'REGÍSTRATE', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
+    texto: 'Escanea el código y déjanos tus datos.',
+    segundos_pantalla: 45,
+    despedida_nombre: '¡Gracias, {nombre}! Ya quedaste registrado.',
+    despedida: 'Gracias por registrarse.',
+    formulario: formularioVacio('REGÍSTRATE', 'Déjanos tus datos y te contactaremos.'),
+  }
 }
 
 /** frase de la cuenta regresiva cuando el evento no define una */
@@ -121,6 +192,10 @@ export function botonFotoVacio(): BotonFoto {
     whatsapp_activo: false,
     whatsapp_numero: '',
     whatsapp_mensaje: 'Hola, quiero reclamar mi foto #{numero} en el stand.',
+    entrega: 'ninguna',
+    despedida: '¡Gracias por visitarnos!',
+    despedida_nombre: '¡Gracias, {nombre}! Disfruta tu foto.',
+    formulario: formularioVacio('REGÍSTRATE Y DESCARGA TU FOTO', 'Déjanos tus datos y llévate tu foto al celular.'),
   }
 }
 
@@ -142,6 +217,8 @@ export interface PantallaInicial {
   botones_adicionales: BotonAdicionalInicial[]
   /** acción de foto, independiente de los dos botones adicionales */
   boton_foto: BotonFoto
+  /** registro de contactos por QR; opcional en proyectos anteriores */
+  boton_registro: BotonRegistro
   tts_toca_pantalla: string
   tts_llega_stand: string
   tts_despedida_stand: string
@@ -260,6 +337,7 @@ export function configVacia(): EventConfig {
       boton_activo: true,
       botones_adicionales: botonesAdicionalesVacios(),
       boton_foto: botonFotoVacio(),
+      boton_registro: botonRegistroVacio(),
       tts_toca_pantalla: '',
       tts_llega_stand: '',
       tts_despedida_stand: '',
@@ -301,6 +379,25 @@ export interface Project {
    * Lo crea Supabase con un valor por defecto (paso de base de datos).
    */
   galeria_token?: string | null
+  /**
+   * Token del formulario de registro. A diferencia del de la galería, este sí
+   * viaja en la config publicada: solo sirve para enviar el formulario.
+   */
+  registro_token?: string | null
+}
+
+/** Fila de la tabla contactos */
+export interface Contacto {
+  id: string
+  project_id: string
+  origen: 'foto' | 'registro'
+  foto_id: string | null
+  foto_numero: number | null
+  serial: string | null
+  nombre: string
+  correo: string
+  celular: string
+  creado_at: string
 }
 
 /** Fila de la tabla robots en Supabase (asignación robot → proyecto) */

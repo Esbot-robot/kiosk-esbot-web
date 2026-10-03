@@ -4,7 +4,8 @@ import { Layout } from './components/Layout'
 import { AvisoSinConexion } from './components/AvisoSinConexion'
 import { Login } from './pages/Login'
 import { Galeria } from './pages/Galeria'
-import { Analitica, Editor, Projects, Robots } from './paginas'
+import { Registro } from './pages/Registro'
+import { Analitica, Contactos, Editor, Projects, Robots } from './paginas'
 
 /**
  * Router "de datos" (createBrowserRouter) y no <BrowserRouter>: es el único
@@ -24,6 +25,7 @@ export const router = createBrowserRouter(
       {/* Públicas: sin sesión */}
       <Route path="/login" element={<Login />} />
       <Route path="/galeria" element={<Galeria />} />
+      <Route path="/registro" element={<Registro />} />
 
       {/* Panel: todo lo de adentro exige sesión */}
       <Route
@@ -35,6 +37,7 @@ export const router = createBrowserRouter(
       >
         <Route path="/proyectos" element={<Projects />} />
         <Route path="/analitica" element={<Analitica />} />
+        <Route path="/contactos" element={<Contactos />} />
         <Route path="/robots" element={<Robots />} />
         <Route path="/editor/:projectId" element={<Editor />} />
         <Route path="*" element={<Navigate to="/proyectos" replace />} />

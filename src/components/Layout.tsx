@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { IconoCarpeta, IconoCerrar, IconoGrafica, IconoMenu, IconoRobotLinea, IconoSalir } from './iconos'
+import { IconoCarpeta, IconoCerrar, IconoContactos, IconoGrafica, IconoMenu, IconoRobotLinea, IconoSalir } from './iconos'
 import { Cargando } from './Cargando'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
@@ -101,6 +101,9 @@ export function Layout() {
           </NavLink>
           <NavLink to="/analitica" className={navItemClass} onClick={cerrarMenu}>
             <IconoGrafica /> Analítica
+          </NavLink>
+          <NavLink to="/contactos" className={navItemClass} onClick={cerrarMenu}>
+            <IconoContactos /> Contactos
           </NavLink>
           <NavLink to="/robots" className={navItemClass} onClick={cerrarMenu}>
             <IconoRobotLinea /> Robots

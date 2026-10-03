@@ -35,6 +35,26 @@ export async function avisoGuardado(titulo = 'Cambios guardados') {
 }
 
 /**
+ * Confirmación de una acción sin vuelta atrás (eliminar). Devuelve true si
+ * la persona confirmó.
+ */
+export async function avisoConfirmar(titulo: string, texto: string, textoConfirmar = 'Eliminar'): Promise<boolean> {
+  const { default: Swal } = await import('sweetalert2')
+  const resultado = await Swal.fire({
+    icon: 'warning',
+    title: titulo,
+    text: texto,
+    showCancelButton: true,
+    confirmButtonText: textoConfirmar,
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#e11d48',
+    focusCancel: true,
+    customClass: { popup: 'alerta-guardado' },
+  })
+  return resultado.isConfirmed
+}
+
+/**
  * Error (no se pudo guardar, sin conexión): ventana arriba a la derecha, 6 s
  * con barra de tiempo, porque trae la causa y hay que alcanzar a leerla.
  */

@@ -10,4 +10,5 @@ import { lazy } from 'react'
 export const Projects = lazy(() => import('./pages/Projects').then((m) => ({ default: m.Projects })))
 export const Editor = lazy(() => import('./pages/Editor').then((m) => ({ default: m.Editor })))
 export const Analitica = lazy(() => import('./pages/Analitica').then((m) => ({ default: m.Analitica })))
+export const Contactos = lazy(() => import('./pages/Contactos').then((m) => ({ default: m.Contactos })))
 export const Robots = lazy(() => import('./pages/Robots').then((m) => ({ default: m.Robots })))
