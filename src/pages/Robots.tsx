@@ -99,7 +99,10 @@ export function Robots() {
       const { data, error } = await supabase
         .from('robot_status')
         .select('*')
-        .order('updated_at', { ascending: false })
+        // Orden fijo: por updated_at, los robots en línea se turnaban el
+        // primer lugar en cada latido y las tarjetas saltaban de posición
+        .order('nombre', { ascending: true, nullsFirst: false })
+        .order('serial', { ascending: true })
       if (error) throw error
       return data as RobotStatus[]
     },
