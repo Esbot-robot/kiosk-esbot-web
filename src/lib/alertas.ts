@@ -71,3 +71,27 @@ export async function avisoError(titulo: string, texto?: string) {
     customClass: { popup: 'alerta-guardado' },
   })
 }
+
+/**
+ * Aviso de carga en el centro, con la animación de SweetAlert2, para órdenes
+ * que tardan lo que tarde el robot (actualizar, reiniciar). Se quita con
+ * cerrarAviso() o al mostrar otro aviso.
+ */
+export async function avisoCargando(titulo: string, texto?: string) {
+  const { default: Swal } = await import('sweetalert2')
+  void Swal.fire({
+    title: titulo,
+    text: texto,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    customClass: { popup: 'alerta-guardado' },
+    didOpen: () => Swal.showLoading(),
+  })
+}
+
+/** Cierra el aviso abierto (por ejemplo, el de carga) */
+export async function cerrarAviso() {
+  const { default: Swal } = await import('sweetalert2')
+  Swal.close()
+}

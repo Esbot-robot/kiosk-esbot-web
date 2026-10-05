@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
+import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/alertas'
 import { Modal } from '../components/Modal'
 import { Ayuda } from '../components/Ayuda'
 import { DialogRuta } from '../components/DialogRuta'
@@ -232,8 +233,7 @@ export function Robots() {
               </div>
 
               <ControlRuta robot={r} enServicio={enServicio} />
-              <ControlComandos robot={r} enServicio={enServicio} ahora={ahora} />
-              <ControlRecorrido robot={r} enServicio={enServicio} />
+              <ControlComandos robot={r} enServicio={enServicio} ahora={ahora} versionProyecto={versiones?.[r.serial]} />
             </div>
           )
         })}
@@ -242,55 +242,134 @@ export function Robots() {
   )
 }
 
-/** tiempo que se muestra "✓ hecho" después de que el robot confirma */
-const MOSTRAR_HECHO_MS = 60_000
+/** el enlace de la videollamada vence a los 30 min (igual que en la app) */
+const VALIDEZ_LLAMADA_MS = 30 * 60 * 1000
+/** "Enlace ya usado" se muestra unos segundos y desaparece */
+const MOSTRAR_USADO_MS = 10_000
+/** si el robot no termina en este tiempo, se deja de esperar y se avisa */
+const LIMITE_ORDEN_MS = 3 * 60 * 1000
+
+/** "9:05" a partir de milisegundos */
+function minutosSegundos(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
+/** Orden que el panel está esperando que el robot termine (actualizar o reiniciar) */
+interface Seguimiento {
+  tipo: 'actualizar' | 'reiniciar'
+  id: number
+  desde: number
+}
 
 /**
- * Órdenes al robot por el latido: buscar la config ya y reiniciar la app.
- * Mientras el robot no confirma, se muestra "Actualizando…" / "Reiniciando…".
- * Reiniciar solo sirve si la app sigue enviando latidos: si se cerró o se
- * colgó del todo, el robot aparece "Desconectado" y hay que ir hasta él.
+ * Órdenes al robot por el latido: buscar la config ya, reiniciar la app y
+ * videollamada. Actualizar y reiniciar muestran un aviso de carga mientras el
+ * robot trabaja y un aviso de listo al terminar.
+ * Solo sirven si la app sigue enviando latidos: si se cerró o se colgó del
+ * todo, el robot aparece "Desconectado" y hay que ir hasta él.
  */
-function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enServicio: boolean; ahora: number }) {
+function ControlComandos({
+  robot,
+  enServicio,
+  ahora,
+  versionProyecto,
+}: {
+  robot: RobotStatus
+  enServicio: boolean
+  ahora: number
+  versionProyecto: number | undefined
+}) {
   const queryClient = useQueryClient()
   const [confirmarReinicio, setConfirmarReinicio] = useState(false)
   /** enlace de videollamada ya abierto: es de un solo uso, no sirve otra vez */
   const [llamadaUsada, setLlamadaUsada] = useState<number | null>(null)
+  /** cuándo se vio por primera vez "enlace usado", para quitarlo a los 10 s */
+  const [usadoVisto, setUsadoVisto] = useState<{ id: number; desde: number } | null>(null)
+  const [seguimiento, setSeguimiento] = useState<Seguimiento | null>(null)
+  const seguimientoRef = useRef<Seguimiento | null>(null)
+  seguimientoRef.current = seguimiento
+
   const pedidoId = robot.comando_id ?? 0
   const hechoId = robot.comando_hecho_id ?? 0
   const pendiente = pedidoId > hechoId
-  const reinicio = robot.comando === 'reiniciar'
   const llamada = robot.comando === 'videollamada'
   // El robot ya respondió a la última orden de videollamada (con enlace o error)
   const respuestaLlamada = llamada && pedidoId > 0 && robot.videollamada_id === pedidoId
-  // El enlace solo sirve 30 min: después no se ofrece
-  const enlaceVigente = ahora - pedidoId < 30 * 60 * 1000
+  const restanteLlamada = pedidoId + VALIDEZ_LLAMADA_MS - ahora
+  const enlaceVigente = restanteLlamada > 0
+  // Usado: lo abrió aquí, o el robot avisó que alguien entró (llega sin enlace ni error)
+  const enlaceUsado =
+    respuestaLlamada &&
+    ((robot.videollamada_url != null && llamadaUsada === pedidoId) ||
+      (!robot.videollamada_url && !robot.videollamada_error))
+
+  useEffect(() => {
+    if (enlaceUsado && usadoVisto?.id !== pedidoId) setUsadoVisto({ id: pedidoId, desde: Date.now() })
+  }, [enlaceUsado, pedidoId, usadoVisto?.id])
 
   const enviar = useMutation({
     mutationFn: async (comando: 'actualizar' | 'reiniciar' | 'videollamada') => {
-      const { error } = await supabase.rpc('enviar_comando', { p_serial: robot.serial, p_comando: comando })
+      const { data, error } = await supabase.rpc('enviar_comando', { p_serial: robot.serial, p_comando: comando })
       if (error) throw error
+      return { comando, id: Number(data) }
     },
-    // refresca ya, sin esperar los 2 s del intervalo
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['robot-status'] }),
+    onSuccess: ({ comando, id }) => {
+      // refresca ya, sin esperar los 2 s del intervalo
+      void queryClient.invalidateQueries({ queryKey: ['robot-status'] })
+      if (comando === 'videollamada') return
+      if (!enServicio) {
+        void avisoError('El robot no está en línea', 'La orden se hará cuando vuelva a conectarse.')
+        return
+      }
+      setSeguimiento({ tipo: comando, id, desde: Date.now() })
+      void avisoCargando(comando === 'reiniciar' ? 'Reiniciando la app…' : 'Buscando actualización…')
+    },
+    onError: (e) => void avisoError('No se pudo enviar la orden', describirError(e)),
   })
 
+  // Mientras se espera, revisa con cada latido si el robot ya terminó
+  useEffect(() => {
+    if (!seguimiento) return
+    const terminar = () => {
+      setSeguimiento(null)
+      void cerrarAviso()
+    }
+    if (Date.now() - seguimiento.desde > LIMITE_ORDEN_MS) {
+      terminar()
+      void avisoError('El robot no terminó a tiempo', 'Revisa su conexión a internet y el estado de la versión.')
+      return
+    }
+    if (hechoId < seguimiento.id) return // todavía no la recibe
+    if (seguimiento.tipo === 'reiniciar') {
+      terminar()
+      void avisoGuardado('App reiniciada')
+      return
+    }
+    // Actualizar: la recibió; si hay versión nueva, se espera a que la aplique
+    const v = robot.version_config
+    if (versionProyecto === undefined || v === versionProyecto) {
+      terminar()
+      void avisoGuardado(v != null ? `Config al día (v${v})` : 'Actualización solicitada')
+    } else if (!enServicio) {
+      terminar()
+      void avisoError('El robot se desconectó', 'Terminará de actualizarse cuando vuelva a conectarse.')
+    }
+  }, [seguimiento, hechoId, robot.version_config, versionProyecto, enServicio, ahora])
+
+  // Si se sale de la página con un aviso de carga abierto, se cierra
+  useEffect(() => () => {
+    if (seguimientoRef.current) void cerrarAviso()
+  }, [])
+
   let estado: { texto: string; color: string } | null = null
-  if (llamada && (pendiente || !respuestaLlamada) && ahora - pedidoId < MOSTRAR_HECHO_MS) {
+  if (llamada && (pendiente || !respuestaLlamada) && enlaceVigente) {
     estado = enServicio
       ? { texto: 'Creando la videollamada en el robot…', color: 'text-amber-700' }
       : { texto: 'Se hará cuando el robot vuelva a conectarse', color: 'text-slate-500' }
-  } else if (llamada) {
-    estado = null
-  } else if (pendiente) {
-    estado = enServicio
-      ? { texto: reinicio ? 'Reiniciando la app…' : 'Buscando actualización…', color: 'text-amber-700' }
-      : { texto: 'Se hará cuando el robot vuelva a conectarse', color: 'text-slate-500' }
-  } else if (pedidoId > 0 && pedidoId === hechoId && ahora - pedidoId < MOSTRAR_HECHO_MS) {
-    estado = { texto: reinicio ? '✓ App reiniciada' : '✓ Actualización solicitada', color: 'text-emerald-700' }
   }
 
-  const ocupado = pendiente || enviar.isPending
+  const ocupado = pendiente || enviar.isPending || seguimiento !== null
 
   return (
     <div className="mt-5 border-t border-slate-100 pt-4">
@@ -314,7 +393,7 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
             type="button"
             disabled={ocupado}
             onClick={() => enviar.mutate('videollamada')}
-            title="Prueba: el robot crea un enlace de videollamada de temi (10 min, un solo uso)"
+            title="El robot crea un enlace de videollamada de temi (un solo uso, vence en 30 min)"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
             Videollamada
@@ -331,14 +410,11 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
       </div>
 
       {estado && <p className={`mt-2 text-sm font-medium ${estado.color}`}>{estado.texto}</p>}
-      {/* Usado: lo abrió aquí, o el robot avisó que alguien entró (llega sin enlace ni error) */}
-      {respuestaLlamada &&
-        enlaceVigente &&
-        ((robot.videollamada_url && llamadaUsada === pedidoId) || (!robot.videollamada_url && !robot.videollamada_error)) && (
-          <p className="mt-2 text-sm text-slate-500">
-            Enlace ya usado (es de un solo uso). Para entrar otra vez, toca Videollamada y se crea uno nuevo.
-          </p>
-        )}
+      {enlaceUsado && usadoVisto?.id === pedidoId && ahora - usadoVisto.desde < MOSTRAR_USADO_MS && (
+        <p className="mt-2 text-sm text-slate-500">
+          Enlace ya usado (es de un solo uso). Para entrar otra vez, toca Videollamada y se crea uno nuevo.
+        </p>
+      )}
       {respuestaLlamada && enlaceVigente && robot.videollamada_url && llamadaUsada !== pedidoId && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           <a
@@ -350,14 +426,13 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
           >
             Abrir videollamada
           </a>
-          <span className="text-slate-500">Un solo uso · 10 min · vence en 30 min</span>
+          <span className="text-slate-500" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            Un solo uso · vence en {minutosSegundos(restanteLlamada)}
+          </span>
         </div>
       )}
       {respuestaLlamada && !robot.videollamada_url && robot.videollamada_error && (
         <p className="mt-2 text-sm font-medium text-rose-600">No se pudo crear la videollamada. {robot.videollamada_error}</p>
-      )}
-      {enviar.error && (
-        <p className="mt-2 text-sm font-medium text-rose-600">No se pudo enviar la orden. {describirError(enviar.error)}</p>
       )}
 
       {confirmarReinicio && (
@@ -384,27 +459,71 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
   )
 }
 
-/** Ruta de patrullaje del robot: resumen en la tarjeta y botón para editarla */
+/**
+ * Ruta de patrullaje y botón de detener/reanudar el recorrido, en la misma fila.
+ *
+ * El recorrido usa dos datos porque la orden viaja por el latido y puede
+ * tardar (o no llegar, si el robot no tiene internet):
+ *   quieto            -> lo que se pidió desde aquí
+ *   quieto_confirmado -> lo que el robot tiene aplicado de verdad
+ * Mientras no coinciden, el botón dice "Deteniendo…" / "Reanudando…".
+ */
 function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: boolean }) {
+  const queryClient = useQueryClient()
   const [editando, setEditando] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
   const ruta = robot.ruta ?? []
+  const pedido = robot.quieto ?? false
+  const aplicado = robot.quieto_confirmado ?? false
+  const enCamino = enServicio && pedido !== aplicado
+
+  const cambiar = useMutation({
+    mutationFn: async (quieto: boolean) => {
+      const { error } = await supabase.rpc('fijar_quieto', { p_serial: robot.serial, p_quieto: quieto })
+      if (error) throw error
+    },
+    // refresca ya, sin esperar los 2 s del intervalo
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['robot-status'] }),
+    onError: (e) => void avisoError('No se pudo cambiar el recorrido', describirError(e)),
+  })
 
   return (
     <div className="mt-5 border-t border-slate-100 pt-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="flex items-center gap-2 text-sm text-slate-500">
           Ruta
           <Ayuda>
-            Ubicaciones que el robot recorre en orden. Se puede cambiar aquí o en el admin del robot, y los dos lados ven el último cambio guardado. El robot la guarda en su memoria: sin internet sigue patrullando con la última que recibió.
+            Ubicaciones que el robot recorre en orden. Se puede cambiar aquí o en el admin del robot, y los dos lados ven el último cambio guardado. El robot la guarda en su memoria: sin internet sigue patrullando con la última que recibió. Detener recorrido lo deja quieto en su lugar; lo demás sigue funcionando.
           </Ayuda>
         </span>
-        <button
-          type="button"
-          onClick={() => setEditando(true)}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-        >
-          {ruta.length ? 'Editar ruta' : 'Configurar ruta'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            {ruta.length ? 'Editar ruta' : 'Configurar ruta'}
+          </button>
+          {pedido ? (
+            <button
+              type="button"
+              disabled={cambiar.isPending || enCamino}
+              onClick={() => cambiar.mutate(false)}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {enCamino ? 'Deteniendo…' : 'Reanudar recorrido'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={cambiar.isPending || enCamino}
+              onClick={() => setConfirmando(true)}
+              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
+            >
+              {enCamino ? 'Reanudando…' : 'Detener recorrido'}
+            </button>
+          )}
+        </div>
       </div>
       <p className={`mt-2 text-sm ${ruta.length ? 'font-medium text-slate-700' : 'text-slate-400'}`}>
         {ruta.length ? ruta.join(' → ') : 'Sin ruta guardada'}
@@ -419,83 +538,6 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
           enServicio={enServicio}
           onCerrar={() => setEditando(false)}
         />
-      )}
-    </div>
-  )
-}
-
-/**
- * Botón de modo quieto de cada robot.
- *
- * Se muestran dos datos distintos porque la orden viaja por el latido y puede
- * tardar (o no llegar, si el robot no tiene internet):
- *   quieto            -> lo que se pidió desde aquí
- *   quieto_confirmado -> lo que el robot tiene aplicado de verdad
- * Mientras no coinciden se ve "Deteniendo..." / "Reanudando...", para no dar
- * por hecho algo que el robot todavía no ha recibido.
- */
-function ControlRecorrido({ robot, enServicio }: { robot: RobotStatus; enServicio: boolean }) {
-  const queryClient = useQueryClient()
-  const [confirmando, setConfirmando] = useState(false)
-  const pedido = robot.quieto ?? false
-  const aplicado = robot.quieto_confirmado ?? false
-
-  const cambiar = useMutation({
-    mutationFn: async (quieto: boolean) => {
-      const { error } = await supabase.rpc('fijar_quieto', { p_serial: robot.serial, p_quieto: quieto })
-      if (error) throw error
-    },
-    // refresca ya, sin esperar los 2 s del intervalo
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['robot-status'] }),
-  })
-
-  let estado: { texto: string; color: string } | null = null
-  if (pedido && aplicado) estado = { texto: 'Recorrido en pausa', color: 'text-amber-700' }
-  else if (pedido && !aplicado)
-    estado = enServicio
-      ? { texto: 'Deteniendo…', color: 'text-amber-700' }
-      : { texto: 'Se detendrá cuando vuelva a reportar', color: 'text-slate-500' }
-  else if (!pedido && aplicado)
-    estado = enServicio
-      ? { texto: 'Reanudando…', color: 'text-emerald-700' }
-      : { texto: 'Reanudará cuando vuelva a reportar', color: 'text-slate-500' }
-
-  return (
-    <div className="mt-5 border-t border-slate-100 pt-4">
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2 text-sm text-slate-500">
-          Recorrido
-          <Ayuda>
-            El robot está detenido en su ubicación actual. Las funciones multimedia y táctiles siguen activas. Puedes reanudar la ruta o cargar nuevas ubicaciones desde el panel de administración.
-          </Ayuda>
-        </span>
-
-        {pedido ? (
-          <button
-            type="button"
-            disabled={cambiar.isPending}
-            onClick={() => cambiar.mutate(false)}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            Reanudar recorrido
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={cambiar.isPending}
-            onClick={() => setConfirmando(true)}
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
-          >
-            Detener recorrido
-          </button>
-        )}
-      </div>
-
-      {estado && <p className={`mt-2 text-sm font-medium ${estado.color}`}>{estado.texto}</p>}
-      {cambiar.error && (
-        <p className="mt-2 text-sm font-medium text-rose-600">
-          No se pudo cambiar. {describirError(cambiar.error)}
-        </p>
       )}
 
       {confirmando && (
