@@ -255,17 +255,17 @@ function minutosSegundos(ms: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
-/** Orden que el panel está esperando que el robot termine (actualizar o reiniciar) */
+/** Orden que el panel está esperando que el robot termine */
 interface Seguimiento {
-  tipo: 'actualizar' | 'reiniciar'
+  tipo: 'actualizar' | 'reiniciar' | 'videollamada'
   id: number
   desde: number
 }
 
 /**
  * Órdenes al robot por el latido: buscar la config ya, reiniciar la app y
- * videollamada. Actualizar y reiniciar muestran un aviso de carga mientras el
- * robot trabaja y un aviso de listo al terminar.
+ * videollamada. Las tres muestran un aviso de carga mientras el robot trabaja
+ * y un aviso de listo (o del error) al terminar.
  * Solo sirven si la app sigue enviando latidos: si se cerró o se colgó del
  * todo, el robot aparece "Desconectado" y hay que ir hasta él.
  */
@@ -317,13 +317,18 @@ function ControlComandos({
     onSuccess: ({ comando, id }) => {
       // refresca ya, sin esperar los 2 s del intervalo
       void queryClient.invalidateQueries({ queryKey: ['robot-status'] })
-      if (comando === 'videollamada') return
       if (!enServicio) {
         void avisoError('El robot no está en línea', 'La orden se hará cuando vuelva a conectarse.')
         return
       }
       setSeguimiento({ tipo: comando, id, desde: Date.now() })
-      void avisoCargando(comando === 'reiniciar' ? 'Reiniciando la app…' : 'Buscando actualización…')
+      void avisoCargando(
+        comando === 'reiniciar'
+          ? 'Reiniciando la app…'
+          : comando === 'videollamada'
+            ? 'Creando la videollamada…'
+            : 'Buscando actualización…'
+      )
     },
     onError: (e) => void avisoError('No se pudo enviar la orden', describirError(e)),
   })
@@ -338,6 +343,14 @@ function ControlComandos({
     if (Date.now() - seguimiento.desde > LIMITE_ORDEN_MS) {
       terminar()
       void avisoError('El robot no terminó a tiempo', 'Revisa su conexión a internet y el estado de la versión.')
+      return
+    }
+    if (seguimiento.tipo === 'videollamada') {
+      // Termina cuando el robot devuelve el enlace (o el motivo del error)
+      if (robot.videollamada_id !== seguimiento.id) return
+      terminar()
+      if (robot.videollamada_url) void avisoGuardado('Videollamada lista')
+      else void avisoError('No se pudo crear la videollamada', robot.videollamada_error ?? undefined)
       return
     }
     if (hechoId < seguimiento.id) return // todavía no la recibe
@@ -355,19 +368,12 @@ function ControlComandos({
       terminar()
       void avisoError('El robot se desconectó', 'Terminará de actualizarse cuando vuelva a conectarse.')
     }
-  }, [seguimiento, hechoId, robot.version_config, versionProyecto, enServicio, ahora])
+  }, [seguimiento, hechoId, robot.version_config, robot.videollamada_id, robot.videollamada_url, robot.videollamada_error, versionProyecto, enServicio, ahora])
 
   // Si se sale de la página con un aviso de carga abierto, se cierra
   useEffect(() => () => {
     if (seguimientoRef.current) void cerrarAviso()
   }, [])
-
-  let estado: { texto: string; color: string } | null = null
-  if (llamada && (pendiente || !respuestaLlamada) && enlaceVigente) {
-    estado = enServicio
-      ? { texto: 'Creando la videollamada en el robot…', color: 'text-amber-700' }
-      : { texto: 'Se hará cuando el robot vuelva a conectarse', color: 'text-slate-500' }
-  }
 
   const ocupado = pendiente || enviar.isPending || seguimiento !== null
 
@@ -409,7 +415,6 @@ function ControlComandos({
         </div>
       </div>
 
-      {estado && <p className={`mt-2 text-sm font-medium ${estado.color}`}>{estado.texto}</p>}
       {enlaceUsado && usadoVisto?.id === pedidoId && ahora - usadoVisto.desde < MOSTRAR_USADO_MS && (
         <p className="mt-2 text-sm text-slate-500">
           Enlace ya usado (es de un solo uso). Para entrar otra vez, toca Videollamada y se crea uno nuevo.
@@ -430,9 +435,6 @@ function ControlComandos({
             Un solo uso · vence en {minutosSegundos(restanteLlamada)}
           </span>
         </div>
-      )}
-      {respuestaLlamada && !robot.videollamada_url && robot.videollamada_error && (
-        <p className="mt-2 text-sm font-medium text-rose-600">No se pudo crear la videollamada. {robot.videollamada_error}</p>
       )}
 
       {confirmarReinicio && (
