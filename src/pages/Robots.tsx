@@ -37,6 +37,12 @@ interface RobotStatus {
   comando_id?: number | null
   /** número de la última orden que el robot ejecutó */
   comando_hecho_id?: number | null
+  /** PRUEBA: orden de videollamada a la que responde el robot */
+  videollamada_id?: number | null
+  /** enlace de la reunión de temi */
+  videollamada_url?: string | null
+  /** motivo si el robot no pudo crearla */
+  videollamada_error?: string | null
 }
 
 /** versión actual del proyecto fijado a cada serial */
@@ -245,13 +251,20 @@ const MOSTRAR_HECHO_MS = 60_000
 function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enServicio: boolean; ahora: number }) {
   const queryClient = useQueryClient()
   const [confirmarReinicio, setConfirmarReinicio] = useState(false)
+  /** enlace de videollamada ya abierto: es de un solo uso, no sirve otra vez */
+  const [llamadaUsada, setLlamadaUsada] = useState<number | null>(null)
   const pedidoId = robot.comando_id ?? 0
   const hechoId = robot.comando_hecho_id ?? 0
   const pendiente = pedidoId > hechoId
   const reinicio = robot.comando === 'reiniciar'
+  const llamada = robot.comando === 'videollamada'
+  // El robot ya respondió a la última orden de videollamada (con enlace o error)
+  const respuestaLlamada = llamada && pedidoId > 0 && robot.videollamada_id === pedidoId
+  // El enlace solo sirve 30 min: después no se ofrece
+  const enlaceVigente = ahora - pedidoId < 30 * 60 * 1000
 
   const enviar = useMutation({
-    mutationFn: async (comando: 'actualizar' | 'reiniciar') => {
+    mutationFn: async (comando: 'actualizar' | 'reiniciar' | 'videollamada') => {
       const { error } = await supabase.rpc('enviar_comando', { p_serial: robot.serial, p_comando: comando })
       if (error) throw error
     },
@@ -260,7 +273,13 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
   })
 
   let estado: { texto: string; color: string } | null = null
-  if (pendiente) {
+  if (llamada && (pendiente || !respuestaLlamada) && ahora - pedidoId < MOSTRAR_HECHO_MS) {
+    estado = enServicio
+      ? { texto: 'Creando la videollamada en el robot…', color: 'text-amber-700' }
+      : { texto: 'Se hará cuando el robot vuelva a conectarse', color: 'text-slate-500' }
+  } else if (llamada) {
+    estado = null
+  } else if (pendiente) {
     estado = enServicio
       ? { texto: reinicio ? 'Reiniciando la app…' : 'Buscando actualización…', color: 'text-amber-700' }
       : { texto: 'Se hará cuando el robot vuelva a conectarse', color: 'text-slate-500' }
@@ -291,6 +310,15 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
           <button
             type="button"
             disabled={ocupado}
+            onClick={() => enviar.mutate('videollamada')}
+            title="Prueba: el robot crea un enlace de videollamada de temi (10 min, un solo uso)"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            Videollamada
+          </button>
+          <button
+            type="button"
+            disabled={ocupado}
             onClick={() => setConfirmarReinicio(true)}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -300,6 +328,31 @@ function ControlComandos({ robot, enServicio, ahora }: { robot: RobotStatus; enS
       </div>
 
       {estado && <p className={`mt-2 text-sm font-medium ${estado.color}`}>{estado.texto}</p>}
+      {/* Usado: lo abrió aquí, o el robot avisó que alguien entró (llega sin enlace ni error) */}
+      {respuestaLlamada &&
+        enlaceVigente &&
+        ((robot.videollamada_url && llamadaUsada === pedidoId) || (!robot.videollamada_url && !robot.videollamada_error)) && (
+          <p className="mt-2 text-sm text-slate-500">
+            Enlace ya usado (es de un solo uso). Para entrar otra vez, toca Videollamada y se crea uno nuevo.
+          </p>
+        )}
+      {respuestaLlamada && enlaceVigente && robot.videollamada_url && llamadaUsada !== pedidoId && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <a
+            onClick={() => setLlamadaUsada(pedidoId)}
+            href={robot.videollamada_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white transition-colors hover:bg-indigo-700"
+          >
+            Abrir videollamada
+          </a>
+          <span className="text-slate-500">Un solo uso · 10 min · vence en 30 min</span>
+        </div>
+      )}
+      {respuestaLlamada && !robot.videollamada_url && robot.videollamada_error && (
+        <p className="mt-2 text-sm font-medium text-rose-600">No se pudo crear la videollamada. {robot.videollamada_error}</p>
+      )}
       {enviar.error && (
         <p className="mt-2 text-sm font-medium text-rose-600">No se pudo enviar la orden. {describirError(enviar.error)}</p>
       )}
