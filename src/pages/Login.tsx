@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { sesionPrestada, supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import loginBg from '../assets/login_bg.png'
 import logoLogin from '../assets/logo-login.png'
@@ -80,7 +80,9 @@ export function Login() {
   // Llegada desde "Cerrar Sesión" del menú (ver Layout)
   useEffect(() => {
     if ((location.state as { cerrarSesion?: boolean } | null)?.cerrarSesion) {
-      void supabase.auth.signOut()
+      // En la pestaña de "Entrar como" solo se cierra esta pestaña: el cierre
+      // normal cerraría todas las sesiones del cliente, también en su equipo
+      void supabase.auth.signOut(sesionPrestada ? { scope: 'local' } : undefined)
     }
   }, [location.state])
 

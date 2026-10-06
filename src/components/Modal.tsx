@@ -1,4 +1,5 @@
 import { Ayuda } from './Ayuda'
+import { useSoloLectura } from '../lib/perfil'
 
 interface ModalProps {
   titulo: string
@@ -19,6 +20,8 @@ interface ModalProps {
   onAceptar: () => void
   aceptarDeshabilitado?: boolean
   textoAceptar?: string
+  /** ancho máximo del diálogo (clase de Tailwind); por defecto max-w-2xl */
+  ancho?: string
 }
 
 export function Modal({
@@ -30,33 +33,47 @@ export function Modal({
   onAceptar,
   aceptarDeshabilitado,
   textoAceptar = 'Aceptar',
+  ancho = 'max-w-2xl',
 }: ModalProps) {
+  // Cliente lector en el editor: ve todo el diálogo, pero sin poder escribir
+  // ni guardar (el fieldset desactiva todos los campos y botones de adentro)
+  const soloLectura = useSoloLectura()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
       {/* Nunca más alto que la pantalla (dvh: descuenta las barras del navegador
           del teléfono). Título y botones fijos; el contenido se desplaza. */}
-      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+      <div className={`flex max-h-[calc(100dvh-2rem)] w-full ${ancho} flex-col rounded-2xl bg-white shadow-2xl`}>
         <h3 className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-5 py-4 text-xl font-semibold text-slate-900 md:px-8 md:py-6 md:text-2xl">
           {titulo}
           {ayuda && <Ayuda ancho="w-80">{ayuda}</Ayuda>}
         </h3>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-8 md:py-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-8 md:py-6">
+          {soloLectura ? (
+            <fieldset disabled className="min-w-0">
+              {children}
+            </fieldset>
+          ) : (
+            children
+          )}
+        </div>
         <div className="shrink-0 border-t border-slate-100 px-5 pb-5 pt-4 md:px-8 md:pb-8">
-          {aviso && <div className="mb-3 text-sm font-medium text-rose-600">{aviso}</div>}
+          {aviso && !soloLectura && <div className="mb-3 text-sm font-medium text-rose-600">{aviso}</div>}
           <div className="flex justify-end gap-3">
             <button
               onClick={onCancelar}
               className="px-6 py-3 font-medium text-slate-600 transition-colors hover:bg-slate-100"
             >
-              Cancelar
+              {soloLectura ? 'Cerrar' : 'Cancelar'}
             </button>
-            <button
-              onClick={onAceptar}
-              disabled={aceptarDeshabilitado}
-              className="bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:px-8"
-            >
-              {textoAceptar}
-            </button>
+            {!soloLectura && (
+              <button
+                onClick={onAceptar}
+                disabled={aceptarDeshabilitado}
+                className="bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:px-8"
+              >
+                {textoAceptar}
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import { DialogRegistro } from '../components/editor/DialogRegistro'
 import { describirError } from '../lib/errores'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 import { Cargando } from '../components/Cargando'
+import { SoloLecturaContext, usePerfil } from '../lib/perfil'
 
 type Pestana = 'inicial' | 'ruleta'
 
@@ -232,6 +233,8 @@ export function Editor() {
   /** nombre + config tal como están en Supabase, para saber si hay cambios sin guardar */
   const [guardadoJson, setGuardadoJson] = useState('')
   const eliminado = useRef(false)
+  // El cliente lector ve todo el proyecto, pero no puede cambiar ni guardar nada
+  const soloLectura = usePerfil().rol === 'lector'
 
   const { data: proyecto, isLoading, error: errorCarga, refetch } = useQuery({
     queryKey: ['project', projectId],
@@ -353,7 +356,7 @@ export function Editor() {
         .select('serial')
         .eq('project_id', projectId)
       for (const robot of robots ?? []) {
-        await publicarConfigRobot(robot.serial, nuevaConfig, proyecto?.registro_token)
+        await publicarConfigRobot(robot.serial, nuevaConfig, proyecto?.registro_token, projectId)
       }
     },
     onError: (e) => void avisoError('No se pudo guardar', describirError(e)),
@@ -608,6 +611,7 @@ export function Editor() {
   }
 
   return (
+    <SoloLecturaContext.Provider value={soloLectura}>
     <div className="flex h-full flex-col">
       {/* Barra superior: nombre + pestañas */}
       <div className="flex flex-col border-b border-slate-200 bg-white md:flex-row md:items-center md:justify-between md:pl-10">
@@ -615,8 +619,9 @@ export function Editor() {
           <input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
+            readOnly={soloLectura}
             className="w-full rounded px-2 text-2xl font-bold text-slate-800 focus:bg-slate-50 focus:outline-none md:w-96"
-            title="Nombre del proyecto (clic para editar)"
+            title={soloLectura ? undefined : 'Nombre del proyecto (clic para editar)'}
           />
           <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
         </div>
@@ -983,6 +988,7 @@ export function Editor() {
                       <input
                         type="radio"
                         name="despues_quiz"
+                        disabled={soloLectura}
                         checked={rul.despues_quiz.modo === opcion.valor}
                         onChange={() =>
                           setRuleta({ despues_quiz: { ...rul.despues_quiz, modo: opcion.valor } })
@@ -1013,7 +1019,7 @@ export function Editor() {
                   <p className="font-semibold text-slate-800">Preguntas</p>
                   <button
                     onClick={() => setDialogo({ tipo: 'pregunta', index: null })}
-                    disabled={rul.preguntas.length >= LIMITES.PREGUNTAS_MAX}
+                    disabled={soloLectura || rul.preguntas.length >= LIMITES.PREGUNTAS_MAX}
                     className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-indigo-50 disabled:opacity-30"
                     title={
                       rul.preguntas.length >= LIMITES.PREGUNTAS_MAX
@@ -1055,6 +1061,7 @@ export function Editor() {
 
           {/* Computador: al final del panel. En teléfono se cambian por los
               botones flotantes de abajo */}
+          {!soloLectura && (
           <div className="hidden border-t border-slate-200 p-6 md:block">
             <div className="flex gap-3">
               <button
@@ -1082,17 +1089,18 @@ export function Editor() {
               <p className="mt-2 text-sm text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
             )}
           </div>
+          )}
         </aside>
       </div>
 
       {/* ─── Teléfono: engranaje flotante abajo a la derecha. Al tocarlo gira y
           despliega hacia arriba Guardar y Eliminar, uno tras otro.
           z-30 queda por debajo del menú lateral (z-40/50) cuando se abre ─── */}
-      {accionesAbiertas && (
+      {!soloLectura && accionesAbiertas && (
         // tocar fuera cierra las acciones
         <div className="fixed inset-0 z-20 md:hidden" onClick={() => setAccionesAbiertas(false)} aria-hidden="true" />
       )}
-      <div className="fixed bottom-6 right-6 z-30 flex flex-col items-end gap-3 md:hidden">
+      <div className={`fixed bottom-6 right-6 z-30 flex-col items-end gap-3 md:hidden ${soloLectura ? 'hidden' : 'flex'}`}>
         <AccionFlotante
           visible={accionesAbiertas}
           orden={1}
@@ -1384,5 +1392,6 @@ export function Editor() {
         />
       )}
     </div>
+    </SoloLecturaContext.Provider>
   )
 }

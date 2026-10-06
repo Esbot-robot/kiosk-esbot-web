@@ -6,6 +6,7 @@ import { avisoConfirmar, avisoError, avisoGuardado } from '../lib/alertas'
 import { describirError } from '../lib/errores'
 import { Cargando } from '../components/Cargando'
 import type { Contacto } from '../types/config'
+import { esAdmin, usePerfil } from '../lib/perfil'
 
 const FILAS_POR_PAGINA = 100
 
@@ -47,6 +48,7 @@ function celdaCsv(valor: string | number | null): string {
  */
 export function Contactos() {
   const queryClient = useQueryClient()
+  const admin = esAdmin(usePerfil())
   const [params, setParams] = useSearchParams()
   const [origen, setOrigen] = useState<Origen>('foto')
   const [busqueda, setBusqueda] = useState('')
@@ -324,7 +326,7 @@ export function Contactos() {
                 >
                   <option value="">Acciones en lote</option>
                   <option value="exportar">Exportar CSV</option>
-                  <option value="eliminar">Eliminar</option>
+                  {admin && <option value="eliminar">Eliminar</option>}
                 </select>
                 <svg
                   aria-hidden="true"

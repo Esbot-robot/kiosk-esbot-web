@@ -148,9 +148,16 @@ export const URL_PUBLICA = (import.meta.env.VITE_URL_PUBLICA as string | undefin
 export async function publicarConfigRobot(
   serial: string,
   config: EventConfig,
-  registroToken?: string | null
+  registroToken?: string | null,
+  /** el robot lo envía con cada evento de analítica (lo que ve cada cliente) */
+  projectId?: string
 ): Promise<string> {
-  const publicada = { ...config, registro_token: registroToken ?? '', formulario_url: `${URL_PUBLICA}/registro` }
+  const publicada = {
+    ...config,
+    project_id: projectId ?? '',
+    registro_token: registroToken ?? '',
+    formulario_url: `${URL_PUBLICA}/registro`,
+  }
   const blob = new Blob([JSON.stringify(publicada, null, 2)], { type: 'application/json' })
   return subirArchivo('configs', `${serial}.json`, blob, { contentType: 'application/json' })
 }

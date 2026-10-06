@@ -24,4 +24,24 @@ const fetchConLimite: typeof fetch = (entrada, opciones = {}) => {
   return fetch(entrada, { ...opciones, signal })
 }
 
-export const supabase = createClient(url, anonKey, { global: { fetch: fetchConLimite } })
+/**
+ * Pestaña abierta con "Entrar como" (llega con ?como=1): guarda su sesión solo
+ * en esta pestaña (sessionStorage). Con el almacenamiento normal, que comparten
+ * todas las pestañas, la sesión del cliente reemplazaría la del super
+ * administrador en las demás.
+ */
+export const sesionPrestada = (() => {
+  try {
+    if (new URLSearchParams(window.location.search).get('como') === '1') {
+      sessionStorage.setItem('kiosk-esbot-sesion-prestada', '1')
+    }
+    return sessionStorage.getItem('kiosk-esbot-sesion-prestada') === '1'
+  } catch {
+    return false
+  }
+})()
+
+export const supabase = createClient(url, anonKey, {
+  global: { fetch: fetchConLimite },
+  auth: sesionPrestada ? { storage: window.sessionStorage, storageKey: 'kiosk-esbot-sesion-prestada-auth' } : undefined,
+})

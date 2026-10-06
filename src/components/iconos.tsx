@@ -74,6 +74,23 @@ export const IconoReloj = ({ className = 'h-4 w-4' }: IconoProps) => (
   </svg>
 )
 
+/** Persona con candado de rol (menú lateral: Usuarios) */
+export const IconoUsuarios = ({ className = 'h-5 w-5' }: IconoProps) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="7" r="4" />
+    <path d="M3 21v-2a4 4 0 0 1 4-4h4" />
+    <path d="M16 19l2 2 4-4" />
+  </svg>
+)
+
+/** Campana de notificaciones */
+export const IconoCampana = ({ className = 'h-5 w-5' }: IconoProps) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+)
+
 /** Libreta de contactos (menú lateral) */
 export const IconoContactos = ({ className = 'h-5 w-5' }: IconoProps) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

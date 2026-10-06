@@ -8,6 +8,7 @@ import { DialogFijarRobot } from '../components/DialogFijarRobot'
 import { IconoFijar, IconoReloj } from '../components/iconos'
 import robotPng from '../assets/icons/robot.png'
 import { Cargando } from '../components/Cargando'
+import { esAdmin, usePerfil } from '../lib/perfil'
 
 async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -34,6 +35,9 @@ export function Projects() {
   const [proyectoAFijar, setProyectoAFijar] = useState<Project | null>(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  // El cliente lector solo ve sus proyectos (lo filtra la base) y no crea,
+  // duplica ni fija robots
+  const admin = esAdmin(usePerfil())
 
   const { data: proyectos, isLoading, error } = useQuery({
     queryKey: ['projects'],
@@ -115,10 +119,13 @@ export function Projects() {
           <div>
             <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Proyectos</h2>
             <p className="mt-2 text-slate-600">
-              Gestiona y personaliza tus módulos interactivos desde un solo lugar.
+              {admin
+                ? 'Gestiona y personaliza tus módulos interactivos desde un solo lugar.'
+                : 'Los proyectos de tu evento.'}
             </p>
           </div>
           {/* En teléfono este botón se cambia por el flotante de abajo */}
+          {admin && (
           <button
             onClick={() => crearProyecto.mutate()}
             disabled={crearProyecto.isPending}
@@ -126,6 +133,7 @@ export function Projects() {
           >
             + Nuevo proyecto
           </button>
+          )}
         </div>
         {crearProyecto.error && (
           <p className="mt-4 text-sm text-red-600">
@@ -179,6 +187,18 @@ export function Projects() {
                 <p className="flex items-center gap-1.5 text-sm text-slate-500">
                   <IconoReloj /> {tiempoRelativo(proyecto.updated_at)}
                 </p>
+                {!admin && proyecto.galeria_token && (
+                  <a
+                    href={`/galeria#${proyecto.galeria_token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="rounded-lg px-2 py-1 text-sm font-semibold text-blue-700 transition-colors hover:bg-indigo-50"
+                  >
+                    Galería
+                  </a>
+                )}
+                {admin && (
                 <div className="flex items-center">
                   <button
                     onClick={(e) => {
@@ -206,6 +226,7 @@ export function Projects() {
                     <IconoFijar />
                   </button>
                 </div>
+                )}
               </div>
             </div>
             )
@@ -214,13 +235,18 @@ export function Projects() {
 
         {!isLoading && filtrados.length === 0 && (
           <p className="mt-10 text-slate-500">
-            {busqueda ? 'Sin resultados para esa búsqueda.' : 'Aún no hay proyectos. Crea el primero.'}
+            {busqueda
+              ? 'Sin resultados para esa búsqueda.'
+              : admin
+                ? 'Aún no hay proyectos. Crea el primero.'
+                : 'Todavía no tienes proyectos asignados.'}
           </p>
         )}
       </div>
 
       {/* Nuevo proyecto en teléfono: botón redondo flotante abajo a la derecha.
           z-30 queda por debajo del menú lateral (z-40/50) cuando se abre */}
+      {admin && (
       <button
         onClick={() => crearProyecto.mutate()}
         disabled={crearProyecto.isPending}
@@ -232,6 +258,7 @@ export function Projects() {
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
+      )}
 
       {proyectoAFijar && (
         <DialogFijarRobot proyecto={proyectoAFijar} onCerrar={() => setProyectoAFijar(null)} />
