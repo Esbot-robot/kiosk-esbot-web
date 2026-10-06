@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { anonKey, url } from '../lib/supabase'
-import { avisoError } from '../lib/alertas'
 
 type Estado = 'ok' | 'sin-red' | 'sin-servidor'
 
@@ -23,7 +22,7 @@ async function servidorResponde(): Promise<boolean> {
 }
 
 /**
- * Franja fija arriba cuando no hay conexión. Responde de una vez la duda de
+ * Aviso fijo arriba (tarjeta flotante) cuando no hay conexión. Responde de una vez la duda de
  * "¿falló el panel o es el internet?": si la franja está, es la red.
  *
  * navigator.onLine solo sabe si el equipo está conectado a una red, no si esa
@@ -46,10 +45,6 @@ export function AvisoSinConexion() {
       clearTimeout(temporizador)
       setRecuperada(nuevo === 'ok')
       if (nuevo === 'ok') temporizador = setTimeout(() => setRecuperada(false), 3000)
-      // Al perder la conexión, además de la franja (que se queda), el aviso
-      // emergente de error para que no pase desapercibido
-      if (nuevo === 'sin-red') void avisoError('Sin conexión a internet', 'Los cambios no se guardarán hasta que vuelva la red.')
-      if (nuevo === 'sin-servidor') void avisoError('Sin conexión con el servidor', 'La red está conectada pero no llega a internet. Los cambios no se guardarán.')
       setEstado(nuevo)
     }
     const comprobar = async () => {
@@ -75,21 +70,42 @@ export function AvisoSinConexion() {
 
   if (estado === 'ok' && !recuperada) return null
 
-  const mensaje =
+  const { titulo, detalle } =
     estado === 'ok'
-      ? 'Conexión restablecida'
+      ? { titulo: 'Conexión restablecida', detalle: 'Ya puedes seguir trabajando con normalidad.' }
       : estado === 'sin-red'
-        ? 'Sin conexión a internet. Los cambios no se guardarán hasta que vuelva la red.'
-        : 'Sin conexión con el servidor: la red está conectada pero no llega a internet. Los cambios no se guardarán.'
+        ? { titulo: 'Sin conexión a internet', detalle: 'Los cambios no se guardarán hasta que vuelva la red.' }
+        : {
+            titulo: 'Sin conexión con el servidor',
+            detalle: 'Los cambios no se guardarán.',
+          }
 
+  // Tarjeta flotante arriba al centro (no una franja de lado a lado)
   return (
-    <div
-      role="status"
-      className={`fixed inset-x-0 top-0 z-[60] px-4 py-2 text-center text-sm font-semibold text-white shadow-md ${
-        estado === 'ok' ? 'bg-emerald-600' : 'bg-rose-600'
-      }`}
-    >
-      {mensaje}
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
+      <div
+        role="status"
+        className={`pointer-events-auto flex w-full max-w-md items-center gap-4 rounded-lg px-5 py-4 text-white shadow-lg ${
+          estado === 'ok' ? 'bg-emerald-600' : 'bg-[#F4511E]'
+        }`}
+      >
+        {/* Nube con ✕ (sin conexión) o con ✓ (conexión restablecida) */}
+        <svg viewBox="0 0 48 48" className="h-10 w-10 shrink-0" aria-hidden="true">
+          <path
+            d="M14 38h22a9 9 0 0 0 1.6-17.86A12 12 0 0 0 14.3 17.1 10.5 10.5 0 0 0 14 38z"
+            fill="white"
+          />
+          {estado === 'ok' ? (
+            <path d="M19 28.5l4 4 7.5-8" fill="none" stroke="#059669" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+          ) : (
+            <path d="M20 23l9 9M29 23l-9 9" fill="none" stroke="#F4511E" strokeWidth="3.2" strokeLinecap="round" />
+          )}
+        </svg>
+        <div className="min-w-0 text-sm leading-snug">
+          <p className="font-semibold">{titulo}</p>
+          <p className="text-white/90">{detalle}</p>
+        </div>
+      </div>
     </div>
   )
 }

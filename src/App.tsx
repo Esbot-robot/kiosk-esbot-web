@@ -1,7 +1,6 @@
 import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router-dom'
 import { RequireAuth, SoloAdmin } from './components/RequireAuth'
 import { Layout } from './components/Layout'
-import { AvisoSinConexion } from './components/AvisoSinConexion'
 import { Login } from './pages/Login'
 import { Galeria } from './pages/Galeria'
 import { Registro } from './pages/Registro'
@@ -14,14 +13,7 @@ import { Analitica, Contactos, Editor, Projects, Robots, Usuarios } from './pagi
  */
 export const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route
-      element={
-        <>
-          <AvisoSinConexion />
-          <Outlet />
-        </>
-      }
-    >
+    <Route element={<Outlet />}>
       {/* Públicas: sin sesión */}
       <Route path="/login" element={<Login />} />
       <Route path="/galeria" element={<Galeria />} />

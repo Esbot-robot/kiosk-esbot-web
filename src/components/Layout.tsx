@@ -6,6 +6,7 @@ import { esAdmin, nombreRol, usePerfil } from '../lib/perfil'
 import { Notificaciones } from './Notificaciones'
 import { sesionPrestada, supabase } from '../lib/supabase'
 import { Cargando } from './Cargando'
+import { AvisoSinConexion } from './AvisoSinConexion'
 import { configVacia } from '../types/config'
 import { describirError } from '../lib/errores'
 import { avisoError } from '../lib/alertas'
@@ -129,6 +130,9 @@ export function Layout() {
 
   return (
     <div className="flex h-screen flex-col bg-slate-50 md:flex-row">
+      {/* Aviso de conexión solo dentro del panel: en el login, la galería y el
+          formulario de registro "los cambios no se guardarán" no aplica */}
+      <AvisoSinConexion />
       {/* Barra superior: solo en teléfono. El ☰ va a la izquierda porque el
           menú sale por la izquierda: el botón queda donde aparece el menú. */}
       <header className="flex shrink-0 items-center gap-3 bg-slate-800 px-4 py-3 md:hidden">
