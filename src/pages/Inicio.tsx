@@ -8,6 +8,8 @@ import { porcentajeProgreso, puntosProgreso } from '../lib/progreso'
 import { ahoraLocal, curvaSuave, generarBuckets, inicioDeMes, pasoRedondo } from '../lib/graficas'
 import type { EventConfig } from '../types/config'
 import { IconoCarpeta } from '../components/iconos'
+import { VideosSinUso } from '../components/VideosSinUso'
+import { tamanoLegible, videosSinUso, type ArchivoMedia } from '../lib/media'
 import robotPng from '../assets/icons/robot.png'
 
 /**
@@ -80,18 +82,6 @@ function haceCuanto(iso: string | null): string {
   if (dias === 1) return 'Ayer'
   if (dias < 30) return `Hace ${dias} días`
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function tamanoLegible(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const unidades = ['KB', 'MB', 'GB', 'TB']
-  let v = bytes / 1024
-  let i = 0
-  while (v >= 1024 && i < unidades.length - 1) {
-    v /= 1024
-    i++
-  }
-  return `${v.toLocaleString('es-CO', { maximumFractionDigits: v < 10 ? 1 : 0 })} ${unidades[i]}`
 }
 
 /** Tarjeta blanca base de todo el tablero */
@@ -243,31 +233,45 @@ export function Inicio() {
     },
   })
 
-  // Tamaño de media: cada proyecto guarda sus archivos en su propia carpeta
-  const { data: bytesMedia } = useQuery({
-    queryKey: ['media', 'tamano'],
+  // Archivos de media: solo sus fichas (nombre, tamaño, tipo, fecha), nunca el
+  // contenido, así que no suma egress. Cada proyecto tiene su propia carpeta.
+  const { data: archivosMedia } = useQuery({
+    queryKey: ['media', 'archivos'],
     staleTime: 5 * 60_000,
-    queryFn: async () => {
+    queryFn: async (): Promise<ArchivoMedia[]> => {
+      type Item = { name: string; id: string | null; created_at: string | null; metadata: { size?: number; mimetype?: string } | null }
       const listar = async (carpeta: string) => {
-        const items: { name: string; id: string | null; metadata: { size?: number } | null }[] = []
+        const items: Item[] = []
         for (let offset = 0; ; offset += 1000) {
           const { data, error } = await supabase.storage.from('media').list(carpeta, { limit: 1000, offset })
           if (error) throw error
-          items.push(...(data ?? []))
+          items.push(...((data ?? []) as Item[]))
           if (!data || data.length < 1000) break
         }
         return items
       }
-      let total = 0
+      const aArchivo = (carpeta: string, i: Item): ArchivoMedia => ({
+        ruta: carpeta ? `${carpeta}/${i.name}` : i.name,
+        carpeta,
+        nombre: i.name,
+        tamano: i.metadata?.size ?? 0,
+        tipo: i.metadata?.mimetype ?? '',
+        creado: i.created_at,
+      })
       const raiz = await listar('')
       // id null = carpeta; con id = archivo suelto en la raíz
-      for (const item of raiz) if (item.id) total += item.metadata?.size ?? 0
+      const archivos = raiz.filter((i) => i.id).map((i) => aArchivo('', i))
       const carpetas = raiz.filter((i) => !i.id).map((i) => i.name)
-      const contenidos = await Promise.all(carpetas.map(listar))
-      for (const lista of contenidos) for (const f of lista) total += f.metadata?.size ?? 0
-      return total
+      const contenidos = await Promise.all(carpetas.map(async (c) => (await listar(c)).map((i) => aArchivo(c, i))))
+      return archivos.concat(...contenidos)
     },
   })
+  const bytesMedia = archivosMedia?.reduce((t, a) => t + a.tamano, 0)
+  const sinUso = useMemo(
+    () => (archivosMedia && proyectos ? videosSinUso(archivosMedia, proyectos.map((p) => p.config)) : []),
+    [archivosMedia, proyectos]
+  )
+  const [verSinUso, setVerSinUso] = useState(false)
 
   // ── Derivados ──
   const aportes = useMemo(() => {
@@ -509,8 +513,30 @@ export function Inicio() {
 
         <Tarjeta titulo="Uso" className="xl:col-span-3">
           <div className="space-y-3">
+            {/* Media: abre la lista de videos sin uso para liberar espacio */}
+            <button
+              type="button"
+              onClick={() => setVerSinUso(true)}
+              title="Ver videos sin uso"
+              className="flex w-full items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              <IconoUso tipo="play" color="#3B82F6" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-slate-700">Media</span>
+                {sinUso.length > 0 && (
+                  <span className="block truncate text-xs text-slate-400">
+                    {sinUso.length} {sinUso.length === 1 ? 'video sin uso' : 'videos sin uso'} · {tamanoLegible(sinUso.reduce((t, v) => t + v.tamano, 0))}
+                  </span>
+                )}
+              </span>
+              <span
+                className="shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                style={{ backgroundColor: '#3B82F6', fontVariantNumeric: 'tabular-nums' }}
+              >
+                {bytesMedia === undefined ? '…' : tamanoLegible(bytesMedia)}
+              </span>
+            </button>
             {[
-              { nombre: 'Media', valor: bytesMedia === undefined ? '…' : tamanoLegible(bytesMedia), color: '#3B82F6', icono: 'play' },
               { nombre: 'Proyectos creados', valor: proyectos?.length ?? '…', color: '#A42BD9', icono: 'carpeta' },
               { nombre: 'Registros', valor: registros?.registro ?? '…', color: '#F7A325', icono: 'persona' },
               { nombre: 'Registros con foto', valor: registros?.foto ?? '…', color: '#26B5A0', icono: 'camara' },
@@ -529,6 +555,14 @@ export function Inicio() {
           </div>
         </Tarjeta>
       </div>
+
+      {verSinUso && (
+        <VideosSinUso
+          videos={sinUso}
+          nombresProyecto={Object.fromEntries((proyectos ?? []).map((p) => [p.id, p.nombre]))}
+          onCerrar={() => setVerSinUso(false)}
+        />
+      )}
     </div>
   )
 }
