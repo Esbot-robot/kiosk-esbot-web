@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { generarReportePdf, type PreguntaDist } from '../lib/reportePdf'
@@ -15,8 +15,9 @@ const COLOR_TOQUE = '#2a78d6' // azul — toques de pantalla
 const COLOR_JUGAR = '#1baf7a' // aqua — botón jugar
 const COLOR_VIDEO = '#8b5cf6' // violeta — video configurado
 const COLOR_UBICACION = '#e57a28' // naranja — guía a ubicación
-const INK_MUTED = '#898781'
-const GRID = '#e1e0d9'
+const COLOR_FOTO = '#d6336c' // rosa — tomar foto
+const INK_MUTED = '#a3a3b5'
+const GRID = '#f1f1f4'
 
 interface Evento {
   id: number
@@ -88,10 +89,11 @@ function etiquetaLarga(clave: string, gran: Granularidad): string {
 }
 
 const TIPOS_EVENTO = [
-  { tipo: 'toque_pantalla', nombre: 'Toque pantalla', color: COLOR_TOQUE },
-  { tipo: 'boton_jugar', nombre: 'Botón jugar', color: COLOR_JUGAR },
-  { tipo: 'boton_video', nombre: 'Botón video', color: COLOR_VIDEO },
-  { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', color: COLOR_UBICACION },
+  { tipo: 'toque_pantalla', nombre: 'Toque pantalla', color: COLOR_TOQUE, ayuda: 'Veces que alguien tocó la pantalla del robot.' },
+  { tipo: 'boton_jugar', nombre: 'Botón jugar', color: COLOR_JUGAR, ayuda: 'Veces que se tocó el botón para jugar el quiz.' },
+  { tipo: 'boton_video', nombre: 'Botón video', color: COLOR_VIDEO, ayuda: 'Veces que se abrió un video configurado.' },
+  { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', color: COLOR_UBICACION, ayuda: 'Veces que el robot guió a alguien a una ubicación.' },
+  { tipo: 'boton_foto', nombre: 'Botón foto', color: COLOR_FOTO, ayuda: 'Veces que se tocó el botón para tomarse una foto.' },
 ] as const
 
 const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
@@ -116,6 +118,17 @@ export function Analitica() {
   // ≤ 48 horas de rango → agrupar por hora; más → por día
   const granularidad: Granularidad =
     new Date(hasta).getTime() - new Date(desde).getTime() <= 48 * 3600_000 ? 'hora' : 'dia'
+
+  // Líneas ocultas con la casilla de su cuadro
+  const [ocultas, setOcultas] = useState<Set<string>>(new Set())
+  function alternarSerie(tipo: string) {
+    setOcultas((actual) => {
+      const nuevo = new Set(actual)
+      if (nuevo.has(tipo)) nuevo.delete(tipo)
+      else nuevo.add(tipo)
+      return nuevo
+    })
+  }
 
   // Gráfica y totales: Postgres agrupa y cuenta — al navegador solo
   // viajan los totales por bucket, sin importar cuántos eventos haya.
@@ -347,63 +360,101 @@ export function Analitica() {
         </div>
       </div>
 
-      {/* Gráfica */}
-      <div className="mt-6 rounded-xl md:mt-8 border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="font-semibold text-slate-900">
-              Frecuencia de toques por {granularidad === 'hora' ? 'hora' : 'día'}
-            </h3>
-            <p className="text-sm text-slate-500">
-              Toques de pantalla y acciones configuradas
-              {granularidad === 'hora' && ' — rango corto: agrupado por hora'}
-            </p>
-          </div>
-          {/* Leyenda con el total de cada tipo en el rango (antes eran tarjetas aparte) */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-600">
-            {TIPOS_EVENTO.map((tipo, index) => (
-              <span key={tipo.tipo} className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tipo.color }} />
-                {tipo.nombre}
-                <span className="font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+      {/* Gráfica: cuadros de colores pegados a la esquina (estilo Search Console);
+          la casilla de cada cuadro muestra u oculta su línea */}
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:mt-8">
+        <div className="flex flex-wrap">
+          {TIPOS_EVENTO.map((tipo, index) => {
+            const visible = !ocultas.has(tipo.tipo)
+            return (
+              <button
+                key={tipo.tipo}
+                type="button"
+                onClick={() => alternarSerie(tipo.tipo)}
+                aria-pressed={visible}
+                className={`relative flex basis-1/2 flex-col items-start px-4 pb-3 pt-3 text-left transition-colors sm:w-48 sm:basis-auto ${
+                  visible ? 'text-white' : 'border-b border-r border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                style={visible ? { backgroundColor: tipo.color } : undefined}
+              >
+                <span className="flex w-full min-w-0 items-center gap-2 text-sm">
+                  <span
+                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[2px] border-[1.5px] ${
+                      visible ? 'border-white' : 'border-slate-400'
+                    }`}
+                  >
+                    {visible && (
+                      <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                        <path d="M4.5 10.5l3.5 3.5 7.5-8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="truncate">{tipo.nombre}</span>
+                </span>
+                <span
+                  className={`mt-1 text-3xl ${visible ? '' : 'text-slate-800'}`}
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
                   {isLoading ? '—' : (totales[index] ?? 0).toLocaleString('es-CO')}
                 </span>
-              </span>
-            ))}
-          </div>
+                {/* Ayuda: aparece al instante al pasar el cursor sobre el ícono (no sobre todo el cuadro).
+                    Se ancla al cuadro, no al ícono: en los de la orilla izquierda abre hacia
+                    la derecha para que la tarjeta no la corte. */}
+                <span
+                  className={`peer/ayuda absolute bottom-2.5 right-3 ${visible ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-label={tipo.ayuda}>
+                    <circle cx="10" cy="10" r="7.5" />
+                    <path d="M8 8a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.2v.5" strokeLinecap="round" />
+                    <circle cx="10" cy="14" r="0.5" fill="currentColor" />
+                  </svg>
+                </span>
+                <span
+                  role="tooltip"
+                  className={`pointer-events-none invisible absolute top-full z-20 mt-1 w-44 rounded-lg bg-slate-800 px-3 py-2 text-xs font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity peer-hover/ayuda:visible peer-hover/ayuda:opacity-100 sm:w-56 ${
+                    index === 0 ? 'left-2' : index % 2 === 0 ? 'left-2 sm:left-auto sm:right-2' : 'right-2'
+                  }`}
+                >
+                  {tipo.ayuda}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
-        {isLoading ? (
-          <Cargando texto="Cargando eventos…" className="py-16" />
-        ) : totalInteracciones === 0 ? (
-          <p className="py-16 text-center text-slate-400">
-            Sin eventos en este rango. Los robots registran toques automáticamente.
-          </p>
-        ) : (
-          <GraficaLineas
-            buckets={buckets}
-            granularidad={granularidad}
-            series={TIPOS_EVENTO.map((tipo, index) => ({
-              valores: series[index],
-              color: tipo.color,
-              nombre: tipo.nombre,
-            }))}
-          />
-        )}
+        <div className="px-4 pb-4 md:px-6">
+          {isLoading ? (
+            <Cargando texto="Cargando eventos…" className="py-16" />
+          ) : totalInteracciones === 0 ? (
+            <p className="py-16 text-center text-slate-400">
+              Sin eventos en este rango. Los robots registran toques automáticamente.
+            </p>
+          ) : (
+            <GraficaLineas
+              buckets={buckets}
+              granularidad={granularidad}
+              series={TIPOS_EVENTO.flatMap((tipo, index) =>
+                ocultas.has(tipo.tipo)
+                  ? []
+                  : [{ valores: series[index], color: tipo.color, nombre: tipo.nombre }]
+              )}
+            />
+          )}
 
-        {/* Reporte PDF con la gráfica, los totales y las respuestas del rango */}
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={descargarReporte}
-            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Exportar PDF
-          </button>
+          {/* Reporte PDF con la gráfica, los totales y las respuestas del rango */}
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={descargarReporte}
+              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Exportar PDF
+            </button>
+          </div>
         </div>
       </div>
 
@@ -519,11 +570,54 @@ export function Analitica() {
   )
 }
 
-/* ───────────── Gráfica de líneas SVG con crosshair + tooltip ───────────── */
+/* ───────────── Gráfica de líneas suaves con brillo + franja y tooltip ───────────── */
 
 const ANCHO = 900
-const ALTO = 300
-const M = { top: 16, right: 24, bottom: 28, left: 40 }
+const ALTO = 320
+const M = { top: 24, right: 24, bottom: 36, left: 44 }
+
+/** Paso "redondo" (1, 2, 5 × 10ⁿ) para que el eje Y tenga números limpios */
+function pasoRedondo(bruto: number): number {
+  const base = 10 ** Math.floor(Math.log10(Math.max(bruto, 1)))
+  for (const f of [1, 2, 5, 10]) if (f * base >= bruto) return f * base
+  return 10 * base
+}
+
+/** Curva suave que pasa por cada punto sin inventar picos ni bajar de cero
+ *  (interpolación monótona de Fritsch–Carlson) */
+function curvaSuave(pts: [number, number][]): string {
+  const n = pts.length
+  if (n === 0) return ''
+  if (n === 1) return `M${pts[0][0]},${pts[0][1]}`
+  const m: number[] = []
+  for (let i = 0; i < n - 1; i++) m.push((pts[i + 1][1] - pts[i][1]) / (pts[i + 1][0] - pts[i][0]))
+  const t: number[] = pts.map((_, i) =>
+    i === 0 ? m[0] : i === n - 1 ? m[n - 2] : m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2
+  )
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) {
+      t[i] = 0
+      t[i + 1] = 0
+      continue
+    }
+    const a = t[i] / m[i]
+    const b = t[i + 1] / m[i]
+    const s = a * a + b * b
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s)
+      t[i] = tau * a * m[i]
+      t[i + 1] = tau * b * m[i]
+    }
+  }
+  let d = `M${pts[0][0]},${pts[0][1]}`
+  for (let i = 0; i < n - 1; i++) {
+    const [x0, y0] = pts[i]
+    const [x1, y1] = pts[i + 1]
+    const dx = (x1 - x0) / 3
+    d += ` C${x0 + dx},${y0 + t[i] * dx} ${x1 - dx},${y1 - t[i + 1] * dx} ${x1},${y1}`
+  }
+  return d
+}
 
 function GraficaLineas({
   buckets,
@@ -535,16 +629,23 @@ function GraficaLineas({
   series: { valores: number[]; color: string; nombre: string }[]
 }) {
   const [hover, setHover] = useState<number | null>(null)
+  const idBase = useId().replace(/:/g, '')
 
   const plotW = ANCHO - M.left - M.right
   const plotH = ALTO - M.top - M.bottom
-  const maxY = Math.max(1, ...series.flatMap((serie) => serie.valores))
+  const maxDatos = Math.max(1, ...series.flatMap((serie) => serie.valores))
+  const paso = pasoRedondo(maxDatos / 5)
+  const maxY = Math.ceil(maxDatos / paso) * paso
+  const ticksY = Array.from({ length: maxY / paso + 1 }, (_, i) => i * paso)
   const x = (i: number) =>
     M.left + (buckets.length === 1 ? plotW / 2 : (i / (buckets.length - 1)) * plotW)
   const y = (v: number) => M.top + plotH - (v / maxY) * plotH
+  const pasoX = Math.max(1, Math.ceil(buckets.length / 12))
 
-  const ticksY = [0, Math.round(maxY / 2), maxY]
-  const paso = Math.max(1, Math.ceil(buckets.length / 8))
+  // Franja del punto señalado: el ancho de una columna, sin pasar de 56px
+  const anchoColumna = buckets.length > 1 ? plotW / (buckets.length - 1) : plotW
+  const anchoFranja = Math.max(10, Math.min(56, anchoColumna * 0.9))
+  const colorFranja = series[0]?.color ?? INK_MUTED
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -552,6 +653,10 @@ function GraficaLineas({
     const i = Math.round(((px - M.left) / plotW) * (buckets.length - 1))
     setHover(Math.max(0, Math.min(buckets.length - 1, i)))
   }
+
+  // Tooltip sobre el punto más alto; si queda muy arriba, va debajo
+  const yTooltip = hover === null ? 0 : y(Math.max(0, ...series.map((serie) => serie.valores[hover])))
+  const tooltipAbajo = yTooltip < ALTO * 0.45
 
   return (
     // En teléfono la gráfica mantiene un ancho mínimo legible y se desliza de
@@ -567,82 +672,108 @@ function GraficaLineas({
             if (e.pointerType === 'mouse') setHover(null)
           }}
         >
-          {/* grid horizontal recesivo */}
+          <defs>
+            {/* brillo suave del mismo color debajo de cada línea */}
+            {series.map((serie, i) => (
+              <filter key={serie.nombre} id={`${idBase}-brillo-${i}`} x="-10%" y="-30%" width="120%" height="160%">
+                <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor={serie.color} floodOpacity="0.35" />
+              </filter>
+            ))}
+            {/* franja del punto señalado: color abajo, se desvanece hacia arriba */}
+            <linearGradient id={`${idBase}-franja`} x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor={colorFranja} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={colorFranja} stopOpacity="0" />
+            </linearGradient>
+            <filter id={`${idBase}-punto`} x="-100%" y="-100%" width="300%" height="300%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.25" />
+            </filter>
+          </defs>
+
+          {/* líneas verticales muy tenues en cada etiqueta del eje x */}
+          {buckets.map((b, i) =>
+            i % pasoX === 0 ? (
+              <line key={b} x1={x(i)} x2={x(i)} y1={M.top} y2={M.top + plotH} stroke={GRID} strokeWidth="1" />
+            ) : null
+          )}
+
+          {/* franja del punto señalado */}
+          {hover !== null && (
+            <rect
+              x={x(hover) - anchoFranja / 2}
+              y={M.top - 8}
+              width={anchoFranja}
+              height={plotH + 8}
+              rx={Math.min(14, anchoFranja / 2)}
+              fill={`url(#${idBase}-franja)`}
+            />
+          )}
+
+          {/* eje Y */}
           {ticksY.map((t) => (
-            <g key={t}>
-              <line x1={M.left} x2={ANCHO - M.right} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth="1" />
-              <text x={M.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill={INK_MUTED}>
-                {t.toLocaleString('es-CO')}
-              </text>
-            </g>
+            <text key={t} x={M.left - 14} y={y(t) + 4} textAnchor="end" fontSize="12" fill={INK_MUTED}>
+              {t.toLocaleString('es-CO')}
+            </text>
           ))}
 
-          {/* etiquetas eje x */}
+          {/* eje X */}
           {buckets.map((b, i) =>
-            i % paso === 0 ? (
-              <text key={b} x={x(i)} y={ALTO - 8} textAnchor="middle" fontSize="11" fill={INK_MUTED}>
+            i % pasoX === 0 ? (
+              <text key={b} x={x(i)} y={ALTO - 10} textAnchor="middle" fontSize="12" fill={INK_MUTED}>
                 {etiquetaBucket(b, granularidad)}
               </text>
             ) : null
           )}
 
-          {/* crosshair */}
-          {hover !== null && (
-            <line
-              x1={x(hover)}
-              x2={x(hover)}
-              y1={M.top}
-              y2={M.top + plotH}
-              stroke={INK_MUTED}
-              strokeWidth="1"
-              strokeDasharray="3 3"
-            />
-          )}
-
-          {/* líneas de las series (2px) */}
-          {series.map((serie) => (
-            <polyline
+          {/* líneas: gruesas, suaves y con brillo */}
+          {series.map((serie, i) => (
+            <path
               key={serie.nombre}
-              points={serie.valores.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+              d={curvaSuave(serie.valores.map((v, j) => [x(j), y(v)]))}
               fill="none"
               stroke={serie.color}
-              strokeWidth="2"
+              strokeWidth="1"
               strokeLinejoin="round"
               strokeLinecap="round"
+              filter={`url(#${idBase}-brillo-${i})`}
             />
           ))}
 
-          {/* marcadores en el punto bajo el cursor (≥8px) */}
+          {/* puntos en la posición señalada */}
           {hover !== null &&
             series.map((serie) => (
               <circle
                 key={serie.nombre}
                 cx={x(hover)}
                 cy={y(serie.valores[hover])}
-                r="5"
+                r="7"
                 fill={serie.color}
                 stroke="#ffffff"
-                strokeWidth="2"
+                strokeWidth="3"
+                filter={`url(#${idBase}-punto)`}
               />
             ))}
         </svg>
 
-        {/* tooltip */}
-        {hover !== null && (
+        {/* tooltip: tarjeta pequeña blanca sobre el punto */}
+        {hover !== null && series.length > 0 && (
           <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-lg"
+            className="pointer-events-none absolute z-10 rounded-xl bg-white px-3 py-2 shadow-[0_6px_20px_rgba(15,23,42,0.12)]"
             style={{
               left: `${(x(hover) / ANCHO) * 100}%`,
-              top: 0,
+              top: `${(yTooltip / ALTO) * 100}%`,
+              transform: tooltipAbajo ? 'translate(-50%, 18px)' : 'translate(-50%, calc(-100% - 18px))',
             }}
           >
-            <p className="text-sm font-bold whitespace-nowrap text-slate-900">
+            <p className="whitespace-nowrap text-[0.6875rem] text-slate-400">
               {etiquetaLarga(buckets[hover], granularidad)}
             </p>
             {series.map((serie) => (
-              <p key={serie.nombre} className="mt-1 flex items-center gap-2 text-sm whitespace-nowrap text-slate-600">
+              <p key={serie.nombre} className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-500">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: serie.color }} />
-                {serie.nombre}: <span className="font-semibold text-slate-900">{serie.valores[hover]}</span>
+                {serie.nombre}
+                <span className="ml-auto pl-2 font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {serie.valores[hover].toLocaleString('es-CO')}
+                </span>
               </p>
             ))}
           </div>
