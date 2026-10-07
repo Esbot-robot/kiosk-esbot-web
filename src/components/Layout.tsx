@@ -1,9 +1,10 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { IconoCarpeta, IconoCerrar, IconoContactos, IconoGrafica, IconoMenu, IconoRobotLinea, IconoSalir, IconoUsuarios } from './iconos'
+import { IconoCarpeta, IconoCerrar, IconoContactos, IconoGrafica, IconoMenu, IconoRobotLinea, IconoUsuarios } from './iconos'
 import { esAdmin, nombreRol, usePerfil } from '../lib/perfil'
 import { Notificaciones } from './Notificaciones'
+import { MenuPerfil } from './MenuPerfil'
 import { sesionPrestada, supabase } from '../lib/supabase'
 import { Cargando } from './Cargando'
 import { AvisoSinConexion } from './AvisoSinConexion'
@@ -150,6 +151,7 @@ export function Layout() {
           <p className="text-xs text-slate-400">{nombreRol(perfil.rol)}</p>
         </div>
         {perfil.rol === 'superadmin' && <Notificaciones oscuro />}
+        <MenuPerfil nombre={perfil.nombre} onCerrarSesion={cerrarSesion} oscuro />
       </header>
 
       {/* Fondo oscuro detrás del menú abierto: tocarlo lo cierra */}
@@ -178,7 +180,6 @@ export function Layout() {
         </div>
 
         {/* Elegir una opción cierra el menú en teléfono (en computador no hace nada) */}
-        {/* min-h-0 + overflow: en pantallas bajas el menú se desplaza y "Cerrar Sesión" no se sale */}
         <nav className="min-h-0 flex-1 overflow-y-auto">
           <TituloSeccion>Menú</TituloSeccion>
           <NavLink to="/proyectos" className={navItemClass} onClick={cerrarMenu}>
@@ -236,15 +237,6 @@ export function Layout() {
             </>
           ) : null}
         </nav>
-
-        <div className="border-t border-slate-600 px-6 py-6">
-          <button
-            onClick={cerrarSesion}
-            className="flex items-center gap-3 text-slate-300 transition-colors hover:text-white"
-          >
-            <IconoSalir /> Cerrar Sesión
-          </button>
-        </div>
       </aside>
 
       {/* Contenido. El Suspense va aquí, alrededor del Outlet, y no en App:
@@ -254,21 +246,15 @@ export function Layout() {
             la sesión. Es una barra propia y no algo que flota: así no tapa las
             pestañas del editor ni los filtros de Analítica. En teléfono la
             campana va en la barra oscura de arriba. */}
-        <header className="relative z-30 hidden shrink-0 items-center justify-end gap-3 border-b border-slate-200 bg-white px-12 py-2.5 md:flex">
-          {perfil.rol === 'superadmin' && <Notificaciones />}
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-medium text-indigo-400">
-              {perfil.nombre
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((p) => p[0]!.toUpperCase())
-                .join('')}
-            </span>
-            <span className="text-sm font-medium text-slate-700">{perfil.nombre}</span>
-          </div>
-        </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* La barra va dentro del área que se desplaza (fija arriba con sticky):
+              así comparte ancho con la página y queda alineada aunque aparezca
+              la barra de desplazamiento */}
+          <header className="sticky top-0 z-30 hidden shrink-0 items-center justify-end gap-3 border-b border-slate-200 bg-white px-12 py-2.5 md:flex">
+            {perfil.rol === 'superadmin' && <Notificaciones />}
+            {/* "Cerrar sesión" vive en el popup del perfil (ya no en el menú lateral) */}
+            <MenuPerfil nombre={perfil.nombre} onCerrarSesion={cerrarSesion} />
+          </header>
           <Suspense fallback={<Cargando className="py-24" />}>
             <Outlet />
           </Suspense>
