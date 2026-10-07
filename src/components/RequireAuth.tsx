@@ -78,6 +78,20 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   return <PerfilContext.Provider value={perfil}>{children}</PerfilContext.Provider>
 }
 
+/** Página solo para el super administrador (Inicio): los demás van a Proyectos */
+export function SoloSuperadmin({ children }: { children: React.ReactNode }) {
+  const perfil = usePerfil()
+  if (perfil.rol !== 'superadmin') return <Navigate to="/proyectos" replace />
+  return <>{children}</>
+}
+
+/** Al entrar al panel (o a una ruta que no existe): Inicio para el super
+ *  administrador, Proyectos para los demás */
+export function PaginaPorDefecto() {
+  const perfil = usePerfil()
+  return <Navigate to={perfil.rol === 'superadmin' ? '/inicio' : '/proyectos'} replace />
+}
+
 /** Páginas solo para administradores: el cliente lector vuelve a Proyectos */
 export function SoloAdmin({ children }: { children: React.ReactNode }) {
   const perfil = usePerfil()

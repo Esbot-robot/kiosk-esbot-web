@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { IconoCarpeta, IconoCerrar, IconoContactos, IconoGrafica, IconoMenu, IconoRobotLinea, IconoUsuarios } from './iconos'
+import { IconoCarpeta, IconoCerrar, IconoContactos, IconoGrafica, IconoInicio, IconoMenu, IconoRobotLinea, IconoUsuarios } from './iconos'
 import { esAdmin, nombreRol, usePerfil } from '../lib/perfil'
 import { Notificaciones } from './Notificaciones'
 import { MenuPerfil } from './MenuPerfil'
@@ -182,6 +182,11 @@ export function Layout() {
         {/* Elegir una opción cierra el menú en teléfono (en computador no hace nada) */}
         <nav className="min-h-0 flex-1 overflow-y-auto">
           <TituloSeccion>Menú</TituloSeccion>
+          {perfil.rol === 'superadmin' && (
+            <NavLink to="/inicio" className={navItemClass} onClick={cerrarMenu}>
+              <IconoInicio /> Inicio
+            </NavLink>
+          )}
           <NavLink to="/proyectos" className={navItemClass} onClick={cerrarMenu}>
             <IconoCarpeta /> Proyectos
           </NavLink>

@@ -1,10 +1,10 @@
-import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route } from 'react-router-dom'
-import { RequireAuth, SoloAdmin } from './components/RequireAuth'
+import { createBrowserRouter, createRoutesFromElements, Outlet, Route } from 'react-router-dom'
+import { PaginaPorDefecto, RequireAuth, SoloAdmin, SoloSuperadmin } from './components/RequireAuth'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
 import { Galeria } from './pages/Galeria'
 import { Registro } from './pages/Registro'
-import { Analitica, Contactos, Editor, Projects, Robots, Usuarios } from './paginas'
+import { Analitica, Contactos, Editor, Inicio, Projects, Robots, Usuarios } from './paginas'
 
 /**
  * Router "de datos" (createBrowserRouter) y no <BrowserRouter>: es el único
@@ -27,13 +27,14 @@ export const router = createBrowserRouter(
           </RequireAuth>
         }
       >
+        <Route path="/inicio" element={<SoloSuperadmin><Inicio /></SoloSuperadmin>} />
         <Route path="/proyectos" element={<Projects />} />
         <Route path="/analitica" element={<Analitica />} />
         <Route path="/contactos" element={<Contactos />} />
         <Route path="/robots" element={<SoloAdmin><Robots /></SoloAdmin>} />
         <Route path="/usuarios" element={<SoloAdmin><Usuarios /></SoloAdmin>} />
         <Route path="/editor/:projectId" element={<Editor />} />
-        <Route path="*" element={<Navigate to="/proyectos" replace />} />
+        <Route path="*" element={<PaginaPorDefecto />} />
       </Route>
     </Route>
   )
