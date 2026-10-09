@@ -86,6 +86,18 @@ export function DialogBotonAdicional({
       setError('Escribe la despedida antes de que Temi reanude el patrullaje.')
       return
     }
+    if (boton.activo && boton.accion === 'secuencia' && !boton.secuencia?.trim()) {
+      setError('Escribe el nombre exacto de la secuencia creada en Temi Center.')
+      return
+    }
+    if (boton.activo && boton.accion === 'secuencia' && !boton.tts_despues_video.trim()) {
+      setError('Escribe el texto que Temi dirá al terminar la secuencia.')
+      return
+    }
+    if (boton.activo && boton.accion === 'secuencia' && !boton.tts_despedida.trim()) {
+      setError('Escribe la despedida antes de que Temi reanude el patrullaje.')
+      return
+    }
     if (boton.activo && boton.accion === 'ir_ubicacion' && !boton.ubicacion.trim()) {
       setError('Escribe el nombre exacto de la ubicación creada en Temi.')
       return
@@ -216,7 +228,7 @@ export function DialogBotonAdicional({
 
         <div>
           <p className="mb-2 font-medium text-slate-800">Acción al tocar</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label
               className={`cursor-pointer rounded-lg border p-4 ${
                 boton.accion === 'video' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
@@ -251,10 +263,52 @@ export function DialogBotonAdicional({
                 <Ayuda>Guía al visitante y retoma el patrullaje.</Ayuda>
               </span>
             </label>
+            <label
+              className={`cursor-pointer rounded-lg border p-4 ${
+                boton.accion === 'secuencia' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
+              }`}
+            >
+              <input
+                type="radio"
+                name={`accion-${boton.id}`}
+                checked={boton.accion === 'secuencia'}
+                onChange={() => setBoton((actual) => ({ ...actual, accion: 'secuencia' }))}
+                className="mr-2 accent-indigo-600"
+              />
+              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                Reproducir secuencia
+                <Ayuda>Reproduce una secuencia de Temi Center y pausa el contador hasta que termine.</Ayuda>
+              </span>
+            </label>
           </div>
         </div>
 
-        {boton.accion === 'video' ? (
+        {boton.accion === 'secuencia' ? (
+          <>
+            <div>
+              <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+                Secuencia de Temi
+                <Ayuda>Nombre exacto de la secuencia creada en Temi Center. Necesita internet en el robot.</Ayuda>
+              </p>
+              <input
+                value={boton.secuencia ?? ''}
+                onChange={(e) => setBoton((actual) => ({ ...actual, secuencia: e.target.value }))}
+                placeholder="Nombre exacto creado en Temi Center"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+              />
+            </div>
+            <TtsField
+              titulo="Texto al terminar la secuencia"
+              value={boton.tts_despues_video}
+              onChange={(tts_despues_video) => setBoton((actual) => ({ ...actual, tts_despues_video }))}
+            />
+            <TtsField
+              titulo="Despedida antes de reanudar patrullaje"
+              value={boton.tts_despedida}
+              onChange={(tts_despedida) => setBoton((actual) => ({ ...actual, tts_despedida }))}
+            />
+          </>
+        ) : boton.accion === 'video' ? (
           <>
             <VideoUpload campo="video_url" titulo="Video que se reproducirá" input={videoInput} />
             <div>

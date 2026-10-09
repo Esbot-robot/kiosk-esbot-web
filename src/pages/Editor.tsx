@@ -549,6 +549,8 @@ export function Editor() {
     const botonIncompleto = botonesAdicionales.find((boton) =>
       boton.activo &&
       ((boton.accion === 'video' && (!boton.video_url || !boton.tts_despues_video.trim() || !boton.tts_despedida.trim())) ||
+        (boton.accion === 'secuencia' &&
+          (!boton.secuencia?.trim() || !boton.tts_despues_video.trim() || !boton.tts_despedida.trim())) ||
         (boton.accion === 'ir_ubicacion' &&
           (!boton.ubicacion.trim() ||
             !boton.tts_antes_de_ir.trim() ||
@@ -560,7 +562,9 @@ export function Editor() {
       setErrorGuardar(
         botonIncompleto.accion === 'video'
           ? `Completa el video, el texto final y la despedida de "${botonIncompleto.boton.texto || 'botón adicional'}".`
-          : `Completa la ubicación y los textos de guía de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+          : botonIncompleto.accion === 'secuencia'
+            ? `Completa la secuencia, el texto final y la despedida de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+            : `Completa la ubicación y los textos de guía de "${botonIncompleto.boton.texto || 'botón adicional'}".`
       )
       return
     }
@@ -942,7 +946,9 @@ export function Editor() {
                         ? 'Desactivado'
                         : boton.accion === 'video'
                           ? 'Reproduce un video'
-                          : `Va a ${boton.ubicacion || 'ubicación pendiente'}`
+                          : boton.accion === 'secuencia'
+                            ? `Secuencia ${boton.secuencia || 'pendiente'}`
+                            : `Va a ${boton.ubicacion || 'ubicación pendiente'}`
                     }
                     onClick={() => setDialogo({ tipo: 'boton-adicional', index })}
                   />

@@ -26,6 +26,7 @@ const COLOR_JUGAR = '#1baf7a' // aqua — botón jugar
 const COLOR_VIDEO = '#8b5cf6' // violeta — video configurado
 const COLOR_UBICACION = '#e57a28' // naranja — guía a ubicación
 const COLOR_FOTO = '#d6336c' // rosa — tomar foto
+const COLOR_SECUENCIA = '#0891b2' // cian — secuencia de temi
 const INK_MUTED = '#a3a3b5'
 const GRID = '#f1f1f4'
 
@@ -45,6 +46,7 @@ const TIPOS_EVENTO = [
   { tipo: 'boton_video', nombre: 'Botón video', color: COLOR_VIDEO, ayuda: 'Veces que se abrió un video configurado.' },
   { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', color: COLOR_UBICACION, ayuda: 'Veces que el robot guió a alguien a una ubicación.' },
   { tipo: 'boton_foto', nombre: 'Botón foto', color: COLOR_FOTO, ayuda: 'Veces que se tocó el botón para tomarse una foto.' },
+  { tipo: 'boton_secuencia', nombre: 'Botón secuencia', color: COLOR_SECUENCIA, ayuda: 'Veces que se tocó un botón que reproduce una secuencia de Temi.' },
 ] as const
 
 const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(

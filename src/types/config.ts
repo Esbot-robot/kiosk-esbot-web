@@ -30,10 +30,14 @@ export interface BotonAdicionalInicial {
   id: string
   activo: boolean
   boton: BotonEstilo
-  accion: 'video' | 'ir_ubicacion'
+  /** secuencia = reproduce una secuencia de temi Center y luego hace lo mismo que el video */
+  accion: 'video' | 'ir_ubicacion' | 'secuencia'
   /** video que se reproduce una vez y después devuelve el contador pausado */
   video_url: string
+  /** lo dice al terminar el video o la secuencia */
   tts_despues_video: string
+  /** nombre exacto de la secuencia creada en temi Center (acción 'secuencia') */
+  secuencia?: string
   /** nombre exacto de la ubicación creada en el mapa de Temi */
   ubicacion: string
   tts_antes_de_ir: string
@@ -243,6 +247,7 @@ export function botonesAdicionalesVacios(): BotonAdicionalInicial[] {
       video_trayecto_url: '',
       tts_al_llegar: '',
       tts_despedida: '',
+      secuencia: '',
     },
     {
       id: 'accion_2',
@@ -256,6 +261,7 @@ export function botonesAdicionalesVacios(): BotonAdicionalInicial[] {
       video_trayecto_url: '',
       tts_al_llegar: '',
       tts_despedida: '',
+      secuencia: '',
     },
   ]
 }
