@@ -1,6 +1,13 @@
 -- ============================================================
--- Kiosk Esbot — schema de Supabase
+-- Kiosk Esbot — schema de Supabase (INSTALACIÓN INICIAL)
 -- Ejecutar en: Dashboard de Supabase -> SQL Editor -> New query
+--
+-- ⚠ NO volver a correr este archivo completo en producción.
+--   Es la primera versión de la base; los cambios posteriores viven en
+--   los otros archivos de esta carpeta (fotos.sql, contactos.sql,
+--   roles.sql, ...). Correrlo de nuevo sobre una base existente falla
+--   o deshace reglas que esos archivos ya ajustaron. Ver
+--   cerrar_lectura_publica.sql (auditoría de seguridad, oct 2026).
 -- ============================================================
 
 -- Proyectos: cada uno guarda el EventConfig completo como JSON
@@ -46,10 +53,10 @@ create policy "admin gestiona projects" on public.projects
 create policy "admin gestiona robots" on public.robots
   for all to authenticated using (true) with check (true);
 
-create policy "lectura publica projects" on public.projects
-  for select to anon using (true);
-create policy "lectura publica robots" on public.robots
-  for select to anon using (true);
+-- Sin lectura anónima de projects ni robots: projects guarda los tokens de
+-- galería y registro. El robot no lee estas tablas (baja su config del
+-- bucket configs) y la galería y el registro entran por funciones
+-- security definer. Ver fotos.sql (punto 10) y cerrar_lectura_publica.sql.
 
 -- ============================================================
 -- Storage: crear los buckets desde el Dashboard -> Storage:
