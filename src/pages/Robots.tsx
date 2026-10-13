@@ -6,8 +6,8 @@ import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/al
 import { Modal } from '../components/Modal'
 import { Ayuda } from '../components/Ayuda'
 import { DialogRuta } from '../components/DialogRuta'
-import robotPng from '../assets/icons/robot.png'
-import cargandoPng from '../assets/icons/charging_icon.png'
+import robotBlanco from '../assets/icons/blanco_robot.webp'
+import robotNegro from '../assets/icons/negro_robot.webp'
 import { Cargando } from '../components/Cargando'
 
 /* El latido de la app llega cada 3s; si el último tiene más de 6s
@@ -46,6 +46,9 @@ interface RobotStatus {
   videollamada_error?: string | null
 }
 
+/** Robots de cuerpo blanco: el resto son negros. Para uno nuevo, agregar su serial. */
+const ROBOTS_BLANCOS = new Set(['00122260063'])
+
 /** versión actual del proyecto fijado a cada serial */
 type VersionPorSerial = Record<string, number>
 
@@ -54,15 +57,16 @@ type VersionPorSerial = Record<string, number>
  * El robot solo descarga la config al arrancar, así que "pendiente" casi
  * siempre se arregla reiniciando la app; si sigue, es el internet del robot.
  */
-function estadoVersion(r: RobotStatus, versionProyecto: number | undefined) {
+function estadoVersion(r: RobotStatus, versionProyecto: number | undefined): {
+  texto: string
+  /** ok = sincronizado; aviso = falta cargar la última versión */
+  tipo: 'ok' | 'neutro' | 'aviso'
+} {
   const v = r.version_config
-  if (v == null) return { texto: 'Versión de config sin reportar', color: 'text-slate-400' }
-  if (versionProyecto === undefined) return { texto: `Config v${v} · sin proyecto fijado`, color: 'text-slate-500' }
-  if (v === versionProyecto) return { texto: `Config v${v} · Sincronizado`, color: 'text-emerald-700' }
-  return {
-    texto: `Config v${v} · falta cargar la v${versionProyecto} (reinicia la app)`,
-    color: 'text-amber-700',
-  }
+  if (v == null) return { texto: 'Versión de config sin reportar', tipo: 'neutro' }
+  if (versionProyecto === undefined) return { texto: `Config v${v} · sin proyecto fijado`, tipo: 'neutro' }
+  if (v === versionProyecto) return { texto: `Config v${v}`, tipo: 'ok' }
+  return { texto: `Config v${v} · falta cargar la v${versionProyecto}`, tipo: 'aviso' }
 }
 
 function edadMs(iso: string, ahora: number): number {
@@ -83,6 +87,78 @@ function colorBateria(nivel: number): string {
   if (nivel > 50) return '#1baf7a' // verde
   if (nivel > 20) return '#eda100' // ámbar
   return '#e34948' // rojo
+}
+
+/**
+ * Batería vertical en forma de tanque: se llena desde abajo con el color del
+ * nivel. Desconectado: atenuada y con "Última conocida" debajo.
+ */
+/** Batería en una línea, solo en tarjetas angostas (el tanque vertical no cabe al lado del texto) */
+function BateriaCompacta({ nivel, enServicio }: { nivel: number | null; enServicio: boolean }) {
+  const pct = nivel == null ? 0 : Math.max(0, Math.min(100, nivel))
+  const color = nivel == null ? '#c3c2b7' : colorBateria(pct)
+  return (
+    <p className="flex items-center gap-2 @md:hidden">
+      <span className="h-2 w-12 shrink-0 overflow-hidden rounded-full bg-slate-100" style={{ opacity: enServicio ? 1 : 0.5 }}>
+        <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </span>
+      <span className="text-slate-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        Batería {nivel == null ? '—' : `${pct}%`}
+        {!enServicio && nivel != null && ' · última conocida'}
+      </span>
+    </p>
+  )
+}
+
+function TanqueBateria({ nivel, cargando, enServicio }: { nivel: number | null; cargando: boolean; enServicio: boolean }) {
+  const pct = nivel == null ? 0 : Math.max(0, Math.min(100, nivel))
+  const color = nivel == null ? '#c3c2b7' : colorBateria(pct)
+  const estado =
+    nivel == null
+      ? 'Sin dato'
+      : !enServicio
+        ? 'Última conocida'
+        : cargando
+          ? 'Cargando'
+          : pct > 50
+            ? 'Óptima'
+            : pct > 20
+              ? 'Media'
+              : 'Baja'
+  // el porcentaje va centrado: en blanco cuando el relleno ya lo cubre
+  const textoClaro = pct >= 55
+  return (
+    // En una tarjeta angosta no cabe al lado del texto: ahí va BateriaCompacta
+    <div className="hidden shrink-0 flex-col items-center border-l border-slate-100 pl-4 @md:flex">
+      <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-400">Batería</p>
+      <div
+        className="relative mt-2 h-24 w-12 overflow-hidden rounded-[1.1rem] border border-slate-200 bg-slate-100"
+        style={{ opacity: enServicio ? 1 : 0.5 }}
+        title={nivel == null ? 'Sin dato de batería' : `${pct}%${cargando ? ' · cargando' : ''}`}
+      >
+        <div
+          className="absolute inset-x-0 bottom-0 transition-all duration-500"
+          style={{ height: `${pct}%`, backgroundColor: color }}
+        />
+        <div
+          className={`absolute inset-0 flex flex-col items-center justify-center text-sm font-bold ${
+            textoClaro ? 'text-white' : 'text-slate-700'
+          }`}
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {cargando && enServicio && (
+            <svg viewBox="0 0 24 24" className="mb-0.5 h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+              <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+            </svg>
+          )}
+          {nivel == null ? '—' : `${pct}%`}
+        </div>
+      </div>
+      <p className="mt-2 text-xs font-medium" style={{ color: enServicio && nivel != null ? color : '#94a3b8' }}>
+        {estado}
+      </p>
+    </div>
+  )
 }
 
 export function Robots() {
@@ -133,15 +209,48 @@ export function Robots() {
     refetchInterval: 10_000,
   })
 
+  // Filtro por conexión (solo en pantalla: no consulta nada nuevo)
+  const [filtro, setFiltro] = useState<'todos' | 'en_linea' | 'desconectados'>('todos')
+  const enLinea = (r: RobotStatus) => edadMs(r.updated_at, ahora) <= UMBRAL_SIN_REPORTE_MS
+  const visibles = (robots ?? []).filter((r) =>
+    filtro === 'todos' ? true : filtro === 'en_linea' ? enLinea(r) : !enLinea(r)
+  )
+
   return (
     // En teléfono menos margen y título más chico; desde md, como siempre
     <div className="px-4 py-6 sm:px-8 md:px-12 md:py-10">
-      <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Robots</h2>
-      <p className="mt-2 text-slate-600">
-        Estado en vivo de cada robot: conexión, batería y versión de la config.
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Robots</h2>
+          <p className="mt-2 text-slate-600">
+            Estado en vivo de cada robot: conexión, batería y versión de la config.
+          </p>
+        </div>
+        {/* "Estado - En línea ▾": select sin borde, como la referencia */}
+        <label className="relative flex items-center gap-1.5 text-sm text-slate-500">
+          Estado -
+          <select
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value as typeof filtro)}
+            className="cursor-pointer appearance-none bg-transparent py-1 pr-6 font-semibold text-slate-800 focus:outline-none"
+          >
+            <option value="todos">Todos</option>
+            <option value="en_linea">En línea</option>
+            <option value="desconectados">Desconectados</option>
+          </select>
+          <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-0 h-4 w-4 text-slate-600" fill="currentColor" aria-hidden="true">
+            <path d="M5.5 8h9L10 13z" />
+          </svg>
+        </label>
+      </div>
 
       {isLoading && <Cargando texto="Cargando robots…" />}
+
+      {!isLoading && (robots ?? []).length > 0 && visibles.length === 0 && (
+        <p className="mt-10 text-slate-500">
+          {filtro === 'en_linea' ? 'Ningún robot está en línea en este momento.' : 'Todos los robots están en línea.'}
+        </p>
+      )}
 
       {!isLoading && (robots ?? []).length === 0 && (
         <p className="mt-10 text-slate-500">
@@ -150,86 +259,70 @@ export function Robots() {
         </p>
       )}
 
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {(robots ?? []).map((r) => {
+      {/* Dos por fila con ancho máximo: si sobra pantalla, queda espacio a la derecha */}
+      <div className="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-[repeat(2,minmax(0,38rem))]">
+        {visibles.map((r) => {
           const enServicio = edadMs(r.updated_at, ahora) <= UMBRAL_SIN_REPORTE_MS
           return (
-            <div
-              key={r.serial}
-              className={`rounded-xl border bg-white p-6 shadow-sm ${
-                enServicio ? 'border-emerald-300' : 'border-slate-200'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                {/* Mismo icono del robot que las cards de proyectos sin fondo */}
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                  <img
-                    src={robotPng}
-                    alt=""
-                    className={`h-16 w-auto object-contain ${enServicio ? 'opacity-90' : 'opacity-40'}`}
-                  />
-                </div>
+            <div key={r.serial} className="@container flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className="flex items-center gap-4 p-5">
+                {/* El robot con su sombra (viene en la imagen), sin caja ni giro */}
+                <img
+                  src={ROBOTS_BLANCOS.has(r.serial) ? robotBlanco : robotNegro}
+                  alt=""
+                  draggable={false}
+                  className={`w-16 shrink-0 select-none @md:w-24 ${enServicio ? '' : 'opacity-40 grayscale'}`}
+                />
 
                 <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-xl font-bold text-slate-900">
+                  <h3 className="truncate text-xl font-bold text-slate-900" title={r.nombre || 'Robot'}>
                     {r.nombre || 'Robot'}
                   </h3>
-                  <p className="text-sm text-slate-500" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    # {r.serial}
-                  </p>
+                  <p className="mt-0.5 truncate whitespace-nowrap font-mono text-sm text-slate-500"># {r.serial}</p>
 
-                  <p className="mt-2 flex items-center gap-2 text-sm font-medium">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: enServicio ? '#1baf7a' : '#c3c2b7' }}
-                    />
-                    {enServicio ? (
-                      <span className="text-emerald-700">En línea</span>
-                    ) : (
-                      <span className="text-slate-500">Desconectado · {haceCuanto(r.updated_at, ahora)}</span>
-                    )}
-                  </p>
-                  {(() => {
-                    const version = estadoVersion(r, versiones?.[r.serial])
-                    return <p className={`mt-1 text-sm font-medium ${version.color}`}>{version.texto}</p>
-                  })()}
-                </div>
-              </div>
-
-              {/* Batería */}
-              <div className="mt-5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">
-                    Batería{!enServicio && r.bateria != null ? ' (última conocida)' : ''}
-                  </span>
-                  <span
-                    className="inline-flex items-center gap-1 font-semibold text-slate-800"
-                    style={{ fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {r.bateria != null ? `${r.bateria}%` : '—'}
-                    {r.cargando && (
-                      <img
-                        src={cargandoPng}
-                        alt="Cargando"
-                        title="Cargando"
-                        className="h-4 w-4"
-                        draggable={false}
+                  <div className="mt-3 space-y-1.5 text-sm">
+                    <p className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: enServicio ? '#1baf7a' : '#c3c2b7' }}
                       />
-                    )}
-                  </span>
+                      {enServicio ? (
+                        <span className="font-medium text-emerald-700">En línea</span>
+                      ) : (
+                        <span className="text-slate-500">Desconectado · {haceCuanto(r.updated_at, ahora)}</span>
+                      )}
+                    </p>
+                    {(() => {
+                      const version = estadoVersion(r, versiones?.[r.serial])
+                      if (version.tipo === 'aviso') {
+                        return (
+                          <p className="flex items-start gap-2 text-slate-900">
+                            <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" fill="currentColor" aria-hidden="true">
+                              <path d="M12 2.5 1.5 21h21z" />
+                              <path d="M11 9.5h2v5.5h-2zM11 16.5h2v2h-2z" fill="#fff" />
+                            </svg>
+                            <span>{version.texto}</span>
+                          </p>
+                        )
+                      }
+                      return (
+                        <p className="flex items-center gap-2">
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: version.tipo === 'ok' ? '#1baf7a' : '#c3c2b7' }}
+                          />
+                          <span className={version.tipo === 'ok' ? 'text-slate-700' : 'text-slate-500'}>
+                            {version.texto}
+                            {version.tipo === 'ok' && <span className="text-emerald-700"> · Sincronizado</span>}
+                          </span>
+                        </p>
+                      )
+                    })()}
+                    <BateriaCompacta nivel={r.bateria} enServicio={enServicio} />
+                  </div>
                 </div>
-                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                  {r.bateria != null && (
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.max(2, Math.min(100, r.bateria))}%`,
-                        backgroundColor: colorBateria(r.bateria),
-                        opacity: enServicio ? 1 : 0.45,
-                      }}
-                    />
-                  )}
-                </div>
+
+                <TanqueBateria nivel={r.bateria} cargando={!!r.cargando} enServicio={enServicio} />
               </div>
 
               <ControlRuta robot={r} enServicio={enServicio} />
@@ -377,62 +470,58 @@ function ControlComandos({
 
   const ocupado = pendiente || enviar.isPending || seguimiento !== null
 
+  const claseBoton =
+    'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50'
+
   return (
-    <div className="mt-5 border-t border-slate-100 pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="flex items-center gap-2 text-sm text-slate-500">
-          App del robot
-          <Ayuda>
-            Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
-          </Ayuda>
-        </span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={ocupado}
-            onClick={() => enviar.mutate('actualizar')}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            Actualizar config
-          </button>
-          <button
-            type="button"
-            disabled={ocupado}
-            onClick={() => enviar.mutate('videollamada')}
-            title="El robot crea un enlace de videollamada de temi (un solo uso, vence en 30 min)"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            Videollamada
-          </button>
-          <button
-            type="button"
-            disabled={ocupado}
-            onClick={() => setConfirmarReinicio(true)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            Reiniciar app
-          </button>
-        </div>
+    <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+      <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-500">
+        App del robot
+        <Ayuda>
+          Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Si sigue diciendo "falta cargar", reinicia la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
+        </Ayuda>
+      </p>
+      {/* Tres botones del mismo ancho; en tarjeta angosta, uno debajo del otro */}
+      <div className="mt-3 grid grid-cols-1 gap-2 @md:grid-cols-3">
+        <button type="button" disabled={ocupado} onClick={() => enviar.mutate('actualizar')} className={claseBoton}>
+          Actualizar config
+        </button>
+        <button
+          type="button"
+          disabled={ocupado}
+          onClick={() => enviar.mutate('videollamada')}
+          title="El robot crea un enlace de videollamada de temi (un solo uso, vence en 30 min)"
+          className={claseBoton}
+        >
+          Videollamada
+        </button>
+        <button type="button" disabled={ocupado} onClick={() => setConfirmarReinicio(true)} className={claseBoton}>
+          Reiniciar app
+        </button>
       </div>
 
       {enlaceUsado && usadoVisto?.id === pedidoId && ahora - usadoVisto.desde < MOSTRAR_USADO_MS && (
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-500">
           Enlace ya usado (es de un solo uso). Para entrar otra vez, toca Videollamada y se crea uno nuevo.
         </p>
       )}
       {respuestaLlamada && enlaceVigente && robot.videollamada_url && llamadaUsada !== pedidoId && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-sm">
           <a
             onClick={() => setLlamadaUsada(pedidoId)}
             href={robot.videollamada_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white transition-colors hover:bg-indigo-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#2A4470] px-4 py-2 font-semibold text-white transition-colors hover:bg-[#223a60]"
           >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="6" width="12" height="12" rx="2" />
+              <path d="m15 10.5 6-3.5v10l-6-3.5" />
+            </svg>
             Abrir videollamada
           </a>
           <span className="text-slate-500" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            Un solo uso · vence en {minutosSegundos(restanteLlamada)}
+            Un solo uso · vence en <span className="font-semibold text-slate-800">{minutosSegundos(restanteLlamada)}</span>
           </span>
         </div>
       )}
@@ -490,19 +579,27 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
   })
 
   return (
-    <div className="mt-5 border-t border-slate-100 pt-4">
+    <div className="border-t border-slate-100 px-5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="flex items-center gap-2 text-sm text-slate-500">
-          Ruta
+        {/* "Ruta: A → B → C" en la misma fila que los botones */}
+        <p className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+          <span className="shrink-0 font-semibold text-slate-900">Ruta:</span>
+          <span
+            className={`truncate ${ruta.length ? 'text-slate-700' : 'text-slate-400'}`}
+            title={ruta.length ? ruta.join(' → ') : undefined}
+          >
+            {ruta.length ? ruta.join(' → ') : 'Sin ruta guardada'}
+          </span>
           <Ayuda>
             Ubicaciones que el robot recorre en orden. Se puede cambiar aquí o en el admin del robot, y los dos lados ven el último cambio guardado. El robot la guarda en su memoria: sin internet sigue patrullando con la última que recibió. Detener recorrido lo deja quieto en su lugar; lo demás sigue funcionando.
           </Ayuda>
-        </span>
-        <div className="flex gap-2">
+        </p>
+        {/* En tarjeta angosta los dos botones ocupan la fila, mitad y mitad */}
+        <div className="grid w-full shrink-0 grid-cols-2 gap-2 @lg:flex @lg:w-auto">
           <button
             type="button"
             onClick={() => setEditando(true)}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
             {ruta.length ? 'Editar ruta' : 'Configurar ruta'}
           </button>
@@ -527,9 +624,6 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
           )}
         </div>
       </div>
-      <p className={`mt-2 text-sm ${ruta.length ? 'font-medium text-slate-700' : 'text-slate-400'}`}>
-        {ruta.length ? ruta.join(' → ') : 'Sin ruta guardada'}
-      </p>
 
       {editando && (
         <DialogRuta

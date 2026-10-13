@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { IconoInfo } from './iconos'
 
 interface AyudaProps {
@@ -12,31 +13,63 @@ interface AyudaProps {
   ancho?: string
 }
 
+/** separación mínima entre el globo y el borde de la ventana */
+const MARGEN = 8
+
 /**
- * Ayuda contextual del editor.
+ * Ayuda contextual del panel: el texto sale al poner el cursor (o el foco)
+ * sobre el icono de información.
  *
- * Los textos de ayuda ya no ocupan espacio bajo cada campo: se muestran al
- * poner el cursor sobre el icono de información.
+ * El globo se dibuja en <body> (portal) con posición fija calculada desde el
+ * icono. Antes iba dentro del propio campo, y los contenedores que recortan lo
+ * que se sale (tarjetas con overflow-hidden, diálogos con scroll) lo dejaban
+ * cortado; además heredaba estilos del título, como las mayúsculas.
+ * Sale debajo del icono; si no cabe, encima. A lo ancho nunca se sale de la
+ * ventana.
  *
- * El globo sale **justo debajo del icono**: el `relative` está en el propio
- * componente, así que no importa dónde se use ni qué clases tenga el campo.
- * Como ya no hereda el ancho del contenedor, el ancho se fija con la prop
- * `ancho`.
- *
- * Se usa estado de React y no el truco `group-hover` de Tailwind porque ahí el
- * globo tendría que ser hijo o hermano del elemento que se pasa con el cursor,
- * y aquí el icono vive dentro de la etiqueta mientras el globo se dibuja al
- * final del campo. Con estado el disparador y el globo pueden estar en sitios
- * distintos del árbol.
+ * Se usa estado de React y no `group-hover` porque el disparador y el globo
+ * viven en sitios distintos del árbol.
  */
 export function Ayuda({ children, ancho = 'w-72' }: AyudaProps) {
   const [abierto, setAbierto] = useState(false)
+  const icono = useRef<HTMLSpanElement>(null)
+  const globo = useRef<HTMLSpanElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  const ubicar = useCallback(() => {
+    const i = icono.current?.getBoundingClientRect()
+    const g = globo.current?.getBoundingClientRect()
+    if (!i || !g) return
+    const anchoVentana = window.innerWidth
+    const altoVentana = window.innerHeight
+    // A lo ancho: alineado con el icono, sin salirse por ningún lado
+    const left = Math.min(Math.max(MARGEN, i.left), anchoVentana - g.width - MARGEN)
+    // A lo alto: debajo si cabe; si no, encima
+    const abajo = i.bottom + 4
+    const top = abajo + g.height > altoVentana - MARGEN ? Math.max(MARGEN, i.top - g.height - 4) : abajo
+    setPos((p) => (p && p.top === top && p.left === left ? p : { top, left }))
+  }, [])
+
+  // Se mide el globo ya dibujado (invisible) y se coloca antes de pintarlo
+  useLayoutEffect(() => {
+    if (!abierto) {
+      setPos(null)
+      return
+    }
+    ubicar()
+    // Si la página o un diálogo se desplazan con el globo abierto, lo sigue
+    window.addEventListener('scroll', ubicar, true)
+    window.addEventListener('resize', ubicar)
+    return () => {
+      window.removeEventListener('scroll', ubicar, true)
+      window.removeEventListener('resize', ubicar)
+    }
+  }, [abierto, ubicar])
 
   return (
-    // El relative va aquí, en el propio icono: así el globo se cuelga del
-    // icono y no del contenedor del campo.
-    <span className="relative inline-flex">
+    <span className="inline-flex">
       <span
+        ref={icono}
         role="button"
         tabIndex={0}
         aria-label="Ver ayuda"
@@ -59,16 +92,19 @@ export function Ayuda({ children, ancho = 'w-72' }: AyudaProps) {
         <IconoInfo />
       </span>
 
-      {abierto && (
-        <span
-          role="tooltip"
-          // max-w-[65vw]: en teléfono el globo no se sale por la derecha
-          // de la pantalla (en computador no cambia nada: 65vw >> w-72)
-          className={`absolute left-0 top-full z-30 mt-1 ${ancho} max-w-[65vw] rounded-lg bg-slate-800 px-3 py-2 text-sm font-normal leading-snug text-white shadow-lg`}
-        >
-          {children}
-        </span>
-      )}
+      {abierto &&
+        createPortal(
+          <span
+            ref={globo}
+            role="tooltip"
+            // max-w: en teléfono el globo no es más ancho que la pantalla
+            className={`pointer-events-none fixed z-[100] ${ancho} max-w-[calc(100vw-1rem)] rounded-lg bg-slate-800 px-3 py-2 text-left text-sm font-normal normal-case leading-snug tracking-normal text-white shadow-lg`}
+            style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: 'hidden' }}
+          >
+            {children}
+          </span>,
+          document.body
+        )}
     </span>
   )
 }
