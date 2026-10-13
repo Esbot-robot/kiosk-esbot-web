@@ -400,9 +400,9 @@ export function Inicio() {
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-12">
         <Interacciones className="md:col-span-2 xl:col-span-5" />
 
-        <Tarjeta titulo="Últimas llamadas" className="xl:col-span-4">
+        <Tarjeta titulo="Enlaces de videollamada" className="xl:col-span-4">
           {(llamadas ?? []).length === 0 && (
-            <p className="py-6 text-center text-sm text-slate-400">Aún no hay llamadas de administradores.</p>
+            <p className="py-6 text-center text-sm text-slate-400">Aún no se han pedido enlaces de videollamada.</p>
           )}
           <div className="space-y-3">
             {(llamadas ?? []).map((l) => {
