@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Modal } from './Modal'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
+import { Advertencia } from './Advertencia'
 
 interface DialogRutaProps {
   serial: string
@@ -77,7 +78,7 @@ export function DialogRuta({ serial, nombre, ubicacionesMapa, rutaActual, enServ
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-slate-800">{ubicacion}</span>
                     {!enMapa.has(ubicacion) && mapa.length > 0 && (
-                      <span className="text-xs font-medium text-amber-700">Ya no existe en el mapa del robot</span>
+                      <Advertencia className="mt-0.5">Ya no existe en el mapa del robot</Advertencia>
                     )}
                   </span>
                   <BotonIcono titulo="Subir" disabled={i === 0} onClick={() => mover(i, -1)}>
@@ -120,9 +121,7 @@ export function DialogRuta({ serial, nombre, ubicacionesMapa, rutaActual, enServ
         </div>
 
         {!enServicio && (
-          <p className="text-sm text-amber-700">
-            Este robot no está en línea: la ruta se aplicará cuando vuelva a conectarse.
-          </p>
+          <Advertencia>Este robot no está en línea: la ruta se aplicará cuando vuelva a conectarse.</Advertencia>
         )}
         {guardar.error && (
           <p className="text-sm font-medium text-rose-600">No se pudo guardar la ruta. {describirError(guardar.error)}</p>

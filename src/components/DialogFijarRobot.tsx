@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
 import { describirError } from '../lib/errores'
 import type { Project } from '../types/config'
+import { Advertencia } from './Advertencia'
 
 interface DialogFijarRobotProps {
   proyecto: Project
@@ -144,9 +145,9 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
         </button>
       </div>
       {serial.trim().length > 0 && !serialValido && (
-        <p className="mt-2 text-sm text-amber-600">
+        <Advertencia className="mt-2">
           El ID del robot debe tener {LARGO_SERIAL} caracteres (tienes {serial.trim().length}).
-        </p>
+        </Advertencia>
       )}
 
       <div className="mt-6 flex gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-sm text-slate-700">

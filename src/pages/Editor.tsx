@@ -16,6 +16,7 @@ import { describirError } from '../lib/errores'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 import { Cargando } from '../components/Cargando'
 import { SoloLecturaContext, usePerfil } from '../lib/perfil'
+import { Advertencia } from '../components/Advertencia'
 
 type Pestana = 'inicial' | 'ruleta'
 
@@ -627,7 +628,10 @@ export function Editor() {
             className="w-full rounded px-2 text-2xl font-bold text-slate-800 focus:bg-slate-50 focus:outline-none md:w-96"
             title={soloLectura ? undefined : 'Nombre del proyecto (clic para editar)'}
           />
-          <p className="px-2 text-sm text-slate-400">Versión {config.version}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-sm text-slate-400">
+            <span>Versión {config.version}</span>
+            {hayCambios && !guardar.isPending && !soloLectura && <Advertencia>Tienes cambios sin guardar</Advertencia>}
+          </div>
         </div>
         <div className="flex">
           {(['inicial', 'ruleta'] as Pestana[]).map((p) => (
@@ -1057,9 +1061,9 @@ export function Editor() {
                   Min. {LIMITES.PREGUNTAS_MIN}
                 </p>
                 {rul.preguntas.length < LIMITES.PREGUNTAS_MIN && (
-                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  <Advertencia className="mt-2">
                     Agrega al menos {LIMITES.PREGUNTAS_MIN} preguntas para que la ruleta funcione.
-                  </p>
+                  </Advertencia>
                 )}
               </div>
             )}
@@ -1087,9 +1091,6 @@ export function Editor() {
                 {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
               </button>
             </div>
-            {hayCambios && !guardar.isPending && (
-              <p className="mt-2 text-sm font-medium text-amber-700">Tienes cambios sin guardar</p>
-            )}
             {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
             {guardar.isError && (
               <p className="mt-2 text-sm text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
@@ -1169,14 +1170,12 @@ export function Editor() {
       </div>
 
       {/* Avisos del guardado en teléfono: flotan a la izquierda de los botones */}
-      {(errorGuardar || guardar.isError || (hayCambios && !guardar.isPending)) && (
+      {(errorGuardar || guardar.isError) && (
         <div className="fixed bottom-6 left-4 right-24 z-30 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg md:hidden">
           {errorGuardar ? (
             <p className="text-red-600">{errorGuardar}</p>
-          ) : guardar.isError ? (
-            <p className="text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
           ) : (
-            <p className="font-medium text-amber-700">Tienes cambios sin guardar</p>
+            <p className="text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
           )}
         </div>
       )}

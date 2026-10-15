@@ -9,6 +9,7 @@ import { DialogRuta } from '../components/DialogRuta'
 import robotBlanco from '../assets/icons/blanco_robot.webp'
 import robotNegro from '../assets/icons/negro_robot.webp'
 import { Cargando } from '../components/Cargando'
+import { Advertencia } from '../components/Advertencia'
 
 /* El latido de la app llega cada 3s; si el último tiene más de 6s
    (2 latidos perdidos), el robot se muestra como "Sin reporte".
@@ -296,13 +297,7 @@ export function Robots() {
                       const version = estadoVersion(r, versiones?.[r.serial])
                       if (version.tipo === 'aviso') {
                         return (
-                          <p className="flex items-start gap-2 text-slate-900">
-                            <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" fill="currentColor" aria-hidden="true">
-                              <path d="M12 2.5 1.5 21h21z" />
-                              <path d="M11 9.5h2v5.5h-2zM11 16.5h2v2h-2z" fill="#fff" />
-                            </svg>
-                            <span>{version.texto}</span>
-                          </p>
+                          <Advertencia>{version.texto}</Advertencia>
                         )
                       }
                       return (
@@ -349,8 +344,20 @@ function minutosSegundos(ms: number): string {
 }
 
 /** Orden que el panel está esperando que el robot termine */
+/** Nombre de la secuencia de la carita que se usó la última vez (por navegador) */
+const CLAVE_CARITA = 'kiosk.secuenciaCarita'
+function nombreCaritaGuardado(): string {
+  try {
+    return localStorage.getItem(CLAVE_CARITA) || 'Carita'
+  } catch {
+    return 'Carita'
+  }
+}
+
+type TipoOrden = 'actualizar' | 'reiniciar' | 'videollamada' | 'carita' | 'quitar_carita'
+
 interface Seguimiento {
-  tipo: 'actualizar' | 'reiniciar' | 'videollamada'
+  tipo: TipoOrden
   id: number
   desde: number
 }
@@ -402,10 +409,12 @@ function ControlComandos({
   }, [enlaceUsado, pedidoId, usadoVisto?.id])
 
   const enviar = useMutation({
-    mutationFn: async (comando: 'actualizar' | 'reiniciar' | 'videollamada') => {
+    // La carita viaja como 'carita:<nombre de la secuencia>'
+    mutationFn: async (comando: string) => {
       const { data, error } = await supabase.rpc('enviar_comando', { p_serial: robot.serial, p_comando: comando })
       if (error) throw error
-      return { comando, id: Number(data) }
+      const tipo: TipoOrden = comando.startsWith('carita:') ? 'carita' : (comando as TipoOrden)
+      return { comando: tipo, id: Number(data) }
     },
     onSuccess: ({ comando, id }) => {
       // refresca ya, sin esperar los 2 s del intervalo
@@ -420,7 +429,11 @@ function ControlComandos({
           ? 'Reiniciando la app…'
           : comando === 'videollamada'
             ? 'Creando la videollamada…'
-            : 'Buscando actualización…'
+            : comando === 'carita'
+              ? 'Activando la carita…'
+              : comando === 'quitar_carita'
+                ? 'Quitando la carita…'
+                : 'Buscando actualización…'
       )
     },
     onError: (e) => void avisoError('No se pudo enviar la orden', describirError(e)),
@@ -452,6 +465,11 @@ function ControlComandos({
       void avisoGuardado('App reiniciada')
       return
     }
+    if (seguimiento.tipo === 'carita' || seguimiento.tipo === 'quitar_carita') {
+      terminar()
+      void avisoGuardado(seguimiento.tipo === 'carita' ? 'Carita activada' : 'Carita quitada')
+      return
+    }
     // Actualizar: la recibió; si hay versión nueva, se espera a que la aplique
     const v = robot.version_config
     if (versionProyecto === undefined || v === versionProyecto) {
@@ -469,6 +487,10 @@ function ControlComandos({
   }, [])
 
   const ocupado = pendiente || enviar.isPending || seguimiento !== null
+  // La carita sigue activa mientras la última orden recibida sea "carita:…"
+  const caritaActiva = (robot.comando ?? '').startsWith('carita:') && hechoId >= pedidoId
+  const [pidiendoCarita, setPidiendoCarita] = useState(false)
+  const [nombreCarita, setNombreCarita] = useState(nombreCaritaGuardado)
 
   const claseBoton =
     'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50'
@@ -478,11 +500,11 @@ function ControlComandos({
       <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-500">
         App del robot
         <Ayuda>
-          Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Si sigue diciendo "falta cargar", reinicia la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
+          Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Si sigue diciendo "falta cargar", reinicia la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Mostrar carita: el robot deja de patrullar y repite sin parar la secuencia de la carita de Temi Center, aunque alguien esté muy cerca, hasta que toques Quitar carita. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
         </Ayuda>
       </p>
       {/* Tres botones del mismo ancho; en tarjeta angosta, uno debajo del otro */}
-      <div className="mt-3 grid grid-cols-1 gap-2 @md:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-2 @md:grid-cols-2">
         <button type="button" disabled={ocupado} onClick={() => enviar.mutate('actualizar')} className={claseBoton}>
           Actualizar config
         </button>
@@ -498,7 +520,62 @@ function ControlComandos({
         <button type="button" disabled={ocupado} onClick={() => setConfirmarReinicio(true)} className={claseBoton}>
           Reiniciar app
         </button>
+        {caritaActiva ? (
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => enviar.mutate('quitar_carita')}
+            className="rounded-lg bg-[#2A4470] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#223a60] disabled:opacity-50"
+          >
+            Quitar carita
+          </button>
+        ) : (
+          <button type="button" disabled={ocupado} onClick={() => setPidiendoCarita(true)} className={claseBoton}>
+            Mostrar carita
+          </button>
+        )}
       </div>
+
+      {pidiendoCarita && (
+        <Modal
+          titulo="Mostrar carita"
+          textoAceptar="Mostrar"
+          ancho="max-w-[35rem]"
+          aceptarDeshabilitado={!nombreCarita.trim()}
+          onCancelar={() => setPidiendoCarita(false)}
+          onAceptar={() => {
+            const nombre = nombreCarita.trim().slice(0, 80)
+            try {
+              localStorage.setItem(CLAVE_CARITA, nombre)
+            } catch {
+              // sin almacenamiento: la próxima vez vuelve a sugerir "Carita"
+            }
+            enviar.mutate(`carita:${nombre}`)
+            setPidiendoCarita(false)
+          }}
+        >
+          <p className="text-slate-700">
+            <span className="font-semibold">{robot.nombre || 'El robot'}</span> dejará de patrullar y repetirá la
+            carita en loop.
+          </p>
+          <label className="mt-4 block text-sm font-medium text-slate-800">
+            Secuencia de Temi Center
+            <input
+              value={nombreCarita}
+              maxLength={80}
+              onChange={(e) => setNombreCarita(e.target.value)}
+              placeholder="Nombre exacto de la secuencia"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+          <p className="mt-1 text-xs text-slate-500">Debe llamarse exactamente igual que en Temi Center. Necesita internet.</p>
+          {!enServicio && (
+            <Advertencia className="mt-3">
+              Este robot no está en línea: la carita se mostrará cuando vuelva a conectarse.
+            </Advertencia>
+          )}
+        </Modal>
+      )}
 
       {enlaceUsado && usadoVisto?.id === pedidoId && ahora - usadoVisto.desde < MOSTRAR_USADO_MS && (
         <p className="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-500">
@@ -540,9 +617,9 @@ function ControlComandos({
             La app de <span className="font-semibold">{robot.nombre || 'el robot'}</span> se cerrará y volverá a abrir en unos segundos. Si está atendiendo a alguien, la interacción se corta. Al abrir sigue con su ruta (o quieto, si lo detuviste).
           </p>
           {!enServicio && (
-            <p className="mt-3 text-sm text-amber-700">
+            <Advertencia className="mt-3">
               Este robot no está en línea: se reiniciará cuando vuelva a conectarse.
-            </p>
+            </Advertencia>
           )}
         </Modal>
       )}
@@ -650,9 +727,9 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
             <span className="font-semibold">{robot.nombre || 'El robot'}</span> dejará de desplazarse y permanecerá en su lugar actual. Todo lo demás seguirá funcionando con normalidad.
           </p>
           {!enServicio && (
-            <p className="mt-3 text-sm text-amber-700">
+            <Advertencia className="mt-3">
               Este robot no está en línea: la orden se aplicará cuando vuelva a conectarse.
-            </p>
+            </Advertencia>
           )}
         </Modal>
       )}

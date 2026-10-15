@@ -7,6 +7,7 @@ import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
 import { CampoTexto, ConfigFormulario } from './ConfigFormulario'
 import { limpiarFormulario, MAX_DESPEDIDA, validarFormulario } from '../../lib/formulario'
+import { Advertencia } from '../Advertencia'
 import {
   FRASE_PREPARACION_DEFECTO,
   SEGUNDOS_PANTALLA_MAX,
@@ -525,10 +526,10 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                 </div>
               </>
             ) : (
-              <p className="mt-1 text-sm text-amber-700">
+              <Advertencia className="mt-1">
                 Este proyecto todavía no tiene enlace de galería. Se genera al crear la columna
                 galeria_token en Supabase.
-              </p>
+              </Advertencia>
             )}
           </div>
         )}
