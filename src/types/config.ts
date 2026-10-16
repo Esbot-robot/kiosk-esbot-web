@@ -22,6 +22,17 @@ export interface BotonEstilo extends TextoEstilo {
   forma: 'pildora' | 'tarjeta'
   /** Imagen mostrada directamente en la tarjeta, sin capas ni filtros. */
   imagen_url: string
+  /**
+   * Solo diseño Feria, tarjeta SIN imagen: la tarjeta se dibuja con su color,
+   * rayas diagonales del mismo tono y un círculo con este ícono (PNG/JPG/WEBP).
+   */
+  icono_url?: string
+  /** relleno del círculo del ícono; vacío = blanco */
+  color_circulo?: string
+  /** contorno del círculo del ícono; vacío = el contorno de la tarjeta */
+  contorno_circulo?: string
+  /** rayas diagonales de la tarjeta; sin valor = sí */
+  rayas?: boolean
 }
 
 /** Acción opcional disponible desde la pantalla inicial del robot. */
@@ -204,6 +215,8 @@ export function botonFotoVacio(): BotonFoto {
 }
 
 export interface PantallaInicial {
+  /** diseño (plantilla) de la pantalla; sin valor = 'clasico'. Apps viejas lo ignoran. */
+  diseno?: 'clasico' | 'feria'
   fondo_url: string
   /** logo de la empresa, arriba centrado (imgLogo en el robot) */
   logo_url: string
@@ -332,6 +345,7 @@ export function configVacia(): EventConfig {
     version: 1,
     empresa: '',
     pantalla_inicial: {
+      diseno: 'clasico',
       fondo_url: '',
       logo_url: '',
       logo_visible: true,

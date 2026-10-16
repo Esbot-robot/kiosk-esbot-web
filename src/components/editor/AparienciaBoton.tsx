@@ -12,12 +12,15 @@ interface AparienciaBotonProps {
 }
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+const MAX_ICONO_BYTES = 2 * 1024 * 1024
 
 /** Campos visuales compartidos por el botón Jugar y las dos acciones adicionales. */
 export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonProps) {
   const [error, setError] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const inputImagen = useRef<HTMLInputElement>(null)
+  const inputIcono = useRef<HTMLInputElement>(null)
+  const [subiendoIcono, setSubiendoIcono] = useState(false)
   const esTarjeta = valor.forma === 'tarjeta'
 
   async function subirImagen(file?: File) {
@@ -40,6 +43,28 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
       setError(`No se pudo subir la imagen. ${describirError(e)}`)
     } finally {
       setSubiendo(false)
+    }
+  }
+
+  async function subirIcono(file?: File) {
+    setError('')
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('El ícono debe ser PNG, JPG o WEBP (mejor PNG con fondo transparente).')
+      return
+    }
+    if (file.size > MAX_ICONO_BYTES) {
+      setError(`El ícono pesa ${(file.size / 1024 / 1024).toFixed(1)}MB. El máximo es 2MB.`)
+      return
+    }
+    setSubiendoIcono(true)
+    try {
+      const icono_url = await subirArchivo('media', rutaMedia(projectId, file.name), file)
+      onChange({ ...valor, icono_url })
+    } catch (e) {
+      setError(`No se pudo subir el ícono. ${describirError(e)}`)
+    } finally {
+      setSubiendoIcono(false)
     }
   }
 
@@ -122,6 +147,75 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
             }}
           />
           {error && <p className="mt-3 text-sm font-medium text-rose-600">{error}</p>}
+        </div>
+      )}
+
+      {esTarjeta && !valor.imagen_url && (
+        <div className="rounded-lg border border-slate-200 p-4">
+          <p className="flex items-center gap-2 font-medium text-slate-800">
+            Ícono de la tarjeta
+            <Ayuda>
+              Solo en el diseño Feria y cuando la tarjeta no tiene imagen. La tarjeta se dibuja con su color de fondo,
+              rayas diagonales del mismo tono y este ícono dentro de un círculo. Usa un PNG cuadrado con fondo
+              transparente; se ajusta solo al círculo. Máximo 2MB.
+            </Ayuda>
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={subiendoIcono}
+              onClick={() => inputIcono.current?.click()}
+              className="rounded-md border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {subiendoIcono ? 'Subiendo...' : valor.icono_url ? 'Reemplazar ícono' : 'Cargar ícono'}
+            </button>
+            {valor.icono_url && (
+              <>
+                <img src={valor.icono_url} alt="" className="h-8 w-8 rounded-full border border-slate-200 object-contain p-1" />
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...valor, icono_url: '' })}
+                  className="text-sm font-medium text-rose-600 hover:text-rose-700"
+                >
+                  Quitar
+                </button>
+              </>
+            )}
+          </div>
+          <input
+            ref={inputIcono}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              void subirIcono(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <CampoColor
+              label="Relleno del círculo"
+              value={valor.color_circulo ?? ''}
+              onChange={(color_circulo) => onChange({ ...valor, color_circulo })}
+            />
+            <CampoColor
+              label="Contorno del círculo"
+              value={valor.contorno_circulo ?? ''}
+              onChange={(contorno_circulo) => onChange({ ...valor, contorno_circulo })}
+            />
+          </div>
+          <label className="mt-4 flex items-center gap-3 text-sm text-slate-800">
+            <input
+              type="checkbox"
+              checked={valor.rayas !== false}
+              onChange={(e) => onChange({ ...valor, rayas: e.target.checked })}
+              className="h-4 w-4 accent-indigo-600"
+            />
+            <span className="flex items-center gap-2 font-medium">
+              Rayas diagonales
+              <Ayuda>Salen del color de fondo de la tarjeta: un tono más oscuro del mismo color.</Ayuda>
+            </span>
+          </label>
         </div>
       )}
     </div>

@@ -17,6 +17,9 @@ import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen 
 import { Cargando } from '../components/Cargando'
 import { SoloLecturaContext, usePerfil } from '../lib/perfil'
 import { Advertencia } from '../components/Advertencia'
+import { SelectorDiseno } from '../components/editor/SelectorDiseno'
+import { disenoDe, FERIA, FUENTE_FERIA } from '../lib/disenos'
+import { TarjetaFeria } from '../components/editor/TarjetaFeria'
 
 type Pestana = 'inicial' | 'ruleta'
 
@@ -99,6 +102,17 @@ function fondoRuleta(preguntas: Pregunta[]): string {
  * su tamaño base (en computador se ve al 80%, ver index.css).
  */
 const ANCHO_VISTA_REM = 48
+
+/** Cinta del título con muescas semicirculares a los lados, como un boleto */
+const ESTILO_CINTA: React.CSSProperties = {
+  fontFamily: FUENTE_FERIA,
+  maskImage:
+    'radial-gradient(circle 0.6rem at 0 50%, #0000 0.55rem, #000 0.6rem), radial-gradient(circle 0.6rem at 100% 50%, #0000 0.55rem, #000 0.6rem)',
+  maskComposite: 'intersect',
+  WebkitMaskImage:
+    'radial-gradient(circle 0.6rem at 0 50%, #0000 0.55rem, #000 0.6rem), radial-gradient(circle 0.6rem at 100% 50%, #0000 0.55rem, #000 0.6rem)',
+  WebkitMaskComposite: 'source-in',
+}
 
 /**
  * La vista previa se dibuja siempre sobre el mismo lienzo (16:10, como la
@@ -467,6 +481,7 @@ export function Editor() {
   const botonFoto = ini.boton_foto ?? botonFotoVacio()
   const botonRegistro = ini.boton_registro ?? botonRegistroVacio()
   const botonJugarActivo = ini.boton_activo ?? true
+  const feria = disenoDe(ini.diseno) === 'feria'
   const botonesVistaPrevia = [
     ...(botonJugarActivo
       ? [
@@ -683,13 +698,19 @@ export function Editor() {
                 </div>
 
                 {/* Título y subtítulo: franjas de lado a lado, como en el robot */}
-                <div className="relative mt-6 w-full">
+                <div className={`relative mt-6 ${feria ? 'mx-auto w-[68.75%]' : 'w-full'}`}>
                   <p
-                    className={`w-full px-16 py-2 text-center text-2xl font-bold ${ini.titulo_visible ? '' : 'opacity-25'}`}
+                    className={`w-full text-center ${
+                      feria ? 'px-12 py-3 text-[1.75rem] font-bold leading-tight' : 'px-16 py-2 text-2xl font-bold'
+                    } ${ini.titulo_visible ? '' : 'opacity-25'}`}
                     style={{
-                      color: ini.titulo.color_texto || '#1e2a4a',
-                      backgroundColor: colorConOpacidad(ini.titulo.color_fondo, ini.titulo.opacidad_fondo),
+                      color: ini.titulo.color_texto || (feria ? FERIA.tituloTexto : '#1e2a4a'),
+                      backgroundColor: colorConOpacidad(
+                        ini.titulo.color_fondo || (feria ? FERIA.tituloFondo : ''),
+                        ini.titulo.opacidad_fondo
+                      ),
                       textShadow: sombraTexto(ini.titulo),
+                      ...(feria ? ESTILO_CINTA : {}),
                     }}
                   >
                     {ini.titulo.texto || 'Título (clic en el lápiz)'}
@@ -700,13 +721,21 @@ export function Editor() {
                   </div>
                 </div>
 
-                <div className="relative w-full">
+                <div className={`relative ${feria ? 'mx-auto w-3/4' : 'w-full'}`}>
                   <p
-                    className={`w-full px-16 py-2 text-center text-xl font-semibold ${ini.subtitulo_visible ? '' : 'opacity-25'}`}
+                    className={`w-full text-center ${
+                      feria
+                        ? 'rounded-b-xl px-10 py-2 text-xl font-semibold leading-tight'
+                        : 'px-16 py-2 text-xl font-semibold'
+                    } ${ini.subtitulo_visible ? '' : 'opacity-25'}`}
                     style={{
-                      color: ini.subtitulo.color_texto || '#1e2a4a',
-                      backgroundColor: colorConOpacidad(ini.subtitulo.color_fondo, ini.subtitulo.opacidad_fondo),
+                      color: ini.subtitulo.color_texto || (feria ? FERIA.subtituloTexto : '#1e2a4a'),
+                      backgroundColor: colorConOpacidad(
+                        ini.subtitulo.color_fondo || (feria ? FERIA.subtituloFondo : ''),
+                        ini.subtitulo.opacidad_fondo
+                      ),
                       textShadow: sombraTexto(ini.subtitulo),
+                      fontFamily: feria ? FUENTE_FERIA : undefined,
                     }}
                   >
                     {ini.subtitulo.texto || 'Subtítulo'}
@@ -718,15 +747,20 @@ export function Editor() {
                 </div>
 
                 <div
-                  className={`mt-8 flex w-full flex-nowrap items-center justify-center gap-3 px-5 ${
-                    botonesVistaPrevia.length === 1 ? 'max-w-xl' : ''
-                  }`}
+                  className={`flex w-full flex-nowrap items-center justify-center gap-3 ${
+                    feria ? 'mt-6 px-12' : 'mt-8 px-5'
+                  } ${botonesVistaPrevia.length === 1 ? 'max-w-xl' : ''}`}
                 >
                   {botonesVistaPrevia.map(({ id, estilo, textoDefecto, editar }) => {
                     const esTarjeta = estilo.forma === 'tarjeta'
                     const tieneImagen = esTarjeta && Boolean(estilo.imagen_url)
+                    // Feria + tarjeta sin imagen: se dibuja sola (rayas, círculo con ícono y franja)
+                    const tarjetaFeria = feria && esTarjeta && !tieneImagen
                     return (
                       <div key={id} className="flex min-w-0 flex-1 items-center gap-1.5">
+                        {tarjetaFeria ? (
+                          <TarjetaFeria estilo={estilo} texto={estilo.texto || textoDefecto} />
+                        ) : (
                         <span
                           className={`flex min-w-0 flex-1 items-center justify-center truncate text-center font-bold ${
                             esTarjeta
@@ -734,19 +768,30 @@ export function Editor() {
                               : `rounded-full py-3 ${botonesVistaPrevia.length === 3 ? 'px-4 text-base' : 'px-6 text-lg'}`
                           }`}
                           style={{
-                            color: estilo.color_texto || '#ffffff',
-                            backgroundColor: estilo.color_fondo || '#031046',
+                            color: estilo.color_texto || (feria ? FERIA.botonTexto : '#ffffff'),
+                            backgroundColor: estilo.color_fondo || (feria ? FERIA.botonFondo : '#031046'),
                             backgroundImage: tieneImagen ? `url(${estilo.imagen_url})` : undefined,
                             backgroundPosition: 'center',
                             backgroundRepeat: 'no-repeat',
                             backgroundSize: 'cover',
-                            border: tieneImagen ? 'none' : `4px solid ${estilo.color_contorno || '#FFD700'}`,
-                            // Sombra fija del contenedor: da profundidad sin alterar la imagen.
-                            boxShadow: esTarjeta ? '0 10px 18px rgba(100, 116, 139, 0.32)' : undefined,
+                            ...(feria
+                              ? {
+                                  // Feria: borde grueso (también sobre la imagen) y sombra dura hacia abajo
+                                  border: `4px solid ${estilo.color_contorno || FERIA.contorno}`,
+                                  boxShadow: `0 6px 0 ${estilo.color_contorno || FERIA.contorno}`,
+                                  fontFamily: FUENTE_FERIA,
+                                  textTransform: 'uppercase' as const,
+                                }
+                              : {
+                                  border: tieneImagen ? 'none' : `4px solid ${estilo.color_contorno || '#FFD700'}`,
+                                  // Sombra fija del contenedor: da profundidad sin alterar la imagen.
+                                  boxShadow: esTarjeta ? '0 10px 18px rgba(100, 116, 139, 0.32)' : undefined,
+                                }),
                           }}
                         >
                           {estilo.texto || textoDefecto}
                         </span>
+                        )}
                         <span className="shrink-0">
                           <Lapiz title="Editar botón" onClick={editar} />
                         </span>
@@ -835,6 +880,13 @@ export function Editor() {
         {/* ─── Panel derecho (en teléfono va debajo de la vista previa) ─── */}
         <aside className="flex w-full flex-col border-t border-slate-200 bg-white md:w-96 md:border-l md:border-t-0">
           <div className="p-4 pb-44 md:flex-1 md:overflow-y-auto md:p-6">
+            {pestana === 'inicial' && (
+              <SelectorDiseno
+                valor={disenoDe(ini.diseno)}
+                onChange={(diseno) => setInicial({ diseno })}
+                deshabilitado={soloLectura}
+              />
+            )}
             {/* En teléfono no hay lápices en la vista previa: lo que solo se
                 editaba con ellos aparece aquí */}
             <div className="mb-5 space-y-1 border-b border-slate-200 pb-5 md:hidden">
