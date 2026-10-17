@@ -18,7 +18,7 @@ import { Cargando } from '../components/Cargando'
 import { SoloLecturaContext, usePerfil } from '../lib/perfil'
 import { Advertencia } from '../components/Advertencia'
 import { SelectorDiseno } from '../components/editor/SelectorDiseno'
-import { disenoDe, FERIA, FUENTE_FERIA } from '../lib/disenos'
+import { BANNER, colorContraste, DisenoContext, disenoDe, FERIA, FUENTE_FERIA } from '../lib/disenos'
 import { TarjetaFeria } from '../components/editor/TarjetaFeria'
 
 type Pestana = 'inicial' | 'ruleta'
@@ -482,6 +482,9 @@ export function Editor() {
   const botonRegistro = ini.boton_registro ?? botonRegistroVacio()
   const botonJugarActivo = ini.boton_activo ?? true
   const feria = disenoDe(ini.diseno) === 'feria'
+  const banner = disenoDe(ini.diseno) === 'banner'
+  const colorPanel = ini.color_panel || BANNER.panel
+  const textoPanel = colorContraste(colorPanel)
   const botonesVistaPrevia = [
     ...(botonJugarActivo
       ? [
@@ -523,6 +526,9 @@ export function Editor() {
         ]
       : []),
   ]
+
+  // Banner: el panel ocupa más alto cuando algún botón es tarjeta (igual que en el robot)
+  const pctPanel = botonesVistaPrevia.some((b) => b.estilo.forma === 'tarjeta') ? 62 : 45
 
   function setInicial(cambios: Partial<EventConfig['pantalla_inicial']>) {
     setConfig((c) => c && { ...c, pantalla_inicial: { ...c.pantalla_inicial, ...cambios } })
@@ -631,6 +637,7 @@ export function Editor() {
   }
 
   return (
+    <DisenoContext.Provider value={disenoDe(ini.diseno)}>
     <SoloLecturaContext.Provider value={soloLectura}>
     <div className="flex h-full flex-col">
       {/* Barra superior: nombre + pestañas */}
@@ -697,19 +704,30 @@ export function Editor() {
                   <Lapiz title="Cambiar logo" onClick={() => setDialogo({ tipo: 'logo' })} />
                 </div>
 
+                {/* Banner: título, subtítulo y botones van dentro del panel de color de abajo */}
+                <div
+                  className={banner ? 'absolute inset-x-0 bottom-0 flex flex-col px-[3.5%] pt-5' : 'contents'}
+                  style={banner ? { height: `${pctPanel}%`, backgroundColor: colorPanel } : undefined}
+                >
                 {/* Título y subtítulo: franjas de lado a lado, como en el robot */}
-                <div className={`relative mt-6 ${feria ? 'mx-auto w-[68.75%]' : 'w-full'}`}>
+                <div className={`relative ${banner ? 'w-full' : `mt-6 ${feria ? 'mx-auto w-[68.75%]' : 'w-full'}`}`}>
                   <p
-                    className={`w-full text-center ${
-                      feria ? 'px-12 py-3 text-[1.75rem] font-bold leading-tight' : 'px-16 py-2 text-2xl font-bold'
+                    className={`w-full ${banner ? '' : 'text-center'} ${
+                      banner
+                        ? 'px-0 text-[1.6rem] font-bold leading-tight'
+                        : feria
+                          ? 'px-12 py-3 text-[1.75rem] font-bold leading-tight'
+                          : 'px-16 py-2 text-2xl font-bold'
                     } ${ini.titulo_visible ? '' : 'opacity-25'}`}
                     style={{
-                      color: ini.titulo.color_texto || (feria ? FERIA.tituloTexto : '#1e2a4a'),
-                      backgroundColor: colorConOpacidad(
-                        ini.titulo.color_fondo || (feria ? FERIA.tituloFondo : ''),
-                        ini.titulo.opacidad_fondo
-                      ),
-                      textShadow: sombraTexto(ini.titulo),
+                      color: ini.titulo.color_texto || (banner ? textoPanel : feria ? FERIA.tituloTexto : '#1e2a4a'),
+                      backgroundColor: banner
+                        ? 'transparent'
+                        : colorConOpacidad(
+                            ini.titulo.color_fondo || (feria ? FERIA.tituloFondo : ''),
+                            ini.titulo.opacidad_fondo
+                          ),
+                      textShadow: banner ? undefined : sombraTexto(ini.titulo),
                       ...(feria ? ESTILO_CINTA : {}),
                     }}
                   >
@@ -721,20 +739,26 @@ export function Editor() {
                   </div>
                 </div>
 
-                <div className={`relative ${feria ? 'mx-auto w-3/4' : 'w-full'}`}>
+                <div className={`relative ${banner ? 'mt-1 w-full' : feria ? 'mx-auto w-3/4' : 'w-full'}`}>
                   <p
-                    className={`w-full text-center ${
-                      feria
-                        ? 'rounded-b-xl px-10 py-2 text-xl font-semibold leading-tight'
-                        : 'px-16 py-2 text-xl font-semibold'
+                    className={`w-full ${banner ? '' : 'text-center'} ${
+                      banner
+                        ? 'px-0 text-xl font-semibold'
+                        : feria
+                          ? 'rounded-b-xl px-10 py-2 text-xl font-semibold leading-tight'
+                          : 'px-16 py-2 text-xl font-semibold'
                     } ${ini.subtitulo_visible ? '' : 'opacity-25'}`}
                     style={{
-                      color: ini.subtitulo.color_texto || (feria ? FERIA.subtituloTexto : '#1e2a4a'),
-                      backgroundColor: colorConOpacidad(
-                        ini.subtitulo.color_fondo || (feria ? FERIA.subtituloFondo : ''),
-                        ini.subtitulo.opacidad_fondo
-                      ),
-                      textShadow: sombraTexto(ini.subtitulo),
+                      color:
+                        ini.subtitulo.color_texto ||
+                        (banner ? colorContraste(colorPanel, 0.75) : feria ? FERIA.subtituloTexto : '#1e2a4a'),
+                      backgroundColor: banner
+                        ? 'transparent'
+                        : colorConOpacidad(
+                            ini.subtitulo.color_fondo || (feria ? FERIA.subtituloFondo : ''),
+                            ini.subtitulo.opacidad_fondo
+                          ),
+                      textShadow: banner ? undefined : sombraTexto(ini.subtitulo),
                       fontFamily: feria ? FUENTE_FERIA : undefined,
                     }}
                   >
@@ -748,18 +772,23 @@ export function Editor() {
 
                 <div
                   className={`flex w-full flex-nowrap items-center justify-center gap-3 ${
-                    feria ? 'mt-6 px-12' : 'mt-8 px-5'
+                    banner ? 'mt-4 px-0' : feria ? 'mt-6 px-12' : 'mt-8 px-5'
                   } ${botonesVistaPrevia.length === 1 ? 'max-w-xl' : ''}`}
                 >
                   {botonesVistaPrevia.map(({ id, estilo, textoDefecto, editar }) => {
                     const esTarjeta = estilo.forma === 'tarjeta'
                     const tieneImagen = esTarjeta && Boolean(estilo.imagen_url)
                     // Feria + tarjeta sin imagen: se dibuja sola (rayas, círculo con ícono y franja)
-                    const tarjetaFeria = feria && esTarjeta && !tieneImagen
+                    const tarjetaFeria = (feria || banner) && esTarjeta && !tieneImagen
                     return (
                       <div key={id} className="flex min-w-0 flex-1 items-center gap-1.5">
                         {tarjetaFeria ? (
-                          <TarjetaFeria estilo={estilo} texto={estilo.texto || textoDefecto} />
+                          <TarjetaFeria
+                            estilo={estilo}
+                            texto={estilo.texto || textoDefecto}
+                            plano={banner}
+                            fondoDefecto={banner ? colorPanel : undefined}
+                          />
                         ) : (
                         <span
                           className={`flex min-w-0 flex-1 items-center justify-center truncate text-center font-bold ${
@@ -768,13 +797,25 @@ export function Editor() {
                               : `rounded-full py-3 ${botonesVistaPrevia.length === 3 ? 'px-4 text-base' : 'px-6 text-lg'}`
                           }`}
                           style={{
-                            color: estilo.color_texto || (feria ? FERIA.botonTexto : '#ffffff'),
-                            backgroundColor: estilo.color_fondo || (feria ? FERIA.botonFondo : '#031046'),
+                            color: banner
+                              ? esTarjeta
+                                ? '#ffffff' // tarjeta con imagen: texto blanco, como en el robot
+                                : estilo.color_texto || colorContraste(estilo.color_fondo || colorPanel)
+                              : estilo.color_texto || (feria ? FERIA.botonTexto : '#ffffff'),
+                            backgroundColor: estilo.color_fondo || (banner ? colorPanel : feria ? FERIA.botonFondo : '#031046'),
                             backgroundImage: tieneImagen ? `url(${estilo.imagen_url})` : undefined,
                             backgroundPosition: 'center',
                             backgroundRepeat: 'no-repeat',
                             backgroundSize: 'cover',
-                            ...(feria
+                            ...(banner
+                              ? {
+                                  // Banner: sin contorno si hay color de fondo; si no, contorno del color del texto
+                                  border: tieneImagen
+                                    ? 'none'
+                                    : `4px solid ${estilo.color_contorno || estilo.color_fondo || colorContraste(colorPanel)}`,
+                                  boxShadow: esTarjeta ? '0 10px 18px rgba(100, 116, 139, 0.32)' : undefined,
+                                }
+                              : feria
                               ? {
                                   // Feria: borde grueso (también sobre la imagen) y sombra dura hacia abajo
                                   border: `4px solid ${estilo.color_contorno || FERIA.contorno}`,
@@ -799,7 +840,25 @@ export function Editor() {
                     )
                   })}
                 </div>
+                </div>
               </div>
+              {banner && (
+                <>
+                  {/* Contador del banner: barra en el borde del panel y etiqueta sobre la imagen */}
+                  <div
+                    className="absolute inset-x-0 h-1.5"
+                    style={{ bottom: `${pctPanel}%`, backgroundColor: colorContraste(colorPanel, 0.18) }}
+                  >
+                    <div className="h-full w-[62%]" style={{ backgroundColor: ini.color_contador || '#FFD700' }} />
+                  </div>
+                  <span
+                    className="absolute right-[5%] rounded-t-lg px-3 py-1 text-sm font-bold"
+                    style={{ bottom: `calc(${pctPanel}% + 0.375rem)`, backgroundColor: colorPanel, color: textoPanel }}
+                  >
+                    Continuaré en <span style={{ color: ini.color_contador || '#FFD700' }}>15</span>
+                  </span>
+                </>
+              )}
             </div>
           ) : (
             <div
@@ -885,6 +944,8 @@ export function Editor() {
                 valor={disenoDe(ini.diseno)}
                 onChange={(diseno) => setInicial({ diseno })}
                 deshabilitado={soloLectura}
+                colorPanel={ini.color_panel ?? ''}
+                onColorPanel={(color_panel) => setInicial({ color_panel })}
               />
             )}
             {/* En teléfono no hay lápices en la vista previa: lo que solo se
@@ -1450,5 +1511,6 @@ export function Editor() {
       )}
     </div>
     </SoloLecturaContext.Provider>
+    </DisenoContext.Provider>
   )
 }

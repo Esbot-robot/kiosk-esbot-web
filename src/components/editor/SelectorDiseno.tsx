@@ -1,5 +1,5 @@
 import { DISENOS, type Diseno } from '../../lib/disenos'
-import { Ayuda } from '../Ayuda'
+import { CampoColor } from '../CampoColor'
 
 /** Esquema de cada diseño: solo las cajas principales, sin colores de marca */
 function Miniatura({ diseno }: { diseno: Diseno }) {
@@ -9,7 +9,19 @@ function Miniatura({ diseno }: { diseno: Diseno }) {
     <svg viewBox="0 0 160 100" className="w-full rounded-md bg-slate-100" aria-hidden="true">
       {/* logo */}
       <rect x="62" y="6" width="36" height="12" rx="3" fill={base} />
-      {diseno === 'feria' ? (
+      {diseno === 'banner' ? (
+        <>
+          {/* imagen arriba (con el logo) y panel de color abajo, con la barra del contador */}
+          <rect x="0" y="52" width="160" height="48" fill="#e2e8f0" />
+          <rect x="0" y="49" width="160" height="3" fill="#94a3b8" />
+          <rect x="0" y="49" width="100" height="3" fill={fuerte} />
+          <rect x="10" y="58" width="70" height="8" rx="2" fill={fuerte} />
+          <rect x="10" y="69" width="100" height="5" rx="2" fill={base} />
+          {[0, 1, 2].map((i) => (
+            <rect key={i} x={10 + i * 50} y="80" width="44" height="14" rx="7" fill="#1e293b" />
+          ))}
+        </>
+      ) : diseno === 'feria' ? (
         <>
           {/* título en cinta con muescas y subtítulo en barra oscura */}
           <path d="M26 24h108v14h-108zM26 29a3 3 0 0 1 0 4zM134 29a3 3 0 0 0 0 4z" fill={fuerte} />
@@ -46,41 +58,57 @@ export function SelectorDiseno({
   valor,
   onChange,
   deshabilitado,
+  colorPanel = '',
+  onColorPanel,
 }: {
   valor: Diseno
   onChange: (d: Diseno) => void
   deshabilitado?: boolean
+  /** color del panel de abajo (solo diseño banner) */
+  colorPanel?: string
+  onColorPanel?: (color: string) => void
 }) {
+  const actual = DISENOS.find((d) => d.id === valor)
   return (
     <div className="mb-5 border-b border-slate-200 pb-5">
-      <p className="flex items-center gap-2 font-semibold text-slate-800">
-        Diseño de la pantalla
-        <Ayuda>
-          Cambia cómo se ve la pantalla inicial del robot. Los colores, el fondo y los textos siguen siendo los del
-          proyecto. Los robots con una app anterior siguen mostrando el diseño clásico.
-        </Ayuda>
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        {DISENOS.map((d) => {
-          const activo = d.id === valor
-          return (
-            <button
-              key={d.id}
-              type="button"
-              disabled={deshabilitado}
-              onClick={() => onChange(d.id)}
-              aria-pressed={activo}
-              className={`rounded-lg border-2 p-2 text-left transition-colors disabled:opacity-60 ${
-                activo ? 'border-[#2A4470] bg-slate-50' : 'border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <Miniatura diseno={d.id} />
-              <p className="mt-2 text-sm font-semibold text-slate-800">{d.nombre}</p>
-              <p className="text-xs text-slate-500">{d.descripcion}</p>
-            </button>
-          )
-        })}
+      {/* "Diseño de la pantalla - Clásico ▾": mismo estilo del filtro de estado de Robots */}
+      <label className="relative flex w-fit items-center gap-1.5 text-slate-500">
+        Diseño de la pantalla -
+        <select
+          value={valor}
+          disabled={deshabilitado}
+          onChange={(e) => onChange(e.target.value as Diseno)}
+          className="cursor-pointer appearance-none bg-transparent py-1 pr-6 font-semibold text-slate-800 focus:outline-none disabled:cursor-default disabled:opacity-60"
+        >
+          {DISENOS.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.nombre}
+            </option>
+          ))}
+        </select>
+        <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-0 h-4 w-4 text-slate-600" fill="currentColor" aria-hidden="true">
+          <path d="M5.5 8h9L10 13z" />
+        </svg>
+      </label>
+
+      {/* Abajo: cómo es el diseño elegido */}
+      <div className="mt-3 flex items-center gap-3">
+        <div className="w-36 shrink-0">
+          <Miniatura diseno={valor} />
+        </div>
+        <p className="text-xs text-slate-500">{actual?.descripcion}</p>
       </div>
+
+      {valor === 'banner' && onColorPanel && (
+        <div className="mt-4">
+          <CampoColor
+            label="Color del panel de abajo"
+            value={colorPanel}
+            onChange={onColorPanel}
+            ayuda="Es el fondo de la zona donde están el título, el subtítulo y los botones. El texto se ajusta solo para que se lea."
+          />
+        </div>
+      )}
     </div>
   )
 }

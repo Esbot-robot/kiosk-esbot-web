@@ -33,6 +33,8 @@ export interface BotonEstilo extends TextoEstilo {
   contorno_circulo?: string
   /** rayas diagonales de la tarjeta; sin valor = sí */
   rayas?: boolean
+  /** diseño banner: color de la franja del texto de la tarjeta; vacío = un tono más oscuro de la tarjeta */
+  color_franja?: string
 }
 
 /** Acción opcional disponible desde la pantalla inicial del robot. */
@@ -216,7 +218,9 @@ export function botonFotoVacio(): BotonFoto {
 
 export interface PantallaInicial {
   /** diseño (plantilla) de la pantalla; sin valor = 'clasico'. Apps viejas lo ignoran. */
-  diseno?: 'clasico' | 'feria'
+  diseno?: 'clasico' | 'feria' | 'banner'
+  /** color del panel de abajo en el diseño banner (vacío = blanco) */
+  color_panel?: string
   fondo_url: string
   /** logo de la empresa, arriba centrado (imgLogo en el robot) */
   logo_url: string

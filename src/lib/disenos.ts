@@ -1,14 +1,46 @@
+import { createContext, useContext } from 'react'
+
 /**
  * Diseños (plantillas) de la pantalla inicial del robot.
  * El valor viaja en la config del proyecto (pantalla_inicial.diseno). Los
  * robots con una app anterior no lo conocen y muestran el diseño clásico.
  */
-export type Diseno = 'clasico' | 'feria'
+export type Diseno = 'clasico' | 'feria' | 'banner'
 
 export const DISENOS: { id: Diseno; nombre: string; descripcion: string }[] = [
   { id: 'clasico', nombre: 'Clásico', descripcion: 'Franjas de lado a lado y botones en píldora' },
   { id: 'feria', nombre: 'Feria', descripcion: 'Título en cinta, botones con borde y sombra' },
+  { id: 'banner', nombre: 'Banner', descripcion: 'Imagen arriba y panel de color abajo' },
 ]
+
+/** Diseño elegido en el editor: los diálogos de los botones muestran solo lo que ese diseño usa */
+export const DisenoContext = createContext<Diseno>('clasico')
+export function useDiseno(): Diseno {
+  return useContext(DisenoContext)
+}
+
+/** diseño banner: color del panel cuando el proyecto no define uno */
+export const BANNER = { panel: '#FFFFFF' } as const
+
+/** Mezcla un color con blanco: t=0 deja el color, t=1 da blanco (el degradado del banner arranca así arriba) */
+export function aclarar(hex: string, t: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim())
+  if (!m) return hex
+  const n = parseInt(m[1], 16)
+  const mezcla = (c: number) => Math.round(c + (255 - c) * t).toString(16).padStart(2, '0')
+  return `#${mezcla((n >> 16) & 255)}${mezcla((n >> 8) & 255)}${mezcla(n & 255)}`
+}
+
+/**
+ * Color de texto legible sobre un fondo: oscuro sobre fondos claros, blanco
+ * sobre oscuros. El robot usa la misma regla (luminancia 0,6).
+ */
+export function colorContraste(fondoHex: string, alfa = 1): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec((fondoHex || '').trim())
+  const n = m ? parseInt(m[1], 16) : 0xffffff
+  const luminancia = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255
+  return luminancia > 0.6 ? `rgba(17,24,39,${alfa})` : `rgba(255,255,255,${alfa})`
+}
 
 /** colores de respaldo del diseño feria cuando el proyecto no define los suyos */
 export const FERIA = {
@@ -59,5 +91,5 @@ export function colorRayas(hex: string): string {
 }
 
 export function disenoDe(valor: string | undefined | null): Diseno {
-  return valor === 'feria' ? 'feria' : 'clasico'
+  return valor === 'feria' ? 'feria' : valor === 'banner' ? 'banner' : 'clasico'
 }

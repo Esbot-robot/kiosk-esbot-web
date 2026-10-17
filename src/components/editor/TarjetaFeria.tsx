@@ -1,4 +1,4 @@
-import { colorRayas, FERIA } from '../../lib/disenos'
+import { aclarar, colorContraste, colorRayas, FERIA } from '../../lib/disenos'
 import { FUENTE_FERIA } from '../../lib/disenos'
 import type { BotonEstilo } from '../../types/config'
 
@@ -8,7 +8,43 @@ import type { BotonEstilo } from '../../types/config'
  * más oscuro del mismo color, círculo con el ícono (relleno y contorno
  * editables) y la franja de abajo con el texto.
  */
-export function TarjetaFeria({ estilo, texto }: { estilo: BotonEstilo; texto: string }) {
+export function TarjetaFeria({
+  estilo,
+  texto,
+  plano = false,
+  fondoDefecto = FERIA.botonFondo,
+}: {
+  estilo: BotonEstilo
+  texto: string
+  /** diseño banner: tarjeta lisa, sin borde ni sombra dura ni rayas, con la franja de un tono más oscuro */
+  plano?: boolean
+  fondoDefecto?: string
+}) {
+  if (plano) {
+    const fondo = estilo.color_fondo || fondoDefecto
+    const franja = estilo.color_franja || colorRayas(fondo)
+    return (
+      <div
+        className="flex h-42 min-w-0 flex-1 flex-col overflow-hidden rounded-[28px]"
+        style={{ backgroundColor: fondo, boxShadow: '0 10px 18px rgba(100, 116, 139, 0.32)' }}
+      >
+        {/* zona del ícono: degradado del color de la tarjeta, más claro arriba */}
+        <div
+          className="flex flex-1 items-center justify-center"
+          style={{ backgroundImage: `linear-gradient(180deg, ${aclarar(fondo, 0.22)}, ${fondo})` }}
+        >
+          {/* en el banner el ícono va directo sobre el degradado, sin círculo */}
+          {estilo.icono_url && <img src={estilo.icono_url} alt="" className="h-[52%] max-h-[4.6rem] object-contain" />}
+        </div>
+        <div
+          className="flex h-[2.6rem] shrink-0 items-center truncate px-4 text-base font-bold"
+          style={{ backgroundColor: franja, color: colorContraste(franja) }}
+        >
+          {texto}
+        </div>
+      </div>
+    )
+  }
   const contorno = estilo.color_contorno || FERIA.contorno
   const fondo = estilo.color_fondo || FERIA.botonFondo
   const conRayas = estilo.rayas !== false
