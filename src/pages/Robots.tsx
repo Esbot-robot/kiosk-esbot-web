@@ -354,7 +354,41 @@ function nombreCaritaGuardado(): string {
   }
 }
 
-type TipoOrden = 'actualizar' | 'reiniciar' | 'videollamada' | 'carita' | 'quitar_carita'
+/** Frases que se le han hecho decir al robot (se recuerdan en este navegador para repetirlas) */
+const CLAVE_FRASES = 'kiosk.frasesDecir'
+const MAX_FRASE = 300
+function frasesGuardadas(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(CLAVE_FRASES) || '[]')
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 6) : []
+  } catch {
+    return []
+  }
+}
+function recordarFrase(frase: string): string[] {
+  const lista = [frase, ...frasesGuardadas().filter((f) => f !== frase)].slice(0, 6)
+  try {
+    localStorage.setItem(CLAVE_FRASES, JSON.stringify(lista))
+  } catch {
+    // sin almacenamiento: simplemente no se recuerdan
+  }
+  return lista
+}
+
+/** Cómo se ve el robot al hablar: lo que cada opción activa en la voz de temi */
+type ModoHabla = 'voz' | 'anim' | 'animtxt'
+const MODOS_HABLA: { id: ModoHabla; nombre: string }[] = [
+  { id: 'voz', nombre: 'Solo voz' },
+  { id: 'anim', nombre: 'Con animación' },
+  { id: 'animtxt', nombre: 'Con animación y texto' },
+]
+const IDIOMAS_HABLA = [
+  { id: 'ES_ES', nombre: 'Español' },
+  { id: 'EN_US', nombre: 'Inglés' },
+  { id: 'SYSTEM', nombre: 'Idioma del robot' },
+]
+
+type TipoOrden = 'actualizar' | 'reiniciar' | 'videollamada' | 'carita' | 'quitar_carita' | 'decir'
 
 interface Seguimiento {
   tipo: TipoOrden
@@ -413,7 +447,11 @@ function ControlComandos({
     mutationFn: async (comando: string) => {
       const { data, error } = await supabase.rpc('enviar_comando', { p_serial: robot.serial, p_comando: comando })
       if (error) throw error
-      const tipo: TipoOrden = comando.startsWith('carita:') ? 'carita' : (comando as TipoOrden)
+      const tipo: TipoOrden = comando.startsWith('carita:')
+        ? 'carita'
+        : comando.startsWith('decir:')
+          ? 'decir'
+          : (comando as TipoOrden)
       return { comando: tipo, id: Number(data) }
     },
     onSuccess: ({ comando, id }) => {
@@ -433,7 +471,9 @@ function ControlComandos({
               ? 'Activando la carita…'
               : comando === 'quitar_carita'
                 ? 'Quitando la carita…'
-                : 'Buscando actualización…'
+                : comando === 'decir'
+                  ? 'Enviando el mensaje…'
+                  : 'Buscando actualización…'
       )
     },
     onError: (e) => void avisoError('No se pudo enviar la orden', describirError(e)),
@@ -465,6 +505,11 @@ function ControlComandos({
       void avisoGuardado('App reiniciada')
       return
     }
+    if (seguimiento.tipo === 'decir') {
+      terminar()
+      void avisoGuardado('Mensaje enviado')
+      return
+    }
     if (seguimiento.tipo === 'carita' || seguimiento.tipo === 'quitar_carita') {
       terminar()
       void avisoGuardado(seguimiento.tipo === 'carita' ? 'Carita activada' : 'Carita quitada')
@@ -490,6 +535,12 @@ function ControlComandos({
   // La carita sigue activa mientras la última orden recibida sea "carita:…"
   const caritaActiva = (robot.comando ?? '').startsWith('carita:') && hechoId >= pedidoId
   const [pidiendoCarita, setPidiendoCarita] = useState(false)
+  // "Decir algo": la frase, cómo se ve el robot al hablar y el idioma
+  const [diciendo, setDiciendo] = useState(false)
+  const [frase, setFrase] = useState('')
+  const [modoHabla, setModoHabla] = useState<ModoHabla>('anim')
+  const [idiomaHabla, setIdiomaHabla] = useState('ES_ES')
+  const [recientes, setRecientes] = useState(frasesGuardadas)
   const [nombreCarita, setNombreCarita] = useState(nombreCaritaGuardado)
 
   const claseBoton =
@@ -500,11 +551,11 @@ function ControlComandos({
       <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-500">
         App del robot
         <Ayuda>
-          Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Si sigue diciendo "falta cargar", reinicia la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Mostrar carita: el robot deja de patrullar y repite sin parar la secuencia de la carita de Temi Center, aunque alguien esté muy cerca, hasta que toques Quitar carita. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
+          Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Si sigue diciendo "falta cargar", reinicia la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Mostrar carita: el robot deja de patrullar y repite sin parar la secuencia de la carita de Temi Center, aunque alguien esté muy cerca, hasta que toques Quitar carita. Decir algo: el robot lee la frase que escribas con la voz de Temi; tarda unos segundos en llegar. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
         </Ayuda>
       </p>
       {/* Tres botones del mismo ancho; en tarjeta angosta, uno debajo del otro */}
-      <div className="mt-3 grid grid-cols-1 gap-2 @md:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-2 @md:grid-cols-3">
         <button type="button" disabled={ocupado} onClick={() => enviar.mutate('actualizar')} className={claseBoton}>
           Actualizar config
         </button>
@@ -534,7 +585,96 @@ function ControlComandos({
             Mostrar carita
           </button>
         )}
+        <button type="button" disabled={ocupado} onClick={() => setDiciendo(true)} className={claseBoton}>
+          Decir algo
+        </button>
       </div>
+
+      {diciendo && (
+        <Modal
+          titulo="Decir algo"
+          textoAceptar="Decir"
+          ancho="max-w-[35rem]"
+          aceptarDeshabilitado={!frase.trim()}
+          onCancelar={() => setDiciendo(false)}
+          onAceptar={() => {
+            const texto = frase.trim().slice(0, MAX_FRASE)
+            setRecientes(recordarFrase(texto))
+            enviar.mutate('decir:' + JSON.stringify({ t: texto, m: modoHabla, i: idiomaHabla }))
+            setDiciendo(false)
+          }}
+        >
+          <p className="text-slate-700">
+            <span className="font-semibold">{robot.nombre || 'El robot'}</span> leerá esta frase con la voz de Temi.
+            Llega en unos segundos.
+          </p>
+          <textarea
+            value={frase}
+            maxLength={MAX_FRASE}
+            rows={4}
+            autoFocus
+            onChange={(e) => setFrase(e.target.value.slice(0, MAX_FRASE))}
+            placeholder="Escribe lo que quieres que diga"
+            className="mt-4 w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+          />
+          <p className="mt-1 text-right text-sm text-slate-400">
+            {frase.length} / {MAX_FRASE} caracteres
+          </p>
+
+          {/* Mismo estilo del filtro de estado: etiqueta, valor en negrita y flecha, sin borde */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-2">
+            {(
+              [
+                { etiqueta: 'Al hablar', valor: modoHabla, opciones: MODOS_HABLA, cambiar: (v: string) => setModoHabla(v as ModoHabla) },
+                { etiqueta: 'Idioma', valor: idiomaHabla, opciones: IDIOMAS_HABLA, cambiar: setIdiomaHabla },
+              ] as const
+            ).map((campo) => (
+              <label key={campo.etiqueta} className="relative flex items-center gap-1.5 text-slate-500">
+                {campo.etiqueta} -
+                <select
+                  value={campo.valor}
+                  onChange={(e) => campo.cambiar(e.target.value)}
+                  className="cursor-pointer appearance-none bg-transparent py-1 pr-6 font-semibold text-slate-800 focus:outline-none"
+                >
+                  {campo.opciones.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.nombre}
+                    </option>
+                  ))}
+                </select>
+                <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-0 h-4 w-4 text-slate-600" fill="currentColor" aria-hidden="true">
+                  <path d="M5.5 8h9L10 13z" />
+                </svg>
+              </label>
+            ))}
+          </div>
+
+          {recientes.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-slate-800">Recientes</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {recientes.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFrase(f)}
+                    title={f}
+                    className="max-w-full truncate rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    {f.length > 42 ? `${f.slice(0, 42)}…` : f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!enServicio && (
+            <Advertencia className="mt-4">
+              Este robot no está en línea: lo dirá cuando vuelva a conectarse.
+            </Advertencia>
+          )}
+        </Modal>
+      )}
 
       {pidiendoCarita && (
         <Modal
