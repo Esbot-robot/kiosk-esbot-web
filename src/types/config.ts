@@ -254,6 +254,16 @@ export interface BotonCatalogo {
   color_acento: string
   /** color del texto de esos botones; vacío = blanco o negro, el que se lea mejor sobre el acento */
   color_texto_acento: string
+  /** lo que dice el robot al abrir el catálogo (la vista "Todos") y al elegir "Todos" */
+  tts_entrada: string
+  /** lo que dice al entrar a cada categoría, por nombre de categoría; sin frase = una general con el nombre */
+  tts_categorias: Record<string, string>
+  /** al tocar un producto que no trae descripción: la misma frase para todos */
+  tts_sin_descripcion: string
+  /** al abrir el QR de cotizar: la misma frase para todos los productos */
+  tts_cotizar: string
+  /** al acabarse el tiempo sin tocar la pantalla del catálogo, justo antes de volver a la ruta */
+  tts_despedida: string
   /** nombre del archivo cargado (solo para mostrarlo en el panel) */
   archivo_nombre: string
   productos: ProductoCatalogo[]
@@ -275,6 +285,11 @@ export function botonCatalogoVacio(): BotonCatalogo {
     segundos_qr: 30,
     color_acento: '',
     color_texto_acento: '',
+    tts_entrada: 'Bienvenido a nuestro catálogo. Toca un producto para conocerlo.',
+    tts_categorias: {},
+    tts_sin_descripcion: 'Un excelente producto. Pregúntame si quieres cotizarlo.',
+    tts_cotizar: 'Escanea el código con tu celular y te atenderemos por WhatsApp.',
+    tts_despedida: 'Gracias por visitarnos. Sigo mi recorrido.',
     archivo_nombre: '',
     productos: [],
   }

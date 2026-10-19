@@ -68,3 +68,29 @@ body {
 .cargando-giro {
   animation: cargando-giro 0.9s steps(8) infinite;
 }
+
+/* Popups: las secciones de adentro se separan con una línea gris clara y continua
+   que NO llega de lado a lado (queda con margen a cada lado). Aplica a los hijos
+   directos del contenido del popup cuando van separados con space-y-5 o space-y-6
+   (las secciones); los campos sueltos con espacios menores no llevan línea.
+   La línea se dibuja en la mitad del espacio entre secciones. */
+.popup-secciones > .space-y-5 > :not(:first-child),
+.popup-secciones > .space-y-6 > :not(:first-child) {
+  position: relative;
+}
+.popup-secciones > .space-y-5 > :not(:first-child)::before,
+.popup-secciones > .space-y-6 > :not(:first-child)::before {
+  content: '';
+  position: absolute;
+  left: 1.5rem;
+  right: 1.5rem;
+  height: 1px;
+  background-color: #e2e8f0;
+  pointer-events: none;
+}
+.popup-secciones > .space-y-5 > :not(:first-child)::before {
+  top: -0.625rem;
+}
+.popup-secciones > .space-y-6 > :not(:first-child)::before {
+  top: -0.75rem;
+}

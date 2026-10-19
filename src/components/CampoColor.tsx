@@ -10,6 +10,17 @@ interface CampoColorProps {
   ayuda?: ReactNode
 }
 
+/** Cuadriculado del círculo cuando no hay color elegido (= el de por defecto) */
+const SIN_COLOR = {
+  backgroundImage: 'conic-gradient(#e2e8f0 25%, #ffffff 0 50%, #e2e8f0 0 75%, #ffffff 0)',
+  backgroundSize: '10px 10px',
+}
+
+/**
+ * Etiqueta arriba y debajo, en una sola línea compacta, un círculo con el color
+ * y su código "# RRGGBB". El círculo abre el selector de color del navegador y
+ * el código se puede escribir directamente.
+ */
 export function CampoColor({ label, value, onChange, ayuda }: CampoColorProps) {
   const hexSinNumeral = value.replace('#', '')
 
@@ -19,28 +30,34 @@ export function CampoColor({ label, value, onChange, ayuda }: CampoColorProps) {
   }
 
   return (
-    <div>
-      <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+    <div className="min-w-0">
+      <p className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-500">
         {label}
         {ayuda && <Ayuda>{ayuda}</Ayuda>}
       </p>
       <div className="flex items-center gap-3">
-        <div className="flex flex-1 items-center rounded-lg border border-slate-300 px-4 py-3">
+        <label className="relative h-9 w-9 shrink-0 cursor-pointer" title="Elegir color">
+          <span
+            className="block h-full w-full rounded-full border border-slate-300 shadow-sm"
+            style={value ? { backgroundColor: value } : SIN_COLOR}
+          />
+          <input
+            type="color"
+            value={value || '#ffffff'}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label={label}
+          />
+        </label>
+        <div className="flex min-w-0 flex-1 items-center border-b border-transparent font-mono text-slate-800 transition-colors focus-within:border-indigo-500 hover:border-slate-300">
           <span className="mr-2 text-slate-400">#</span>
           <input
             value={hexSinNumeral}
             onChange={(e) => cambiarDesdeTexto(e.target.value)}
-            placeholder="vacío = por defecto"
-            className="w-full font-mono uppercase focus:outline-none"
+            placeholder="por defecto"
+            className="w-full min-w-0 bg-transparent py-1 uppercase placeholder:font-sans placeholder:normal-case placeholder:text-slate-400 focus:outline-none"
           />
         </div>
-        <input
-          type="color"
-          value={value || '#ffffff'}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-12 w-12 cursor-pointer rounded-lg border border-slate-300"
-          title="Elegir color"
-        />
       </div>
     </div>
   )

@@ -48,9 +48,9 @@ export function Modal({
           {titulo}
           {ayuda && <Ayuda ancho="w-80">{ayuda}</Ayuda>}
         </h3>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-8 md:py-6">
+        <div className="popup-secciones min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-8 md:py-6">
           {soloLectura ? (
-            <fieldset disabled className="min-w-0">
+            <fieldset disabled className="popup-secciones min-w-0">
               {children}
             </fieldset>
           ) : (
