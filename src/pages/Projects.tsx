@@ -1,3 +1,4 @@
+import { Advertencia } from '../components/Advertencia'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -136,21 +137,21 @@ export function Projects() {
           )}
         </div>
         {crearProyecto.error && (
-          <p className="mt-4 text-sm text-red-600">
+          <Advertencia className="mt-4">
             No se pudo crear el proyecto. {describirError(crearProyecto.error)}
-          </p>
+          </Advertencia>
         )}
         {duplicar.error && (
-          <p className="mt-4 text-sm text-red-600">
+          <Advertencia className="mt-4">
             No se pudo duplicar el proyecto. {describirError(duplicar.error)}
-          </p>
+          </Advertencia>
         )}
 
         {isLoading && <Cargando texto="Cargando proyectos…" />}
         {error && (
-          <p className="mt-10 text-red-600">
+          <Advertencia className="mt-10">
             No se pudieron cargar los proyectos. {describirError(error)}
-          </p>
+          </Advertencia>
         )}
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">

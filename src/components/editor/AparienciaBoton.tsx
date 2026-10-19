@@ -1,3 +1,4 @@
+import { Advertencia } from '../Advertencia'
 import { useRef, useState } from 'react'
 import { CampoColor } from '../CampoColor'
 import { Ayuda } from '../Ayuda'
@@ -152,7 +153,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
               e.target.value = ''
             }}
           />
-          {error && <p className="mt-3 text-sm font-medium text-rose-600">{error}</p>}
+          {error && <Advertencia className="mt-3">{error}</Advertencia>}
         </div>
       )}
 

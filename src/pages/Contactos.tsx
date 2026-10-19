@@ -1,3 +1,4 @@
+import { Advertencia } from '../components/Advertencia'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -394,7 +395,7 @@ export function Contactos() {
               <Cargando />
             ) : error ? (
               <div className="p-6">
-                <p className="text-red-600">No se pudieron cargar los contactos. {describirError(error)}</p>
+                <Advertencia>No se pudieron cargar los contactos. {describirError(error)}</Advertencia>
                 <button onClick={() => void refetch()} className="mt-3 text-sm font-semibold text-indigo-600">
                   Reintentar
                 </button>

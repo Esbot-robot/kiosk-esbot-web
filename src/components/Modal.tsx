@@ -1,3 +1,4 @@
+import { Advertencia } from './Advertencia'
 import { Ayuda } from './Ayuda'
 import { useSoloLectura } from '../lib/perfil'
 
@@ -57,7 +58,7 @@ export function Modal({
           )}
         </div>
         <div className="shrink-0 border-t border-slate-100 px-5 pb-5 pt-4 md:px-8 md:pb-8">
-          {aviso && !soloLectura && <div className="mb-3 text-sm font-medium text-rose-600">{aviso}</div>}
+          {aviso && !soloLectura && <Advertencia className="mb-3">{aviso}</Advertencia>}
           <div className="flex justify-end gap-3">
             <button
               onClick={onCancelar}

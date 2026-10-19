@@ -124,7 +124,7 @@ export function DialogRuta({ serial, nombre, ubicacionesMapa, rutaActual, enServ
           <Advertencia>Este robot no está en línea: la ruta se aplicará cuando vuelva a conectarse.</Advertencia>
         )}
         {guardar.error && (
-          <p className="text-sm font-medium text-rose-600">No se pudo guardar la ruta. {describirError(guardar.error)}</p>
+          <Advertencia>No se pudo guardar la ruta. {describirError(guardar.error)}</Advertencia>
         )}
       </div>
     </Modal>

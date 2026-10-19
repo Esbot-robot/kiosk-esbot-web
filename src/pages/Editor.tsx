@@ -461,7 +461,7 @@ export function Editor() {
   if (errorCarga && !config) {
     return (
       <div className="p-12">
-        <p className="font-medium text-red-600">No se pudo cargar el proyecto. {describirError(errorCarga)}</p>
+        <Advertencia>No se pudo cargar el proyecto. {describirError(errorCarga)}</Advertencia>
         <button
           onClick={() => void refetch()}
           className="mt-4 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700"
@@ -1204,9 +1204,9 @@ export function Editor() {
                 {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
               </button>
             </div>
-            {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
+            {errorGuardar && <Advertencia className="mt-2">{errorGuardar}</Advertencia>}
             {guardar.isError && (
-              <p className="mt-2 text-sm text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
+              <Advertencia className="mt-2">No se pudo guardar. {describirError(guardar.error)}</Advertencia>
             )}
           </div>
           )}
@@ -1286,9 +1286,9 @@ export function Editor() {
       {(errorGuardar || guardar.isError) && (
         <div className="fixed bottom-6 left-4 right-24 z-30 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg md:hidden">
           {errorGuardar ? (
-            <p className="text-red-600">{errorGuardar}</p>
+            <Advertencia>{errorGuardar}</Advertencia>
           ) : (
-            <p className="text-red-600">No se pudo guardar. {describirError(guardar.error)}</p>
+            <Advertencia>No se pudo guardar. {describirError(guardar.error)}</Advertencia>
           )}
         </div>
       )}
@@ -1344,7 +1344,7 @@ export function Editor() {
           )}
 
           {borrar.isError && (
-            <p className="mt-3 text-sm text-red-600">No se pudo eliminar. {describirError(borrar.error)}</p>
+            <Advertencia className="mt-3">No se pudo eliminar. {describirError(borrar.error)}</Advertencia>
           )}
         </Modal>
       )}
