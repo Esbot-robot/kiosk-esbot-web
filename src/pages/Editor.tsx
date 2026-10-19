@@ -5,13 +5,14 @@ import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, nombreDesdeUrl, publicarConfigRobot } from '../lib/storage'
 import { avisoError, avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
-import { botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
+import { botonCatalogoVacio, botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonCatalogo, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
 import { DialogBotonAdicional } from '../components/editor/DialogBotonAdicional'
 import { DialogFoto } from '../components/editor/DialogFoto'
 import { DialogRegistro } from '../components/editor/DialogRegistro'
+import { DialogCatalogo } from '../components/editor/DialogCatalogo'
 import { describirError } from '../lib/errores'
 import { IconoGuardar, IconoLapiz, IconoMas, IconoOnda, IconoPlay, IconoVolumen } from '../components/iconos'
 import { Cargando } from '../components/Cargando'
@@ -30,6 +31,7 @@ type Dialogo =
   | { tipo: 'boton-adicional'; index: number }
   | { tipo: 'boton-foto' }
   | { tipo: 'boton-registro' }
+  | { tipo: 'boton-catalogo' }
   | { tipo: 'logo' }
   | { tipo: 'tts-inicial'; campo: CampoTtsInicial; titulo: string }
   | { tipo: 'tts-ruleta'; campo: CampoTtsRuleta; titulo: string }
@@ -348,6 +350,17 @@ export function Editor() {
             formulario: { ...registroBase.formulario, ...registroGuardado.formulario },
           }
         : registroBase
+      // Proyectos anteriores no tenían el catálogo: se agrega desactivado y vacío.
+      const catalogoBase = botonCatalogoVacio()
+      const catalogoGuardado = inicialAnterior.boton_catalogo
+      cfg.pantalla_inicial.boton_catalogo = catalogoGuardado
+        ? {
+            ...catalogoBase,
+            ...catalogoGuardado,
+            boton: { ...catalogoBase.boton, ...catalogoGuardado.boton },
+            productos: catalogoGuardado.productos ?? [],
+          }
+        : catalogoBase
       setConfig(cfg)
       setGuardadoJson(JSON.stringify({ nombre: proyecto.nombre, config: cfg }))
     }
@@ -480,6 +493,7 @@ export function Editor() {
   const botonesAdicionales = ini.botones_adicionales ?? botonesAdicionalesVacios()
   const botonFoto = ini.boton_foto ?? botonFotoVacio()
   const botonRegistro = ini.boton_registro ?? botonRegistroVacio()
+  const botonCatalogo = ini.boton_catalogo ?? botonCatalogoVacio()
   const botonJugarActivo = ini.boton_activo ?? true
   const feria = disenoDe(ini.diseno) === 'feria'
   const banner = disenoDe(ini.diseno) === 'banner'
@@ -525,6 +539,16 @@ export function Editor() {
           },
         ]
       : []),
+    ...(botonCatalogo.activo
+      ? [
+          {
+            id: 'catalogo',
+            estilo: botonCatalogo.boton,
+            textoDefecto: 'CATÁLOGO',
+            editar: () => setDialogo({ tipo: 'boton-catalogo' } as const),
+          },
+        ]
+      : []),
   ]
 
   // Banner: el panel ocupa más alto cuando algún botón es tarjeta (igual que en el robot)
@@ -548,6 +572,10 @@ export function Editor() {
 
   function setBotonRegistro(boton_registro: BotonRegistro) {
     setInicial({ boton_registro })
+  }
+
+  function setBotonCatalogo(boton_catalogo: BotonCatalogo) {
+    setInicial({ boton_catalogo })
   }
 
   function guardarPregunta(index: number | null, pregunta: Pregunta) {
@@ -595,15 +623,21 @@ export function Editor() {
       setErrorGuardar('Completa el marco de la promo y el texto del botón "Tomar foto".')
       return
     }
+    if (botonCatalogo.activo && botonCatalogo.productos.length === 0) {
+      setPestana('inicial')
+      setErrorGuardar('Carga el archivo con los productos del botón de catálogo.')
+      return
+    }
     // Sin ningún botón activo, el visitante toca la pantalla y no tiene qué hacer
     const hayAlgunBoton =
       botonJugarActivo ||
       botonFoto.activo ||
       botonRegistro.activo ||
+      botonCatalogo.activo ||
       botonesAdicionales.some((boton) => boton.activo)
     if (!hayAlgunBoton) {
       setPestana('inicial')
-      setErrorGuardar('Deja al menos un botón activo: Jugar, uno adicional, el de tomar foto o el de registro.')
+      setErrorGuardar('Deja al menos un botón activo: Jugar, uno adicional, el de tomar foto, el de registro o el de catálogo.')
       return
     }
     setErrorGuardar('')
@@ -1088,6 +1122,18 @@ export function Editor() {
                   detalle={botonRegistro.activo ? 'Muestra un QR al formulario de registro' : 'Desactivado'}
                   onClick={() => setDialogo({ tipo: 'boton-registro' })}
                 />
+                <ItemPanel
+                  icono={<IconoPlay />}
+                  label={botonCatalogo.boton.texto || 'Botón de catálogo'}
+                  detalle={
+                    !botonCatalogo.activo
+                      ? 'Desactivado'
+                      : botonCatalogo.productos.length > 0
+                        ? `${botonCatalogo.productos.length} productos`
+                        : 'Falta cargar el archivo de productos'
+                  }
+                  onClick={() => setDialogo({ tipo: 'boton-catalogo' })}
+                />
               </div>
             ) : (
               <div>
@@ -1403,6 +1449,14 @@ export function Editor() {
           valor={botonRegistro}
           projectId={projectId!}
           onGuardar={setBotonRegistro}
+          onCerrar={() => setDialogo(null)}
+        />
+      )}
+      {dialogo?.tipo === 'boton-catalogo' && (
+        <DialogCatalogo
+          valor={botonCatalogo}
+          projectId={projectId!}
+          onGuardar={setBotonCatalogo}
           onCerrar={() => setDialogo(null)}
         />
       )}

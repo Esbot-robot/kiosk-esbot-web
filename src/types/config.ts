@@ -216,6 +216,70 @@ export function botonFotoVacio(): BotonFoto {
   }
 }
 
+/** Un producto del catálogo (una fila válida del CSV) */
+export interface ProductoCatalogo {
+  nombre: string
+  /** pesos colombianos, entero; 0 = Agotado */
+  precio: number
+  /** null = columna vacía (disponible); 0 = Agotado */
+  stock: number | null
+  /** enlace directo a la imagen; vacío = ícono de "sin imagen" */
+  imagen_url: string
+  /** si es mayor que el precio se muestra tachado; null = sin precio anterior */
+  precio_anterior: number | null
+  /** lo que lee el robot al tocar la tarjeta; vacío = no dice nada */
+  descripcion: string
+  /** etiqueta de la tarjeta y filtro; vacío = solo aparece en "Todos" */
+  categoria: string
+}
+
+/**
+ * Botón "Catálogo" de la pantalla inicial: abre una cuadrícula de productos
+ * cargada desde un CSV. Los productos viajan dentro de la config del proyecto.
+ */
+export interface BotonCatalogo {
+  activo: boolean
+  boton: BotonEstilo
+  /** segundos sin tocar la pantalla antes de volver a la ruta */
+  segundos_inactividad: number
+  /** muestra "Cotizar" en cada producto: un QR que abre WhatsApp con el producto */
+  cotizar_activo: boolean
+  /** solo dígitos, con indicativo de país. Ej: 573108676490 */
+  whatsapp_numero: string
+  /** {producto} y {precio} se reemplazan por los del producto elegido */
+  whatsapp_mensaje: string
+  /** segundos que el QR queda en pantalla */
+  segundos_qr: number
+  /** color del botón "Cotizar" y del filtro de categoría seleccionado; vacío = los de siempre */
+  color_acento: string
+  /** color del texto de esos botones; vacío = blanco o negro, el que se lea mejor sobre el acento */
+  color_texto_acento: string
+  /** nombre del archivo cargado (solo para mostrarlo en el panel) */
+  archivo_nombre: string
+  productos: ProductoCatalogo[]
+}
+
+export const CATALOGO_INACTIVIDAD_MIN = 10
+export const CATALOGO_INACTIVIDAD_MAX = 120
+export const CATALOGO_QR_MIN = 5
+export const CATALOGO_QR_MAX = 120
+
+export function botonCatalogoVacio(): BotonCatalogo {
+  return {
+    activo: false,
+    boton: { texto: 'CATÁLOGO', color_texto: '', color_fondo: '', color_contorno: '', forma: 'pildora', imagen_url: '' },
+    segundos_inactividad: 30,
+    cotizar_activo: false,
+    whatsapp_numero: '',
+    whatsapp_mensaje: 'Hola, quiero cotizar este producto: {producto} ({precio}).',
+    segundos_qr: 30,
+    color_acento: '',
+    color_texto_acento: '',
+    archivo_nombre: '',
+    productos: [],
+  }
+}
+
 export interface PantallaInicial {
   /** diseño (plantilla) de la pantalla; sin valor = 'clasico'. Apps viejas lo ignoran. */
   diseno?: 'clasico' | 'feria' | 'banner'
@@ -240,6 +304,8 @@ export interface PantallaInicial {
   boton_foto: BotonFoto
   /** registro de contactos por QR; opcional en proyectos anteriores */
   boton_registro: BotonRegistro
+  /** catálogo de productos por CSV; opcional en proyectos anteriores */
+  boton_catalogo?: BotonCatalogo
   tts_toca_pantalla: string
   tts_llega_stand: string
   tts_despedida_stand: string
@@ -362,6 +428,7 @@ export function configVacia(): EventConfig {
       botones_adicionales: botonesAdicionalesVacios(),
       boton_foto: botonFotoVacio(),
       boton_registro: botonRegistroVacio(),
+      boton_catalogo: botonCatalogoVacio(),
       tts_toca_pantalla: '',
       tts_llega_stand: '',
       tts_despedida_stand: '',
