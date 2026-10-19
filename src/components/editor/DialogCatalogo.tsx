@@ -12,6 +12,7 @@ import {
   descargarPlantilla,
   estaAgotado,
   formatearPesos,
+  porcentajeDescuento,
   PRODUCTOS_AVISO,
   type ResultadoCsv,
 } from '../../lib/catalogo'
@@ -37,6 +38,8 @@ const MAX_WA_MENSAJE = 300
 /** colores de siempre del botón Cotizar (verde) y del filtro seleccionado (oscuro) */
 const COTIZAR_DEFECTO = '#059669'
 const CHIP_DEFECTO = '#0F172A'
+/** rojo de la cinta de descuento cuando no hay color de marca */
+const CINTA_DEFECTO = '#EF5350'
 /** filas de omitidas y advertencias que se listan antes de decir "y N más" */
 const MAX_LISTADAS = 8
 
@@ -148,6 +151,9 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
   const fondoChip = catalogo.color_acento || CHIP_DEFECTO
   const textoCotizar = catalogo.color_texto_acento || colorTextoSobre(fondoCotizar)
   const textoChip = catalogo.color_texto_acento || colorTextoSobre(fondoChip)
+  const fondoCinta = catalogo.color_acento || CINTA_DEFECTO
+  const textoCinta = catalogo.color_texto_acento || colorTextoSobre(fondoCinta)
+  const conDescuento = catalogo.productos.filter((p) => porcentajeDescuento(p) !== null).length
 
   /** Título, texto actual y cómo se guarda la frase que se está editando */
   function datosEditorTts(editor: EditorTts) {
@@ -385,6 +391,22 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
                     </div>
                   </div>
 
+                  {/* Cinta del porcentaje de descuento */}
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={catalogo.mostrar_descuento}
+                      onChange={(e) => cambiar({ mostrar_descuento: e.target.checked })}
+                      className="h-3.5 w-3.5 accent-indigo-600"
+                    />
+                    Mostrar el porcentaje de descuento ({conDescuento} {conDescuento === 1 ? 'producto' : 'productos'} con
+                    descuento)
+                    <Ayuda>
+                      Una cinta en la esquina de la imagen con el porcentaje que baja el precio frente al precio anterior.
+                      Se calcula sola y no sale en productos agotados ni sin precio anterior mayor.
+                    </Ayuda>
+                  </label>
+
                   {/* Vista previa: las primeras tarjetas, como las verá el visitante */}
                   <div>
                     <p className="mb-2 text-xs font-medium text-slate-800">Vista previa</p>
@@ -414,6 +436,11 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
                             cotizar={catalogo.cotizar_activo}
                             fondoCotizar={fondoCotizar}
                             textoCotizar={textoCotizar}
+                            cinta={
+                              catalogo.mostrar_descuento && !estaAgotado(p) && porcentajeDescuento(p) !== null
+                                ? { texto: `-${porcentajeDescuento(p)}%`, fondo: fondoCinta, color: textoCinta }
+                                : null
+                            }
                           />
                         ))}
                       </div>
@@ -588,16 +615,31 @@ function TarjetaMini({
   cotizar,
   fondoCotizar,
   textoCotizar,
+  cinta,
 }: {
   producto: ProductoCatalogo
   cotizar: boolean
   fondoCotizar: string
   textoCotizar: string
+  cinta: { texto: string; fondo: string; color: string } | null
 }) {
   const agotado = estaAgotado(producto)
   return (
     <div className="overflow-hidden rounded-md bg-white shadow-sm">
-      <div className="aspect-square bg-slate-100">
+      <div className="relative aspect-square overflow-hidden bg-slate-100">
+        {cinta && (
+          <div
+            className="absolute right-0 top-0 h-9 w-9"
+            style={{ backgroundColor: cinta.fondo, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
+          >
+            <span
+              className="absolute text-center text-[8px] font-bold leading-none"
+              style={{ right: -3, top: 9, width: 28, color: cinta.color, transform: 'rotate(45deg)' }}
+            >
+              {cinta.texto}
+            </span>
+          </div>
+        )}
         {producto.imagen_url ? (
           <img
             src={producto.imagen_url}

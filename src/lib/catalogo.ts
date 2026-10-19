@@ -354,6 +354,13 @@ export function descargarPlantilla() {
   URL.revokeObjectURL(enlace.href)
 }
 
+/** Porcentaje de descuento entero (1 a 99) entre el precio anterior y el precio; null si no hay descuento */
+export function porcentajeDescuento(p: ProductoCatalogo): number | null {
+  if (!p.precio_anterior || p.precio <= 0 || p.precio_anterior <= p.precio) return null
+  const pct = Math.round(((p.precio_anterior - p.precio) * 100) / p.precio_anterior)
+  return pct >= 1 ? Math.min(pct, 99) : null
+}
+
 /** Agotado: precio 0 o stock 0 */
 export function estaAgotado(p: ProductoCatalogo): boolean {
   return p.precio === 0 || p.stock === 0

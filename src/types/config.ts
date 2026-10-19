@@ -250,6 +250,8 @@ export interface BotonCatalogo {
   whatsapp_mensaje: string
   /** segundos que el QR queda en pantalla */
   segundos_qr: number
+  /** cinta con el porcentaje de descuento en la esquina de la imagen (sale de precio y precio anterior) */
+  mostrar_descuento: boolean
   /** color del botón "Cotizar" y del filtro de categoría seleccionado; vacío = los de siempre */
   color_acento: string
   /** color del texto de esos botones; vacío = blanco o negro, el que se lea mejor sobre el acento */
@@ -283,6 +285,7 @@ export function botonCatalogoVacio(): BotonCatalogo {
     whatsapp_numero: '',
     whatsapp_mensaje: 'Hola, quiero cotizar este producto: {producto} ({precio}).',
     segundos_qr: 30,
+    mostrar_descuento: true,
     color_acento: '',
     color_texto_acento: '',
     tts_entrada: 'Bienvenido a nuestro catálogo. Toca un producto para conocerlo.',
