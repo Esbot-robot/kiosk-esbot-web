@@ -7,6 +7,7 @@ import { avisoCargando, avisoConfirmar, avisoError, avisoGuardado, cerrarAviso }
 import { nombreRol, usePerfil, type Rol } from '../lib/perfil'
 import { Modal } from '../components/Modal'
 import { Cargando } from '../components/Cargando'
+import { usePresencia } from '../lib/presencia'
 
 /** Fila que devuelve la función listar_usuarios (ver supabase/roles.sql) */
 interface Usuario {
@@ -46,10 +47,13 @@ async function llamarUsuarios<T = { ok: true }>(cuerpo: Record<string, unknown>)
   return data as T
 }
 
-/** El panel avisa cada 10 s: sin aviso en 20 s, la persona ya no está */
-const EN_LINEA_MS = 20_000
+/**
+ * Respaldo si el canal en vivo no está disponible: el panel avisa a la base cada minuto
+ * mientras se ve, así que sin aviso en 90 s la persona ya no está.
+ */
+const EN_LINEA_MS = 90_000
 
-function enLinea(u: Usuario, ahora: number): boolean {
+function enLineaPorBase(u: Usuario, ahora: number): boolean {
   return u.visto_at !== null && ahora - new Date(u.visto_at).getTime() < EN_LINEA_MS
 }
 
@@ -95,6 +99,18 @@ export function Usuarios() {
     const id = setInterval(() => setAhora(Date.now()), 5_000)
     return () => clearInterval(id)
   }, [])
+
+  // En vivo: quién tiene el panel abierto y a la vista (cambia al instante)
+  const presencia = usePresencia()
+  const enLinea = (u: Usuario) =>
+    presencia.lista ? presencia.conectados.has(u.user_id) : enLineaPorBase(u, ahora)
+  /** La hora más reciente entre el dato de la base y la salida que se vio en vivo */
+  const ultimaVez = (u: Usuario): string | null => {
+    const salida = presencia.salidas.get(u.user_id)
+    const base = u.visto_at ?? u.ultimo_ingreso
+    if (salida === undefined) return base
+    return !base || salida > new Date(base).getTime() ? new Date(salida).toISOString() : base
+  }
 
   const { data: usuarios, isLoading, error, refetch } = useQuery({
     queryKey: ['usuarios'],
@@ -229,7 +245,7 @@ export function Usuarios() {
                       </td>
                       <td className="px-4 py-3 text-slate-700">{nombreRol(u.rol)}</td>
                       <td className="px-4 py-3">
-                        {enLinea(u, ahora) ? (
+                        {enLinea(u) ? (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                             Activo
                           </span>
@@ -240,7 +256,7 @@ export function Usuarios() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                        {enLinea(u, ahora) ? 'Ahora' : haceCuanto(u.visto_at ?? u.ultimo_ingreso)}
+                        {enLinea(u) ? 'Ahora' : haceCuanto(ultimaVez(u))}
                       </td>
                       <td className="px-4 py-3">
                         <MenuAcciones

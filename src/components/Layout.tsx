@@ -11,6 +11,7 @@ import { AvisoSinConexion } from './AvisoSinConexion'
 import { configVacia } from '../types/config'
 import { describirError } from '../lib/errores'
 import { avisoError } from '../lib/alertas'
+import { iniciarPresencia } from '../lib/presencia'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 px-6 py-3 text-base transition-colors ${
@@ -93,22 +94,29 @@ export function Layout() {
     onError: (e) => void avisoError('No se pudo crear el proyecto', describirError(e)),
   })
 
-  // "En línea": cada 10 s el panel avisa que sigue abierto (página Usuarios).
-  // La pestaña de "Entrar como" no avisa: sería el superadmin, no el cliente.
+  // "En línea" (página Usuarios): al instante, por Presence (quién tiene el panel abierto y a la vista)
+  // y "la última vez" en la base (marcar_visto): al entrar, cada minuto mientras se ve y al irse
+  // de la pestaña o cerrarla. La pestaña de "Entrar como" no avisa: sería el superadmin, no el cliente.
   useEffect(() => {
     if (sesionPrestada) return
+    const dejarPresencia = iniciarPresencia(perfil.user_id)
     const avisar = () => {
       // .then(): las consultas de supabase-js solo se envían al esperar su respuesta
-      if (document.visibilityState === 'visible') void supabase.rpc('marcar_visto').then(() => undefined)
+      void supabase.rpc('marcar_visto').then(() => undefined)
     }
     avisar()
-    const id = setInterval(avisar, 10_000)
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') avisar()
+    }, 60_000)
     document.addEventListener('visibilitychange', avisar)
+    window.addEventListener('pagehide', avisar)
     return () => {
       clearInterval(id)
       document.removeEventListener('visibilitychange', avisar)
+      window.removeEventListener('pagehide', avisar)
+      dejarPresencia()
     }
-  }, [])
+  }, [perfil.user_id])
 
   // Esc cierra el menú (solo se escucha mientras está abierto)
   useEffect(() => {
