@@ -6,6 +6,7 @@ import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/al
 import { Modal } from '../components/Modal'
 import { Ayuda } from '../components/Ayuda'
 import { DialogRuta } from '../components/DialogRuta'
+import { DialogDetener, FRASE_QUIETO_SEG_DEFECTO, type ModoQuieto } from '../components/DialogDetener'
 import robotBlanco from '../assets/icons/blanco_robot.webp'
 import robotNegro from '../assets/icons/negro_robot.webp'
 import { Cargando } from '../components/Cargando'
@@ -27,6 +28,13 @@ interface RobotStatus {
   quieto?: boolean
   /** lo que el robot tiene aplicado, según su último latido */
   quieto_confirmado?: boolean
+  /** quieto sin video: pantalla inicial fija, con una frase cada cierto tiempo */
+  quieto_sin_video?: boolean
+  quieto_frase?: string | null
+  quieto_frase_seg?: number | null
+  /** número de la última orden de quieto y de la última que el robot aplicó */
+  quieto_orden?: number | null
+  quieto_orden_hecha?: number | null
   /** versión de la config que el robot tiene aplicada; null en apps anteriores */
   version_config?: number | null
   /** ubicaciones del mapa del robot; null si su app aún no las envía */
@@ -780,14 +788,26 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
   const queryClient = useQueryClient()
   const [editando, setEditando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const [editandoFrase, setEditandoFrase] = useState(false)
   const ruta = robot.ruta ?? []
   const pedido = robot.quieto ?? false
   const aplicado = robot.quieto_confirmado ?? false
   const enCamino = enServicio && pedido !== aplicado
+  const sinVideo = pedido && (robot.quieto_sin_video ?? false)
+  const frase = robot.quieto_frase ?? ''
+  const fraseSeg = robot.quieto_frase_seg ?? FRASE_QUIETO_SEG_DEFECTO
+  // El robot aplica los cambios de frase y tiempo en su siguiente latido
+  const aplicandoCambios = enServicio && pedido && (robot.quieto_orden ?? 0) !== (robot.quieto_orden_hecha ?? 0)
 
   const cambiar = useMutation({
-    mutationFn: async (quieto: boolean) => {
-      const { error } = await supabase.rpc('fijar_quieto', { p_serial: robot.serial, p_quieto: quieto })
+    mutationFn: async (modo: { quieto: boolean } & Partial<ModoQuieto>) => {
+      const { error } = await supabase.rpc('fijar_quieto_modo', {
+        p_serial: robot.serial,
+        p_quieto: modo.quieto,
+        p_sin_video: modo.sinVideo ?? false,
+        p_frase: modo.frase ?? '',
+        p_seg: modo.segundos ?? FRASE_QUIETO_SEG_DEFECTO,
+      })
       if (error) throw error
     },
     // refresca ya, sin esperar los 2 s del intervalo
@@ -799,20 +819,26 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
     <div className="border-t border-slate-100 px-5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* "Ruta: A → B → C" en la misma fila que los botones */}
-        <p className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-          <span className="shrink-0 font-semibold text-slate-900">Ruta:</span>
-          <span
-            className={`truncate ${ruta.length ? 'text-slate-700' : 'text-slate-400'}`}
-            title={ruta.length ? ruta.join(' → ') : undefined}
-          >
-            {ruta.length ? ruta.join(' → ') : 'Sin ruta guardada'}
-          </span>
-          <Ayuda>
-            Ubicaciones que el robot recorre en orden. Se puede cambiar aquí o en el admin del robot, y los dos lados ven el último cambio guardado. El robot la guarda en su memoria: sin internet sigue patrullando con la última que recibió. Detener recorrido lo deja quieto en su lugar; lo demás sigue funcionando.
-          </Ayuda>
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="shrink-0 font-semibold text-slate-900">Ruta:</span>
+            <span
+              className={`truncate ${ruta.length ? 'text-slate-700' : 'text-slate-400'}`}
+              title={ruta.length ? ruta.join(' → ') : undefined}
+            >
+              {ruta.length ? ruta.join(' → ') : 'Sin ruta guardada'}
+            </span>
+            <Ayuda>
+              Ubicaciones que el robot recorre en orden. Se puede cambiar aquí o en el admin del robot, y los dos lados ven el último cambio guardado. El robot la guarda en su memoria: sin internet sigue patrullando con la última que recibió. Detener recorrido lo deja quieto en su lugar; con "Sin video" queda en la pantalla inicial fija y puede decir una frase cada cierto tiempo.
+            </Ayuda>
+          </p>
+        </div>
         {/* En tarjeta angosta los dos botones ocupan la fila, mitad y mitad */}
-        <div className="grid w-full shrink-0 grid-cols-2 gap-2 @lg:flex @lg:w-auto">
+        <div
+          className={`grid w-full shrink-0 items-center gap-2 @lg:flex @lg:w-auto ${
+            pedido ? 'grid-cols-[1fr_1fr_auto]' : 'grid-cols-2'
+          }`}
+        >
           <button
             type="button"
             onClick={() => setEditando(true)}
@@ -824,7 +850,7 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
             <button
               type="button"
               disabled={cambiar.isPending || enCamino}
-              onClick={() => cambiar.mutate(false)}
+              onClick={() => cambiar.mutate({ quieto: false })}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               {enCamino ? 'Deteniendo…' : 'Reanudar recorrido'}
@@ -834,9 +860,25 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
               type="button"
               disabled={cambiar.isPending || enCamino}
               onClick={() => setConfirmando(true)}
-              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
+              className="rounded-lg bg-[#2A4470] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#223a60] disabled:opacity-50"
             >
               {enCamino ? 'Reanudando…' : 'Detener recorrido'}
+            </button>
+          )}
+          {/* El lápiz está siempre que el robot esté quieto: desde ahí se enciende o apaga "Sin video" */}
+          {pedido && (
+            <button
+              type="button"
+              onClick={() => setEditandoFrase(true)}
+              title={aplicandoCambios ? 'Editar el modo quieto (aplicando cambios…)' : 'Editar el modo quieto (con o sin video)'}
+              aria-label="Editar el modo quieto"
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1d293d] text-white shadow-sm transition-opacity hover:opacity-85 ${
+                aplicandoCambios ? 'animate-pulse' : ''
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+              </svg>
             </button>
           )}
         </div>
@@ -854,24 +896,31 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
       )}
 
       {confirmando && (
-        <Modal
-          titulo="¿Detener el recorrido?"
-          textoAceptar="Sí, detener"
-          onCancelar={() => setConfirmando(false)}
-          onAceptar={() => {
-            cambiar.mutate(true)
+        <DialogDetener
+          nombreRobot={robot.nombre || 'El robot'}
+          enServicio={enServicio}
+          editando={false}
+          inicial={{ sinVideo: false, frase: '', segundos: FRASE_QUIETO_SEG_DEFECTO }}
+          onCerrar={() => setConfirmando(false)}
+          onAceptar={(modo) => {
+            cambiar.mutate({ quieto: true, ...modo })
             setConfirmando(false)
           }}
-        >
-          <p className="text-slate-700">
-            <span className="font-semibold">{robot.nombre || 'El robot'}</span> dejará de desplazarse y permanecerá en su lugar actual. Todo lo demás seguirá funcionando con normalidad.
-          </p>
-          {!enServicio && (
-            <Advertencia className="mt-3">
-              Este robot no está en línea: la orden se aplicará cuando vuelva a conectarse.
-            </Advertencia>
-          )}
-        </Modal>
+        />
+      )}
+
+      {editandoFrase && (
+        <DialogDetener
+          nombreRobot={robot.nombre || 'El robot'}
+          enServicio={enServicio}
+          editando
+          inicial={{ sinVideo, frase, segundos: fraseSeg }}
+          onCerrar={() => setEditandoFrase(false)}
+          onAceptar={(modo) => {
+            cambiar.mutate({ quieto: true, ...modo })
+            setEditandoFrase(false)
+          }}
+        />
       )}
     </div>
   )
