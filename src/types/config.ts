@@ -219,7 +219,7 @@ export function botonFotoVacio(): BotonFoto {
 /** Un producto del catálogo (una fila válida del CSV) */
 export interface ProductoCatalogo {
   nombre: string
-  /** pesos colombianos, entero; 0 = Agotado */
+  /** pesos colombianos, con centavos si los trae (94790.41); 0 = Agotado */
   precio: number
   /** null = columna vacía (disponible); 0 = Agotado */
   stock: number | null

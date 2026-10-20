@@ -120,9 +120,11 @@ export function parsearCsv(texto: string): string[][] {
 }
 
 /**
- * Número entero de pesos. Acepta "$ 12.500", "12,500", "12500", "12500.00".
- * Un punto o coma seguido de exactamente tres cifras es separador de miles; en
- * cualquier otro caso se toma como decimal y se redondea (con aviso).
+ * Valor en pesos, con centavos si los trae. Acepta "$ 12.500", "12,500", "12500",
+ * "94,790.41" (formato inglés), "94.790,41" (formato colombiano) y "12500.00".
+ * Con los dos separadores, el último es el decimal. Con uno solo, un punto o coma
+ * seguido de exactamente tres cifras es separador de miles; en cualquier otro caso
+ * es decimal. Los centavos se conservan (hasta 2 decimales).
  */
 export function leerPesos(bruto: string): { valor: number | null; nota?: string } {
   let t = bruto.replace(/cop/gi, '').replace(/[$\s]/g, '')
@@ -145,17 +147,20 @@ export function leerPesos(bruto: string): { valor: number | null; nota?: string 
     if (despues.length === 3 && antes.length >= 1) t = antes + despues
     else {
       t = `${antes}.${despues}`
-      // "12500.00" es un entero normal; solo se avisa cuando de verdad había decimales
-      if (!Number.isInteger(Number(t))) nota = `se leyó "${bruto.trim()}" como ${Math.round(Number(t))}`
+      // más de 2 decimales no son centavos: se redondea y se avisa
+      if (despues.length > 2) nota = `se leyó "${bruto.trim()}" como ${(Math.round(Number(t) * 100) / 100).toFixed(2)}`
     }
   }
   const numero = Number(t)
   if (!Number.isFinite(numero) || numero < 0) return { valor: null }
-  return { valor: Math.round(numero), nota }
+  return { valor: Math.round(numero * 100) / 100, nota }
 }
 
+/** $94.790,41 con centavos; $289.000 si son cero (formato colombiano) */
 export function formatearPesos(valor: number): string {
-  return `$${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(valor)}`
+  const conCentavos = Math.round(valor * 100) % 100 !== 0
+  const digitos = conCentavos ? 2 : 0
+  return `$${new Intl.NumberFormat('es-CO', { minimumFractionDigits: digitos, maximumFractionDigits: digitos }).format(valor)}`
 }
 
 function limpiarTexto(valor: string | undefined): string {
@@ -354,10 +359,14 @@ export function descargarPlantilla() {
   URL.revokeObjectURL(enlace.href)
 }
 
-/** Porcentaje de descuento entero (1 a 99) entre el precio anterior y el precio; null si no hay descuento */
+/**
+ * Porcentaje de descuento entero (1 a 99) entre el precio anterior y el precio; null si no hay descuento.
+ * Se trunca y no se redondea (13,8 % es 13 %): así coincide con las tiendas en línea y nunca se anuncia
+ * más descuento del real. Igual que EventConfig.kt en la app.
+ */
 export function porcentajeDescuento(p: ProductoCatalogo): number | null {
   if (!p.precio_anterior || p.precio <= 0 || p.precio_anterior <= p.precio) return null
-  const pct = Math.round(((p.precio_anterior - p.precio) * 100) / p.precio_anterior)
+  const pct = Math.floor(((p.precio_anterior - p.precio) * 100) / p.precio_anterior)
   return pct >= 1 ? Math.min(pct, 99) : null
 }
 
