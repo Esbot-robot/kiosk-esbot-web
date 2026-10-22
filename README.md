@@ -37,9 +37,9 @@ Panel (este repo) ──sesión de usuario──▶ Supabase
                                           ├─ Postgres  projects, robots, robot_status, events,
                                           │            contactos, fotos, perfiles, actividad,
                                           │            robot_tokens …  (todo con RLS)
-                                          ├─ Storage   media/  configs/{serial}.json  fotos/
+                                          ├─ Storage   media/  configs/{serial}.json  fotos/  apks/ (privado)
                                           ├─ Realtime  quién está en línea (canal privado)
-                                          └─ Edge      usuarios · limpiar-fotos · azure-token
+                                          └─ Edge      usuarios · limpiar-fotos · azure-token · apk-descarga
                                                 │
 App del robot ◀── config pública ──────────────┘   (configs/{serial}.json, cacheada: funciona sin internet)
 App del robot ──── token del robot ───────────────▶ funciones latido / registrar_evento / azure-token
@@ -73,7 +73,9 @@ no es la protección, lo es la RLS.
   CSV y PDF), *Proyectos*, *Robots*, *Videollamadas* y *Almacenamiento*.
 - **Robots**: estado en vivo, batería, versión de la config, ruta, modo quieto,
   órdenes (actualizar config, reiniciar app, videollamada, carita, decir algo) y
-  **vínculo** (vincular, volver a vincular, revocar, agregar robot por serial).
+  **vínculo** (vincular, volver a vincular, revocar, agregar robot por serial) y
+  **actualización remota de la app**: versión instalada de cada robot, *Versiones de la
+  app* (subir y eliminar APK, solo super administrador) y *Actualizar app* por robot.
 - **Contactos**: registros que dejan los visitantes por el formulario del QR.
 - **Usuarios**: crear, editar y eliminar usuarios, quién está en línea y «Entrar como».
 - **Ajustes** (menú del perfil): cambiar el propio nombre.
@@ -120,6 +122,7 @@ public/_redirects   reenvío a index.html (aplicación de una sola página)
    | 10 | `cerrar_lectura_publica.sql` | Cierra la lectura anónima de `projects` y `robots` |
    | 11 | `limpieza_fotos.sql` | Borrado diario de fotos vencidas (requiere la función `limpiar-fotos` desplegada) |
    | 12 | `token_robot.sql`, `token_robot_alta.sql` | Token por robot y alta manual |
+   | 12b | `ota_app.sql` | Actualización remota: bucket privado `apks`, versiones, versión instalada y orden `actualizar_app` (requiere `token_robot.sql` y `decir.sql`) |
    | 13 | `token_robot_cerrar.sql` | **Cierre**: quita el acceso anónimo directo de los robots. Solo con todos los robots vinculados. |
 
    `roles_smartbooks.sql` es una asignación de datos puntual: no forma parte de una
@@ -137,6 +140,7 @@ Se despliegan desde esta carpeta con la CLI de Supabase (`npx supabase login` y
 npx supabase functions deploy usuarios
 npx supabase functions deploy limpiar-fotos --no-verify-jwt
 npx supabase functions deploy azure-token --no-verify-jwt
+npx supabase functions deploy apk-descarga --no-verify-jwt
 ```
 
 `azure-token` entrega a los robots vinculados un token temporal de Azure Speech,
@@ -190,6 +194,11 @@ Antes de abrir un PR deben pasar `npm run lint` y `npm run build`.
   uso, 5 intentos). La base solo guarda la huella del token. El latido y los
   eventos pasan por las funciones `latido` y `registrar_evento`, que validan el
   token. Con `token_robot_cerrar.sql` el camino anónimo directo queda cerrado.
+- **Actualización remota (OTA):** solo el super administrador sube versiones y ordena
+  actualizar. La APK vive en un bucket **privado**; el robot la descarga con un enlace
+  temporal (10 minutos) que `apk-descarga` entrega solo si el token del robot es válido
+  **y** se le ordenó esa versión. El robot verifica huella, paquete, versión y firma, y
+  Android exige que una persona confirme la instalación en su pantalla.
 - **Funciones con permisos mínimos:** las de panel exigen sesión y rol; las de robot,
   su token. Ninguna tabla sensible se lee con la clave pública.
 - **Cabeceras** (`public/_headers`): anti-sniffing, anti-iframe, HSTS y una política

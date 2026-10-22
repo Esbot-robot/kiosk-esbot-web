@@ -30,7 +30,7 @@ const SIN_AVANCE_MS = 45_000
  * un video pesado con internet lento de una subida colgada.
  */
 export async function subirArchivo(
-  bucket: 'media' | 'configs',
+  bucket: 'media' | 'configs' | 'apks',
   path: string,
   archivo: File | Blob,
   { contentType, onProgreso, signal }: OpcionesSubida = {}

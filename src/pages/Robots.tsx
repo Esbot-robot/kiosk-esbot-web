@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BotonAgregarRobot, FilaVinculo } from '../components/VinculoRobotPanel'
+import { BotonVersionesApp, FilaAppRobot } from '../components/VersionesApp'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/alertas'
@@ -25,6 +26,10 @@ interface RobotStatus {
   bateria: number | null
   cargando: boolean | null
   updated_at: string
+  /** versión de la app instalada y estado de su actualización; null en apps anteriores a la 1.17 */
+  app_version_code?: number | null
+  app_version_name?: string | null
+  app_actualizacion?: string | null
   /** lo que pide el panel: no recorrer ubicaciones */
   quieto?: boolean
   /** lo que el robot tiene aplicado, según su último latido */
@@ -245,6 +250,7 @@ export function Robots() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <BotonVersionesApp />
         <BotonAgregarRobot />
         {/* "Estado - En línea ▾": select sin borde, como la referencia */}
         <label className="relative flex items-center gap-1.5 text-sm text-slate-500">
@@ -333,6 +339,14 @@ export function Robots() {
                       )
                     })()}
                     <BateriaCompacta nivel={r.bateria} enServicio={enServicio} />
+                    <FilaAppRobot
+                      serial={r.serial}
+                      nombre={r.nombre || 'Robot'}
+                      versionCode={r.app_version_code}
+                      versionName={r.app_version_name}
+                      estado={r.app_actualizacion}
+                      enServicio={enServicio}
+                    />
                     <FilaVinculo serial={r.serial} enServicio={enServicio} />
                   </div>
                 </div>
