@@ -18,7 +18,7 @@ export function BarraSubida({ progreso }: { progreso: ProgresoSubida | null }) {
     <div className="w-full">
       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
         <div
-          className="h-full rounded-full bg-indigo-600 transition-[width] duration-300"
+          className="h-full rounded-full bg-[#1d293d] transition-[width] duration-300"
           style={{ width: `${porcentaje}%` }}
         />
       </div>

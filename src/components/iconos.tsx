@@ -5,7 +5,6 @@ import masPng from '../assets/icons/mas.png'
 import menosPng from '../assets/icons/menos.png'
 import volumenPng from '../assets/icons/volumen.png'
 import ondaPng from '../assets/icons/onda.png'
-import fijarPng from '../assets/icons/fijar.png'
 
 type IconoProps = { className?: string }
 
@@ -31,7 +30,21 @@ export const IconoOnda = ({ className = 'h-6 w-6' }: IconoProps) => (
   <img src={ondaPng} className={className} alt="" draggable={false} />
 )
 export const IconoFijar = ({ className = 'h-5 w-5' }: IconoProps) => (
-  <img src={fijarPng} className={className} alt="" draggable={false} />
+  // Chincheta vectorial: hereda el color del texto (antes era una imagen azul fija)
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="currentColor"
+    stroke="currentColor"
+    strokeWidth="1.2"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <g transform="rotate(45 12 12)">
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+      <path d="M12 17v5" fill="none" strokeWidth="2" strokeLinecap="round" />
+    </g>
+  </svg>
 )
 
 /* Iconos de línea (SVG) para sidebar y cards, estilo del mockup */
@@ -112,13 +125,6 @@ export const IconoRobotLinea = ({ className = 'h-5 w-5' }: IconoProps) => (
   </svg>
 )
 
-export const IconoInicio = ({ className = 'h-5 w-5' }: IconoProps) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 10.5 12 3l9 7.5" />
-    <path d="M5 9.5V20h5v-6h4v6h5V9.5" />
-  </svg>
-)
-
 export const IconoGrafica = ({ className = 'h-5 w-5' }: IconoProps) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="4" y1="20" x2="20" y2="20" />
@@ -134,10 +140,11 @@ export const IconoGrafica = ({ className = 'h-5 w-5' }: IconoProps) => (
  * que poner el cursor, y la "i" en un gris oscuro para que se lea.
  */
 export const IconoInfo = ({ className = 'h-4 w-4' }: IconoProps) => (
-  <svg className={className} viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="10.5" fill="#F0F0F0" stroke="#CBD5E1" strokeWidth="1.5" />
-    <circle cx="12" cy="7.3" r="1.3" fill="#64748B" />
-    <rect x="10.8" y="10.4" width="2.4" height="7.2" rx="1.2" fill="#64748B" />
+  // Solo contorno, sin relleno: el color (gris muy claro) lo pone quien lo usa con text-*
+  <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.5" />
+    <circle cx="12" cy="7.6" r="1.2" fill="currentColor" />
+    <rect x="11" y="10.6" width="2" height="6.6" rx="1" fill="currentColor" />
   </svg>
 )
 

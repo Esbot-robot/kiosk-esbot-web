@@ -76,11 +76,11 @@ export function CamposDespedida({
   return (
     <>
       <CampoTexto
-        label="Despedida con nombre"
+        label="Mensaje de despedida con nombre"
         ayuda={
           <>
-            La dice el robot si alguien se registra antes de que acabe el tiempo. Escribe{' '}
-            <span className="font-mono">{'{nombre}'}</span> donde va el primer nombre de la persona.
+            Se reproduce si el visitante se registra antes de que finalice el tiempo. Utilice{' '}
+            <span className="font-mono">{'{nombre}'}</span> para incluir su primer nombre.
           </>
         }
         valor={conNombre}
@@ -89,7 +89,7 @@ export function CamposDespedida({
         onChange={onConNombre}
       />
       <CampoTexto
-        label="Despedida sin nombre"
+        label="Mensaje de despedida sin nombre"
         ayuda={ayudaSinNombre}
         valor={sinNombre}
         max={MAX_DESPEDIDA}
@@ -121,7 +121,7 @@ export function ConfigFormulario({
     <div className="space-y-4 rounded-lg border border-slate-200 p-4">
       <p className="flex items-center gap-2 font-semibold text-slate-800">
         Formulario
-        <Ayuda>Lo que ve el visitante en su celular al escanear el QR. Pide nombre, correo y celular.</Ayuda>
+        <Ayuda>Contenido que el visitante ve en su celular al escanear el código QR. Solicita nombre, correo y celular.</Ayuda>
       </p>
 
       <CampoTexto label="Título" valor={valor.titulo} max={MAX_TITULO} onChange={(titulo) => cambiar({ titulo })} />
@@ -140,7 +140,7 @@ export function ConfigFormulario({
       />
       <CampoTexto
         label="Texto de autorización de datos"
-        ayuda="Acompaña la casilla que el visitante debe marcar para enviar."
+        ayuda="Acompaña la casilla que el visitante debe marcar para enviar el formulario."
         valor={valor.texto_autorizacion}
         max={MAX_AUTORIZACION}
         filas={3}
@@ -150,7 +150,7 @@ export function ConfigFormulario({
       <div className="relative">
         <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
           Enlace a la política de datos
-          <Ayuda>Opcional. Si lo pones, el texto de autorización muestra un enlace para leerla.</Ayuda>
+          <Ayuda>Opcional. Si se indica, el texto de autorización incluye un enlace para consultarla.</Ayuda>
         </p>
         <input
           value={valor.politica_url}
@@ -198,7 +198,7 @@ export function ConfigFormulario({
           <button
             type="button"
             onClick={() => window.open(enlace(), '_blank', 'noopener')}
-            className="rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
           >
             Ver vista previa
           </button>

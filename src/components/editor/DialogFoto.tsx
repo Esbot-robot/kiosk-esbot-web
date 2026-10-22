@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Modal } from '../Modal'
+import { ModalPestanas } from '../ModalPestanas'
 import { Ayuda } from '../Ayuda'
+import { Interruptor } from '../Interruptor'
 import { AparienciaBoton } from './AparienciaBoton'
+import { CargadorArchivo } from './CargadorArchivo'
+import { IconoCamara, IconoPaleta, IconoQr, IconoReloj } from '../iconosPopup'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
 import { CampoTexto, ConfigFormulario } from './ConfigFormulario'
@@ -34,10 +37,23 @@ const MIN_CUENTA = 3
 const MAX_CUENTA = 15
 const MAX_WA_MENSAJE = 200
 
+type Pestana = 'apariencia' | 'captura' | 'resultado' | 'cierre'
+
+const PESTANAS = [
+  { id: 'apariencia', etiqueta: 'Apariencia', icono: <IconoPaleta /> },
+  { id: 'captura', etiqueta: 'Captura', icono: <IconoCamara /> },
+  { id: 'resultado', etiqueta: 'Resultado', icono: <IconoQr /> },
+  { id: 'cierre', etiqueta: 'Cierre', icono: <IconoReloj /> },
+]
+
 const ENTREGAS: { valor: EntregaFoto; label: string; detalle: string }[] = [
-  { valor: 'ninguna', label: 'Sin QR', detalle: 'Solo el número de la foto' },
-  { valor: 'whatsapp', label: 'WhatsApp', detalle: 'El visitante envía un mensaje con su número' },
-  { valor: 'registro', label: 'Formulario de registro', detalle: 'Deja sus datos y descarga la foto' },
+  { valor: 'ninguna', label: 'Sin código QR', detalle: 'Se muestra únicamente el número de la foto.' },
+  { valor: 'whatsapp', label: 'WhatsApp', detalle: 'El visitante envía un mensaje con el número de su foto.' },
+  {
+    valor: 'registro',
+    label: 'Formulario de registro',
+    detalle: 'El visitante registra sus datos y descarga la foto.',
+  },
 ]
 /** límites físicos de la cabeza del robot según el SDK de temi */
 const MIN_INCLINACION = -30
@@ -58,13 +74,55 @@ function ejemploMensaje(plantilla: string): string {
   return conNumero.trim()
 }
 
-/** Configura el botón "Tomar foto": apariencia, marco de la promo y texto */
+/** Etiqueta de un campo dentro de una pestaña */
+function Titulo({ children, ayuda }: { children: React.ReactNode; ayuda?: React.ReactNode }) {
+  return (
+    <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+      {children}
+      {ayuda && <Ayuda>{ayuda}</Ayuda>}
+    </p>
+  )
+}
+
+/** Campo numérico con su unidad al lado */
+function CampoNumero({
+  valor,
+  min,
+  max,
+  paso,
+  unidad,
+  onChange,
+}: {
+  valor: number
+  min: number
+  max: number
+  paso?: number
+  unidad: string
+  onChange: (valor: string) => void
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={paso}
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+      />
+      <span className="text-slate-500">{unidad}</span>
+    </div>
+  )
+}
+
+/** Configura el botón "Tomar foto": apariencia, captura, resultado y cierre */
 export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar }: DialogFotoProps) {
   const [foto, setFoto] = useState(() => structuredClone(valor))
+  const [pestana, setPestana] = useState<Pestana>('apariencia')
   const [error, setError] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const [copiado, setCopiado] = useState(false)
-  const inputMarco = useRef<HTMLInputElement>(null)
 
   const enlaceGaleria = galeriaToken ? `${window.location.origin}/galeria#${galeriaToken}` : ''
 
@@ -72,11 +130,11 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
     setError('')
     if (!file) return
     if (file.type !== 'image/png') {
-      setError('El marco debe ser un PNG con el hueco de la foto transparente.')
+      setError('El marco debe ser un archivo PNG con el área de la foto transparente.')
       return
     }
     if (file.size > MAX_MARCO_BYTES) {
-      setError(`El marco pesa ${(file.size / 1024 / 1024).toFixed(1)}MB. El máximo es 3MB.`)
+      setError(`El marco pesa ${(file.size / 1024 / 1024).toFixed(1)} MB. El máximo permitido es 3 MB.`)
       return
     }
     setSubiendo(true)
@@ -84,7 +142,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       const marco_url = await subirArchivo('media', rutaMedia(projectId, file.name), file, { contentType: 'image/png' })
       setFoto((actual) => ({ ...actual, marco_url }))
     } catch (e) {
-      setError(`No se pudo subir el marco. ${describirError(e)}`)
+      setError(`No fue posible subir el marco. ${describirError(e)}`)
     } finally {
       setSubiendo(false)
     }
@@ -96,40 +154,36 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
       setCopiado(true)
       setTimeout(() => setCopiado(false), 2000)
     } catch {
-      setError('No se pudo copiar. Selecciona el enlace y cópialo a mano.')
+      setError('No fue posible copiar el enlace. Selecciónelo y cópielo manualmente.')
     }
+  }
+
+  /** Muestra el error y lleva a la pestaña donde se corrige */
+  function fallar(en: Pestana, mensaje: string) {
+    setPestana(en)
+    setError(mensaje)
   }
 
   function guardar() {
     const texto = foto.boton.texto.trim()
-    if (foto.activo && !texto) {
-      setError('Escribe el texto que verá el visitante en el botón.')
-      return
-    }
-    if (foto.activo && !foto.marco_url) {
-      setError('Carga el marco de la promo que se aplicará a la foto.')
-      return
-    }
-    if (foto.activo && !foto.texto.trim()) {
-      setError('Escribe el texto que el robot mostrará y dirá con el número.')
-      return
-    }
-    if (foto.activo && foto.entrega === 'whatsapp') {
-      const soloDigitos = foto.whatsapp_numero.replace(/\D/g, '')
-      if (soloDigitos.length < 10 || soloDigitos.length > 15) {
-        setError('Escribe el número de WhatsApp con indicativo de país, solo dígitos. Ej: 573108676490')
-        return
+    if (foto.activo) {
+      if (!texto) return fallar('apariencia', 'Ingrese la etiqueta del botón.')
+      if (!foto.marco_url) return fallar('captura', 'Cargue el marco de la promoción que se aplicará a la foto.')
+      if (!foto.texto.trim()) {
+        return fallar('resultado', 'Ingrese el texto que el robot mostrará y reproducirá junto al número.')
       }
-      if (!foto.whatsapp_mensaje.trim()) {
-        setError('Escribe el mensaje que enviará el visitante por WhatsApp.')
-        return
+      if (foto.entrega === 'whatsapp') {
+        const soloDigitos = foto.whatsapp_numero.replace(/\D/g, '')
+        if (soloDigitos.length < 10 || soloDigitos.length > 15) {
+          return fallar('resultado', 'Ingrese el número de WhatsApp con indicativo de país, solo dígitos. Ejemplo: 573108676490.')
+        }
+        if (!foto.whatsapp_mensaje.trim()) {
+          return fallar('resultado', 'Ingrese el mensaje que enviará el visitante por WhatsApp.')
+        }
       }
-    }
-    if (foto.activo && foto.entrega === 'registro') {
-      const errorFormulario = validarFormulario(foto.formulario, foto.despedida_nombre)
-      if (errorFormulario) {
-        setError(errorFormulario)
-        return
+      if (foto.entrega === 'registro') {
+        const errorFormulario = validarFormulario(foto.formulario, foto.despedida_nombre)
+        if (errorFormulario) return fallar('resultado', errorFormulario)
       }
     }
     onGuardar({
@@ -151,162 +205,189 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
   }
 
   return (
-    <Modal
-      titulo="Configurar botón Tomar foto"
+    <ModalPestanas
+      titulo="Configuración del botón Tomar foto"
+      ayuda="El robot toma la foto del visitante, la inserta en el marco de la promoción y le asigna un número para reclamarla en el stand."
+      pestanas={PESTANAS}
+      activa={pestana}
+      onCambiar={(id) => setPestana(id as Pestana)}
       onCancelar={onCerrar}
       onAceptar={guardar}
       aceptarDeshabilitado={subiendo}
       textoAceptar={subiendo ? 'Subiendo marco...' : 'Guardar'}
       aviso={error}
     >
-      <div className="space-y-5">
-        <label className="relative flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
-          <input
-            type="checkbox"
-            checked={foto.activo}
-            onChange={(e) => setFoto((actual) => ({ ...actual, activo: e.target.checked }))}
-            className="h-4 w-4 accent-indigo-600"
-          />
-          <span className="flex items-center gap-2 font-semibold">
-            Mostrar este botón
-            <Ayuda>Los botones desactivados no aparecen en el robot.</Ayuda>
-          </span>
-        </label>
-
-        <div>
-          <p className="mb-2 font-medium text-slate-800">Texto del botón</p>
-          <input
-            value={foto.boton.texto}
-            maxLength={MAX_BOTON}
-            onChange={(e) =>
-              setFoto((actual) => ({
-                ...actual,
-                boton: { ...actual.boton, texto: e.target.value.slice(0, MAX_BOTON) },
-              }))
-            }
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-          />
-          <p className="mt-1 text-right text-sm text-slate-400">
-            {foto.boton.texto.length} / {MAX_BOTON} caracteres
-          </p>
-        </div>
-
-        {/* Píldora o tarjeta, colores e imagen de la tarjeta */}
-        <AparienciaBoton
-          valor={foto.boton}
-          projectId={projectId}
-          onChange={(visual) => setFoto((actual) => ({ ...actual, boton: visual }))}
-        />
-
-        {/* Marco de la promo */}
-        <div className="relative rounded-lg border border-slate-200 p-4">
-          <p className="flex items-center gap-2 font-medium text-slate-800">
-            Marco de la promo
-            <Ayuda>
-              PNG de 1200 × 1800 px (vertical), con el hueco de la foto transparente y sin
-              transparencias por fuera del marco. Máximo 3MB.
-            </Ayuda>
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={subiendo}
-              onClick={() => inputMarco.current?.click()}
-              className="rounded-md border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-            >
-              {subiendo ? 'Subiendo...' : foto.marco_url ? 'Reemplazar marco' : 'Cargar marco'}
-            </button>
-            {foto.marco_url && (
-              <>
-                <span className="text-sm text-emerald-700">Marco cargado</span>
-                <button
-                  type="button"
-                  onClick={() => setFoto((actual) => ({ ...actual, marco_url: '' }))}
-                  className="text-sm font-medium text-rose-600 hover:text-rose-700"
-                >
-                  Quitar
-                </button>
-              </>
-            )}
-          </div>
-          {foto.marco_url && (
-            <img
-              src={foto.marco_url}
-              alt="Marco cargado"
-              className="mt-3 h-40 w-auto rounded-md border border-slate-200 bg-slate-100 object-contain"
+      {/* ───────── Apariencia ───────── */}
+      {pestana === 'apariencia' && (
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-2 font-medium text-slate-800">
+              Botón habilitado
+              <Ayuda>Los botones deshabilitados no se muestran en el robot.</Ayuda>
+            </span>
+            <Interruptor
+              activo={foto.activo}
+              onChange={(activo) => setFoto((actual) => ({ ...actual, activo }))}
+              etiqueta="Botón habilitado"
             />
-          )}
-          <input
-            ref={inputMarco}
-            type="file"
-            accept="image/png"
-            className="hidden"
-            onChange={(e) => {
-              void subirMarco(e.target.files?.[0])
-              e.target.value = ''
-            }}
+          </div>
+
+          <div>
+            <Titulo>Etiqueta del botón</Titulo>
+            <input
+              value={foto.boton.texto}
+              maxLength={MAX_BOTON}
+              onChange={(e) =>
+                setFoto((actual) => ({
+                  ...actual,
+                  boton: { ...actual.boton, texto: e.target.value.slice(0, MAX_BOTON) },
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="mt-1 text-right text-sm text-slate-400">
+              {foto.boton.texto.length} / {MAX_BOTON}
+            </p>
+          </div>
+
+          {/* Píldora o tarjeta, colores e imagen de la tarjeta */}
+          <AparienciaBoton
+            valor={foto.boton}
+            projectId={projectId}
+            onChange={(visual) => setFoto((actual) => ({ ...actual, boton: visual }))}
           />
         </div>
+      )}
 
-        {/* Texto que se muestra y se dice */}
-        <div className="relative">
-          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-            Texto al mostrar la foto
-            <Ayuda>
-              Se muestra en pantalla junto al número y el robot lo dice en voz alta. Debe indicar
-              dónde reclamar la foto y mencionar el número que aparece en pantalla.
-            </Ayuda>
-          </p>
-          <textarea
-            value={foto.texto}
-            maxLength={MAX_TEXTO}
-            rows={3}
-            onChange={(e) => setFoto((actual) => ({ ...actual, texto: e.target.value.slice(0, MAX_TEXTO) }))}
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-          />
-          <p className="mt-1 text-right text-sm text-slate-400">
-            {foto.texto.length} / {MAX_TEXTO} caracteres
-          </p>
+      {/* ───────── Captura ───────── */}
+      {pestana === 'captura' && (
+        <div className="space-y-5">
+          {/* Marco de la promoción */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <Titulo ayuda="PNG de 1200 × 1800 px (vertical), con el área de la foto transparente y sin transparencias fuera del marco. Máximo 3 MB.">
+              Marco de la promoción
+            </Titulo>
+            <div className="mt-3">
+              <CargadorArchivo
+                entidad="marco"
+                tipo="marco"
+                etiquetaCarga="Cargar marco"
+                detalle="PNG de 1200 × 1800 px (máx. 3 MB)"
+                accept="image/png"
+                url={foto.marco_url}
+                subiendo={subiendo}
+                onElegir={(archivo) => void subirMarco(archivo)}
+                onQuitar={() => setFoto((actual) => ({ ...actual, marco_url: '' }))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Titulo ayuda={`Segundos de los que dispone el visitante para ubicarse antes de la captura (${MIN_CUENTA} a ${MAX_CUENTA}).`}>
+              Cuenta regresiva
+            </Titulo>
+            <CampoNumero
+              valor={foto.segundos_cuenta}
+              min={MIN_CUENTA}
+              max={MAX_CUENTA}
+              unidad="segundos"
+              onChange={(v) =>
+                setFoto((actual) => ({
+                  ...actual,
+                  segundos_cuenta: Math.min(MAX_CUENTA, Math.max(MIN_CUENTA, Number(v) || 10)),
+                }))
+              }
+            />
+          </div>
+
+          <div>
+            <Titulo ayuda="Lo reproduce el robot al iniciar la cuenta regresiva. Si se deja vacío, se utiliza el mensaje predeterminado.">
+              Mensaje de preparación
+            </Titulo>
+            <textarea
+              value={foto.frase_preparacion}
+              maxLength={MAX_FRASE}
+              rows={2}
+              placeholder={FRASE_PREPARACION_DEFECTO}
+              onChange={(e) =>
+                setFoto((actual) => ({ ...actual, frase_preparacion: e.target.value.slice(0, MAX_FRASE) }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="mt-1 text-right text-sm text-slate-400">
+              {foto.frase_preparacion.length} / {MAX_FRASE} caracteres
+            </p>
+          </div>
+
+          {/* Inclinación de la cabeza: la cámara va en ella, así que define el encuadre */}
+          <div>
+            <Titulo ayuda={`Ángulo de la cabeza del robot durante la captura. 0 corresponde a la pantalla recta; los valores positivos elevan la cámara (de ${MIN_INCLINACION} a ${MAX_INCLINACION}).`}>
+              Inclinación de la pantalla
+            </Titulo>
+            <CampoNumero
+              valor={foto.inclinacion_pantalla}
+              min={MIN_INCLINACION}
+              max={MAX_INCLINACION}
+              paso={5}
+              unidad="grados"
+              onChange={(v) => setFoto((actual) => ({ ...actual, inclinacion_pantalla: limitarInclinacion(v) }))}
+            />
+          </div>
         </div>
+      )}
 
-        {/* QR que acompaña la foto */}
-        <div className="rounded-lg border border-slate-200 p-4">
-          <p className="flex items-center gap-2 font-semibold text-slate-800">
-            QR con la foto
-            <Ayuda>Se muestra junto al número en la pantalla de resultado.</Ayuda>
-          </p>
-          <div className="mt-3 space-y-2">
-            {ENTREGAS.map(({ valor, label, detalle }) => (
-              <label
-                key={valor}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
-                  foto.entrega === valor ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="entrega-foto"
-                  checked={foto.entrega === valor}
-                  onChange={() => setFoto((actual) => ({ ...actual, entrega: valor }))}
-                  className="mt-1 h-4 w-4 accent-indigo-600"
-                />
-                <span>
-                  <span className="block font-medium text-slate-800">{label}</span>
-                  <span className="block text-sm text-slate-500">{detalle}</span>
-                </span>
-              </label>
-            ))}
+      {/* ───────── Resultado ───────── */}
+      {pestana === 'resultado' && (
+        <div className="space-y-5">
+          <div>
+            <Titulo ayuda="Se muestra en pantalla junto al número y se reproduce por voz. Debe indicar dónde reclamar la foto y mencionar el número que aparece en pantalla.">
+              Texto al mostrar la foto
+            </Titulo>
+            <textarea
+              value={foto.texto}
+              maxLength={MAX_TEXTO}
+              rows={3}
+              onChange={(e) => setFoto((actual) => ({ ...actual, texto: e.target.value.slice(0, MAX_TEXTO) }))}
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="mt-1 text-right text-sm text-slate-400">
+              {foto.texto.length} / {MAX_TEXTO} caracteres
+            </p>
+          </div>
+
+          {/* Código QR que acompaña la foto */}
+          <div>
+            <Titulo ayuda="Se muestra junto al número en la pantalla de resultado.">Código QR con la foto</Titulo>
+            <div className="space-y-2">
+              {ENTREGAS.map(({ valor, label, detalle }) => (
+                <label
+                  key={valor}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
+                    foto.entrega === valor ? 'border-[#1d293d] bg-slate-50' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="entrega-foto"
+                    checked={foto.entrega === valor}
+                    onChange={() => setFoto((actual) => ({ ...actual, entrega: valor }))}
+                    className="mt-1 h-4 w-4 accent-[#1d293d]"
+                  />
+                  <span>
+                    <span className="block font-medium text-slate-800">{label}</span>
+                    <span className="block text-sm text-slate-500">{detalle}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {foto.entrega === 'whatsapp' && (
-            <div className="mt-4 space-y-4">
-              <div className="relative">
-                <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+            <>
+              <div>
+                <Titulo ayuda="Con indicativo de país, sin espacios ni signos. Colombia: 57 + número de celular.">
                   Número que recibe los mensajes
-                  <Ayuda>
-                    Con indicativo de país y sin espacios ni signos. Colombia: 57 + celular.
-                  </Ayuda>
-                </p>
+                </Titulo>
                 <input
                   value={foto.whatsapp_numero}
                   inputMode="numeric"
@@ -321,14 +402,17 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                 />
               </div>
 
-              <div className="relative">
-                <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-                  Mensaje que enviará el visitante
-                  <Ayuda>
-                    Escribe <span className="font-mono">{'{numero}'}</span> donde quieras que
-                    aparezca el número de la foto. Si no lo pones, se agrega al final.
-                  </Ayuda>
-                </p>
+              <div>
+                <Titulo
+                  ayuda={
+                    <>
+                      Utilice <span className="font-mono">{'{numero}'}</span> para incluir el número de la foto. Si se
+                      omite, se agrega al final del mensaje.
+                    </>
+                  }
+                >
+                  Mensaje del visitante
+                </Titulo>
                 <textarea
                   value={foto.whatsapp_mensaje}
                   maxLength={MAX_WA_MENSAJE}
@@ -341,19 +425,22 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                   }
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
                 />
-                <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  Así lo verá: <span className="font-medium">{ejemploMensaje(foto.whatsapp_mensaje)}</span>
+                <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm italic text-slate-500">
+                  {ejemploMensaje(foto.whatsapp_mensaje)}
                 </p>
                 <p className="mt-1 text-right text-sm text-slate-400">
                   {foto.whatsapp_mensaje.length} / {MAX_WA_MENSAJE} caracteres
                 </p>
               </div>
-            </div>
+            </>
           )}
 
           {foto.entrega === 'registro' && (
-            <div className="mt-4 space-y-4">
-              <Link to={`/contactos?proyecto=${projectId}`} className="inline-block text-sm font-semibold text-indigo-600 hover:underline">
+            <>
+              <Link
+                to={`/contactos?proyecto=${projectId}`}
+                className="inline-block text-sm font-semibold text-indigo-600 hover:underline"
+              >
                 Ver contactos registrados →
               </Link>
               <ConfigFormulario
@@ -362,11 +449,11 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                 onChange={(formulario) => setFoto((actual) => ({ ...actual, formulario }))}
               />
               <CampoTexto
-                label="Despedida con nombre"
+                label="Mensaje de despedida con nombre"
                 ayuda={
                   <>
-                    La dice el robot si alguien se registra antes de que acabe el tiempo en pantalla.
-                    Escribe <span className="font-mono">{'{nombre}'}</span> donde va el primer nombre.
+                    Se reproduce si el visitante se registra antes de que finalice el tiempo en pantalla. Utilice{' '}
+                    <span className="font-mono">{'{nombre}'}</span> para incluir su primer nombre.
                   </>
                 }
                 valor={foto.despedida_nombre}
@@ -374,141 +461,54 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                 filas={2}
                 onChange={(despedida_nombre) => setFoto((actual) => ({ ...actual, despedida_nombre }))}
               />
-            </div>
+            </>
           )}
         </div>
+      )}
 
-        {/* Cuenta regresiva antes de la foto */}
-        <div className="relative">
-          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-            Cuenta regresiva
-            <Ayuda>
-              Segundos que tiene el visitante para ubicarse antes de la foto ({MIN_CUENTA} a{' '}
-              {MAX_CUENTA}).
-            </Ayuda>
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min={MIN_CUENTA}
-              max={MAX_CUENTA}
-              value={foto.segundos_cuenta}
-              onChange={(e) =>
-                setFoto((actual) => ({
-                  ...actual,
-                  segundos_cuenta: Math.min(MAX_CUENTA, Math.max(MIN_CUENTA, Number(e.target.value) || 10)),
-                }))
-              }
-              className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-            />
-            <span className="text-slate-600">segundos</span>
-          </div>
-        </div>
-
-        {/* Frase que dice el robot al empezar la cuenta */}
-        <div className="relative">
-          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-            Frase de preparación
-            <Ayuda>
-              La dice el robot al empezar la cuenta regresiva. Si la dejas vacía, usa la frase por
-              defecto.
-            </Ayuda>
-          </p>
-          <textarea
-            value={foto.frase_preparacion}
-            maxLength={MAX_FRASE}
-            rows={2}
-            placeholder={FRASE_PREPARACION_DEFECTO}
-            onChange={(e) =>
-              setFoto((actual) => ({ ...actual, frase_preparacion: e.target.value.slice(0, MAX_FRASE) }))
-            }
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-          />
-          <p className="mt-1 text-right text-sm text-slate-400">
-            {foto.frase_preparacion.length} / {MAX_FRASE} caracteres
-          </p>
-        </div>
-
-        {/* Tiempo en pantalla */}
-        <div className="relative">
-          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-            Tiempo en pantalla
-            <Ayuda>
-              Tiempo de lectura y captura del número/QR por parte del visitante ({SEGUNDOS_PANTALLA_MIN} a{' '}
-              {SEGUNDOS_PANTALLA_MAX}). Con formulario conviene dar más tiempo para llenarlo.
-            </Ayuda>
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
+      {/* ───────── Cierre ───────── */}
+      {pestana === 'cierre' && (
+        <div className="space-y-5">
+          <div>
+            <Titulo
+              ayuda={`Tiempo disponible para leer y capturar el número o el código QR (${SEGUNDOS_PANTALLA_MIN} a ${SEGUNDOS_PANTALLA_MAX} segundos). Con formulario de registro se recomienda un tiempo mayor.`}
+            >
+              Tiempo en pantalla
+            </Titulo>
+            <CampoNumero
+              valor={foto.segundos_pantalla}
               min={SEGUNDOS_PANTALLA_MIN}
               max={SEGUNDOS_PANTALLA_MAX}
-              value={foto.segundos_pantalla}
-              onChange={(e) =>
+              unidad="segundos"
+              onChange={(v) =>
                 setFoto((actual) => ({
                   ...actual,
-                  segundos_pantalla: Math.min(
-                    SEGUNDOS_PANTALLA_MAX,
-                    Math.max(SEGUNDOS_PANTALLA_MIN, Number(e.target.value) || 10)
-                  ),
+                  segundos_pantalla: Math.min(SEGUNDOS_PANTALLA_MAX, Math.max(SEGUNDOS_PANTALLA_MIN, Number(v) || 10)),
                 }))
               }
-              className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
             />
-            <span className="text-slate-600">segundos</span>
           </div>
-        </div>
 
-        <CampoTexto
-          label={foto.entrega === 'registro' ? 'Despedida sin nombre' : 'Despedida'}
-          ayuda={
-            foto.entrega === 'registro'
-              ? 'La dice el robot al acabar el tiempo si nadie se registró. Vacía = no dice nada.'
-              : 'La dice el robot al acabar el tiempo en pantalla, antes de seguir su ruta. Vacía = no dice nada.'
-          }
-          valor={foto.despedida}
-          max={MAX_DESPEDIDA}
-          filas={2}
-          onChange={(despedida) => setFoto((actual) => ({ ...actual, despedida }))}
-        />
+          <CampoTexto
+            label={foto.entrega === 'registro' ? 'Mensaje de despedida sin nombre' : 'Mensaje de despedida'}
+            ayuda={
+              foto.entrega === 'registro'
+                ? 'Se reproduce al finalizar el tiempo si nadie se registró. Vacío: no se reproduce ningún mensaje.'
+                : 'Se reproduce al finalizar el tiempo en pantalla, antes de retomar el recorrido. Vacío: no se reproduce ningún mensaje.'
+            }
+            valor={foto.despedida}
+            max={MAX_DESPEDIDA}
+            filas={2}
+            onChange={(despedida) => setFoto((actual) => ({ ...actual, despedida }))}
+          />
 
-        {/* Inclinación de la cabeza: la cámara va en ella, así que define el encuadre */}
-        <div className="relative">
-          <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-            Inclinación de la pantalla
-            <Ayuda>
-              Ángulo de la cabeza al tomar la foto. 0 = pantalla derecha, positivo sube la cámara
-              ({MIN_INCLINACION} a {MAX_INCLINACION}).
-            </Ayuda>
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min={MIN_INCLINACION}
-              max={MAX_INCLINACION}
-              step={5}
-              value={foto.inclinacion_pantalla}
-              onChange={(e) =>
-                setFoto((actual) => ({
-                  ...actual,
-                  inclinacion_pantalla: limitarInclinacion(e.target.value),
-                }))
-              }
-              className="w-28 rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-            />
-            <span className="text-slate-600">grados</span>
-          </div>
-        </div>
-
-        {/* Enlace de la galería para el cliente */}
-        {foto.activo && (
-          <div className="relative rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-            <p className="flex items-center gap-2 font-medium text-slate-800">
-              Enlace de la galería para el cliente
-              <Ayuda>Enlace exclusivo para ver galería. Mantener en privado.</Ayuda>
-            </p>
-            {enlaceGaleria ? (
-              <>
+          {/* Enlace de la galería para el cliente */}
+          {foto.activo && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <Titulo ayuda="Enlace exclusivo para consultar la galería. Debe mantenerse en privado.">
+                Enlace de la galería para el cliente
+              </Titulo>
+              {enlaceGaleria ? (
                 <div className="mt-3 flex gap-2">
                   <input
                     readOnly
@@ -519,22 +519,20 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                   <button
                     type="button"
                     onClick={() => void copiarEnlace()}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                    className="rounded-lg bg-[#1d293d] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                   >
                     {copiado ? 'Copiado ✓' : 'Copiar'}
                   </button>
                 </div>
-              </>
-            ) : (
-              <Advertencia className="mt-1">
-                Este proyecto todavía no tiene enlace de galería. Se genera al crear la columna
-                galeria_token en Supabase.
-              </Advertencia>
-            )}
-          </div>
-        )}
-
-      </div>
-    </Modal>
+              ) : (
+                <Advertencia className="mt-1">
+                  Este proyecto aún no tiene enlace de galería. Se genera al crear la columna galeria_token en Supabase.
+                </Advertencia>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </ModalPestanas>
   )
 }

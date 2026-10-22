@@ -1,8 +1,10 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { generarReportePdf, type PreguntaDist } from '../lib/reportePdf'
+import { generarReportePdf, type GrupoDist, type PreguntaDist } from '../lib/reportePdf'
 import { Cargando } from '../components/Cargando'
+import { esAdmin, usePerfil } from '../lib/perfil'
+import { neutralizarFormula } from '../lib/csv'
 import {
   ahoraLocal,
   curvaSuave,
@@ -27,12 +29,50 @@ const COLOR_VIDEO = '#8b5cf6' // violeta — video configurado
 const COLOR_UBICACION = '#e57a28' // naranja — guía a ubicación
 const COLOR_FOTO = '#d6336c' // rosa — tomar foto
 const COLOR_SECUENCIA = '#0891b2' // cian — secuencia de temi
+const COLOR_REGISTRO = '#ca8a04' // ámbar — botón de registro
+const COLOR_CATALOGO = '#475569' // pizarra — botón de catálogo
 const INK_MUTED = '#a3a3b5'
 const GRID = '#f1f1f4'
+
+interface EventoLigero {
+  serial: string
+  tipo: string
+  project_id: string | null
+  creado_at: string
+}
+
+interface FilaRespuesta {
+  pregunta: string | null
+  respuesta: string | null
+  serial: string
+  project_id: string | null
+}
+
+/** Cuenta las respuestas por pregunta, de la más respondida a la menos */
+function contarPreguntas(filas: FilaRespuesta[]): PreguntaDist[] {
+  const mapa = new Map<string, Map<string, number>>()
+  for (const f of filas) {
+    const p = (f.pregunta ?? '').trim()
+    if (!p) continue
+    const r = (f.respuesta ?? '').trim() || 'Sin respuesta'
+    if (!mapa.has(p)) mapa.set(p, new Map())
+    const m = mapa.get(p)!
+    m.set(r, (m.get(r) ?? 0) + 1)
+  }
+  return [...mapa.entries()]
+    .map(([pregunta, m]) => {
+      const respuestas = [...m.entries()]
+        .map(([texto, conteo]) => ({ texto, conteo }))
+        .sort((a, b) => b.conteo - a.conteo)
+      return { pregunta, total: respuestas.reduce((a, b) => a + b.conteo, 0), respuestas }
+    })
+    .sort((a, b) => b.total - a.total)
+}
 
 interface Evento {
   id: number
   serial: string
+  project_id: string | null
   tipo: string
   video_seg: number | null
   pregunta: string | null
@@ -47,6 +87,8 @@ const TIPOS_EVENTO = [
   { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', color: COLOR_UBICACION, ayuda: 'Veces que el robot guió a alguien a una ubicación.' },
   { tipo: 'boton_foto', nombre: 'Botón foto', color: COLOR_FOTO, ayuda: 'Veces que se tocó el botón para tomarse una foto.' },
   { tipo: 'boton_secuencia', nombre: 'Botón secuencia', color: COLOR_SECUENCIA, ayuda: 'Veces que se tocó un botón que reproduce una secuencia de Temi.' },
+  { tipo: 'boton_registro', nombre: 'Botón registro', color: COLOR_REGISTRO, ayuda: 'Veces que se tocó el botón de registro.' },
+  { tipo: 'boton_catalogo', nombre: 'Botón catálogo', color: COLOR_CATALOGO, ayuda: 'Veces que se abrió el catálogo.' },
 ] as const
 
 const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
@@ -54,19 +96,41 @@ const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
 )
 
 export function Analitica() {
+  // El cliente lector ve solo los datos de sus proyectos: nada de robots (ni nombres ni desglose)
+  const verRobots = esAdmin(usePerfil())
   const [desde, setDesde] = useState(inicioDeMes())
   const [hasta, setHasta] = useState(ahoraLocal())
   const [robot, setRobot] = useState('todos')
+  // 'todos' | 'sin' (eventos anteriores, sin proyecto) | id del proyecto
+  const [proyecto, setProyecto] = useState('todos')
 
   const { data: robots } = useQuery({
-    queryKey: ['robots'],
+    queryKey: ['robots-nombres'],
+    enabled: verRobots,
     queryFn: async () => {
-      const { data, error } = await supabase.from('robots').select('serial')
+      const { data, error } = await supabase
+        .from('robot_status')
+        .select('serial, nombre')
+        .order('nombre', { ascending: true, nullsFirst: false })
+        .order('serial', { ascending: true })
       if (error) throw error
       // solo robots reales (11 caracteres), sin los de demo/prueba
-      return (data as { serial: string }[]).filter((r) => r.serial.length === 11)
+      return (data as { serial: string; nombre: string | null }[]).filter((r) => r.serial.length === 11)
     },
   })
+
+  const { data: proyectos } = useQuery({
+    queryKey: ['proyectos-nombres'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('id, nombre').order('nombre')
+      if (error) throw error
+      return data as { id: string; nombre: string }[]
+    },
+  })
+
+  const nombreRobot = (serial: string) => robots?.find((r) => r.serial === serial)?.nombre || serial
+  const nombreProyecto = (id: string | null) =>
+    id ? (proyectos?.find((p) => p.id === id)?.nombre ?? 'Proyecto eliminado') : 'Sin proyecto'
 
   // ≤ 48 horas de rango → agrupar por hora; más → por día
   const granularidad: Granularidad =
@@ -83,26 +147,37 @@ export function Analitica() {
     })
   }
 
-  // Gráfica y totales: Postgres agrupa y cuenta — al navegador solo
-  // viajan los totales por bucket, sin importar cuántos eventos haya.
-  const { data: agregados, isLoading } = useQuery({
-    queryKey: ['events-agg', desde, hasta, robot, granularidad],
+  // Gráfica y barras: se leen los eventos del rango en tandas de 1.000 y se
+  // agrupan en el navegador (volumen bajo: pocos robots).
+  const { data: eventosRango, isLoading } = useQuery({
+    queryKey: ['events-rango', desde, hasta, robot, proyecto],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('eventos_agrupados', {
-        p_desde: `${desde}:00`,
-        p_hasta: `${hasta}:59`,
-        p_serial: robot === 'todos' ? null : robot,
-        p_gran: granularidad,
-      })
-      if (error) throw error
-      return data as { bucket: string; tipo: string; total: number }[]
+      const filas: EventoLigero[] = []
+      for (let offset = 0; ; offset += 1000) {
+        let q = supabase
+          .from('events')
+          .select('serial,tipo,project_id,creado_at')
+          .gte('creado_at', `${desde}:00`)
+          .lte('creado_at', `${hasta}:59`)
+          .order('id', { ascending: true })
+          .range(offset, offset + 999)
+        if (robot !== 'todos') q = q.eq('serial', robot)
+        else q = q.like('serial', PATRON_SERIAL_REAL)
+        if (proyecto === 'sin') q = q.is('project_id', null)
+        else if (proyecto !== 'todos') q = q.eq('project_id', proyecto)
+        const { data, error } = await q
+        if (error) throw error
+        filas.push(...(data as EventoLigero[]))
+        if (!data || data.length < 1000) break
+      }
+      return filas
     },
   })
 
   // Tabla de detalle: paginada — el navegador recibe 100 filas por página.
   const [pagina, setPagina] = useState(0)
   const [exportando, setExportando] = useState(false)
-  useEffect(() => setPagina(0), [desde, hasta, robot])
+  useEffect(() => setPagina(0), [desde, hasta, robot, proyecto])
 
   /** Descarga TODOS los eventos del rango filtrado como CSV (en tandas de 1000) */
   async function exportarCsv(total: number) {
@@ -120,19 +195,22 @@ export function Analitica() {
           .range(offset, Math.min(offset + 999, total - 1))
         if (robot !== 'todos') q = q.eq('serial', robot)
         else q = q.like('serial', PATRON_SERIAL_REAL)
+        if (proyecto === 'sin') q = q.is('project_id', null)
+        else if (proyecto !== 'todos') q = q.eq('project_id', proyecto)
         const { data, error } = await q
         if (error) throw error
         filas.push(...(data as Evento[]))
         if (!data || data.length < 1000) break
       }
 
-      const limpiar = (t: string | null) => (t ?? '').replace(/;/g, ',').replace(/\r?\n/g, ' ')
-      const lineas = ['Evento;Robot;Fecha;Hora;Seg. del video;Pregunta;Respuesta']
+      const limpiar = (t: string | null) => neutralizarFormula((t ?? '').replace(/;/g, ',').replace(/\r?\n/g, ' '))
+      const lineas = [`Evento;${verRobots ? 'Robot;' : ''}Proyecto;Fecha;Hora;Seg. del video;Pregunta;Respuesta`]
       for (const e of filas) {
         lineas.push(
           [
             NOMBRE_TIPO[e.tipo] ?? e.tipo,
-            e.serial,
+            ...(verRobots ? [limpiar(nombreRobot(e.serial))] : []),
+            limpiar(nombreProyecto(e.project_id)),
             e.creado_at.slice(0, 10),
             e.creado_at.slice(11, 19),
             e.video_seg != null ? e.video_seg : '',
@@ -152,15 +230,15 @@ export function Analitica() {
       enlace.click()
       URL.revokeObjectURL(enlace.href)
     } catch (e) {
-      console.error('Error exportando CSV', e)
-      alert('No se pudo exportar el CSV. Intenta de nuevo.')
+      console.error('Error al exportar el CSV', e)
+      alert('No fue posible exportar el CSV. Intente nuevamente.')
     } finally {
       setExportando(false)
     }
   }
 
   const { data: detalle } = useQuery({
-    queryKey: ['events-detalle', desde, hasta, robot, pagina],
+    queryKey: ['events-detalle', desde, hasta, robot, proyecto, pagina],
     queryFn: async () => {
       let q = supabase
         .from('events')
@@ -171,92 +249,107 @@ export function Analitica() {
         .range(pagina * FILAS_POR_PAGINA, pagina * FILAS_POR_PAGINA + FILAS_POR_PAGINA - 1)
       if (robot !== 'todos') q = q.eq('serial', robot)
       else q = q.like('serial', PATRON_SERIAL_REAL)
+      if (proyecto === 'sin') q = q.is('project_id', null)
+      else if (proyecto !== 'todos') q = q.eq('project_id', proyecto)
       const { data, count, error } = await q
       if (error) throw error
       return { eventos: data as Evento[], total: count ?? 0 }
     },
   })
 
-  // Distribución de respuestas por pregunta (agrega en el navegador desde los
-  // eventos boton_jugar que llevan pregunta + respuesta)
-  const { data: distribucion } = useQuery({
-    queryKey: ['distribucion', desde, hasta, robot],
-    queryFn: async (): Promise<PreguntaDist[]> => {
-      const filas: { pregunta: string | null; respuesta: string | null }[] = []
+  // Respuestas del quiz del rango (filas sueltas; se agrupan al generar el PDF)
+  const { data: respuestasQuiz } = useQuery({
+    queryKey: ['distribucion', desde, hasta, robot, proyecto],
+    queryFn: async () => {
+      const filas: FilaRespuesta[] = []
       for (let offset = 0; ; offset += 1000) {
         let q = supabase
           .from('events')
-          .select('pregunta,respuesta')
+          .select('pregunta,respuesta,serial,project_id')
           .eq('tipo', 'boton_jugar')
           .not('pregunta', 'is', null)
           .gte('creado_at', `${desde}:00`)
           .lte('creado_at', `${hasta}:59`)
+          .order('id', { ascending: true })
           .range(offset, offset + 999)
         if (robot !== 'todos') q = q.eq('serial', robot)
         else q = q.like('serial', PATRON_SERIAL_REAL)
+        if (proyecto === 'sin') q = q.is('project_id', null)
+        else if (proyecto !== 'todos') q = q.eq('project_id', proyecto)
         const { data, error } = await q
         if (error) throw error
-        filas.push(...(data as { pregunta: string | null; respuesta: string | null }[]))
+        filas.push(...(data as FilaRespuesta[]))
         if (!data || data.length < 1000) break
       }
-      const mapa = new Map<string, Map<string, number>>()
-      for (const f of filas) {
-        const p = (f.pregunta ?? '').trim()
-        if (!p) continue
-        const r = (f.respuesta ?? '').trim() || 'Sin respuesta'
-        if (!mapa.has(p)) mapa.set(p, new Map())
-        const m = mapa.get(p)!
-        m.set(r, (m.get(r) ?? 0) + 1)
-      }
-      const resultado: PreguntaDist[] = [...mapa.entries()].map(([pregunta, m]) => {
-        const respuestas = [...m.entries()]
-          .map(([texto, conteo]) => ({ texto, conteo }))
-          .sort((a, b) => b.conteo - a.conteo)
-        return { pregunta, total: respuestas.reduce((a, b) => a + b.conteo, 0), respuestas }
-      })
-      resultado.sort((a, b) => b.total - a.total)
-      return resultado
+      return filas
     },
   })
 
-  const { buckets, series, totales, totalInteracciones } = useMemo(() => {
+  const { buckets, series, totales, totalInteracciones, porRobot, porProyecto } = useMemo(() => {
     const buckets = generarBuckets(desde, hasta, granularidad)
     const idx = new Map(buckets.map((b, i) => [b, i]))
     const series = TIPOS_EVENTO.map(() => buckets.map(() => 0))
     const totales = TIPOS_EVENTO.map(() => 0)
-    for (const fila of agregados ?? []) {
-      const i = idx.get(fila.bucket)
+    const robotsCont = new Map<string, number>()
+    const proyectosCont = new Map<string, number>()
+    for (const fila of eventosRango ?? []) {
       const serieIndex = TIPOS_EVENTO.findIndex((tipo) => tipo.tipo === fila.tipo)
-      if (serieIndex >= 0) {
-        totales[serieIndex] += fila.total
-        if (i !== undefined) series[serieIndex][i] = fila.total
-      }
+      if (serieIndex < 0) continue
+      totales[serieIndex] += 1
+      const i = idx.get(fila.creado_at.slice(0, granularidad === 'hora' ? 13 : 10))
+      if (i !== undefined) series[serieIndex][i] += 1
+      robotsCont.set(fila.serial, (robotsCont.get(fila.serial) ?? 0) + 1)
+      const clave = fila.project_id ?? 'sin'
+      proyectosCont.set(clave, (proyectosCont.get(clave) ?? 0) + 1)
     }
+    const ordenar = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1])
     return {
       buckets,
       series,
       totales,
       totalInteracciones: totales.reduce((total, cantidad) => total + cantidad, 0),
+      porRobot: ordenar(robotsCont),
+      porProyecto: ordenar(proyectosCont),
     }
-  }, [agregados, desde, hasta, granularidad])
+  }, [eventosRango, desde, hasta, granularidad])
+
+  /** El reporte se desglosa en un solo nivel, según lo que esté en "Todos" */
+  function armarGrupos(): GrupoDist[] {
+    const filas = respuestasQuiz ?? []
+    if (robot !== 'todos' && proyecto !== 'todos') return [{ titulo: '', preguntas: contarPreguntas(filas) }]
+    if (!verRobots && proyecto !== 'todos') return [{ titulo: '', preguntas: contarPreguntas(filas) }]
+    if (proyecto !== 'todos') {
+      // un proyecto, todos los robots: un bloque por robot
+      return porRobot.map(([serial, total]) => ({
+        titulo: nombreRobot(serial),
+        detalle: `${total.toLocaleString('es-CO')} interacciones`,
+        preguntas: contarPreguntas(filas.filter((f) => f.serial === serial)),
+      }))
+    }
+    // todos los proyectos (con un robot o con todos): un bloque por proyecto
+    return porProyecto.map(([id, total]) => ({
+      titulo: nombreProyecto(id === 'sin' ? null : id),
+      detalle: `${total.toLocaleString('es-CO')} interacciones`,
+      preguntas: contarPreguntas(filas.filter((f) => (f.project_id ?? 'sin') === id)),
+    }))
+  }
 
   function descargarReporte() {
     void generarReportePdf({
-      robotLabel: robot,
+      robotLabel: robot === 'todos' ? robot : nombreRobot(robot),
+      ocultarRobot: !verRobots,
+      proyectoLabel: proyecto === 'todos' ? proyecto : nombreProyecto(proyecto === 'sin' ? null : proyecto),
+      tablaRobots:
+        verRobots && robot === 'todos' && proyecto === 'todos'
+          ? porRobot.map(([serial, total]) => ({ nombre: nombreRobot(serial), total }))
+          : undefined,
       desde,
       hasta,
       granularidad,
-      totalToques: totales[0],
-      totalJugar: totales[1],
-      totalVideos: totales[2],
-      totalUbicaciones: totales[3],
+      tipos: TIPOS_EVENTO.map((t, i) => ({ nombre: t.nombre, color: t.color, valor: totales[i], serie: series[i] })),
       buckets,
-      serieToques: series[0],
-      serieJugar: series[1],
-      serieVideos: series[2],
-      serieUbicaciones: series[3],
       etiquetaBucket: (b) => etiquetaBucket(b, granularidad),
-      distribucion: distribucion ?? [],
+      grupos: armarGrupos(),
     })
   }
 
@@ -265,52 +358,71 @@ export function Analitica() {
     // overflow-x-hidden: si algo llegara a ser más ancho que la pantalla, la
     // página no se desliza de lado (la gráfica y la tabla tienen su propio scroll)
     <div className="overflow-x-hidden px-4 pb-16 pt-6 sm:px-8 md:px-12 md:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Analítica</h2>
-          <p className="mt-2 text-slate-600">
-            Registro de interacciones
-          </p>
-        </div>
+      <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Interacciones</h2>
+      <p className="mt-2 text-slate-600">
+        Análisis del volumen de interacciones por fecha, robot y proyecto.
+      </p>
 
-        {/* Filtros: una sola fila, arriba de las gráficas */}
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
-          <label className="text-sm text-slate-600">
-            ID del Robot
-            <select
-              value={robot}
-              onChange={(e) => setRobot(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 sm:w-auto"
-            >
-              <option value="todos">Todos los robots</option>
-              {(robots ?? []).map((r) => (
-                <option key={r.serial} value={r.serial}>
-                  {r.serial}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm text-slate-600">
-            Desde
-            <input
-              type="datetime-local"
-              value={desde}
-              max={hasta}
-              onChange={(e) => setDesde(e.target.value)}
-              className="mt-1 block w-full min-w-0 max-w-full rounded-lg max-sm:appearance-none border border-slate-300 bg-white px-3 py-2 text-left text-slate-800 sm:w-auto"
-            />
-          </label>
-          <label className="text-sm text-slate-600">
-            Hasta
-            <input
-              type="datetime-local"
-              value={hasta}
-              min={desde}
-              onChange={(e) => setHasta(e.target.value)}
-              className="mt-1 block w-full min-w-0 max-w-full rounded-lg max-sm:appearance-none border border-slate-300 bg-white px-3 py-2 text-left text-slate-800 sm:w-auto"
-            />
-          </label>
+      {/* Filtros en tarjetas: Período (hora de inicio y de fin), Proyecto y Robot */}
+      <div className={`mt-6 grid gap-3 md:mt-8 ${verRobots ? 'lg:grid-cols-[1.7fr_1fr_1fr]' : 'lg:grid-cols-[1.7fr_1fr]'}`}>
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">Período</p>
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-500">
+              Inicio
+              <input
+                type="datetime-local"
+                value={desde}
+                max={hasta}
+                onChange={(e) => setDesde(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-slate-800 focus:outline-none max-sm:appearance-none"
+              />
+            </label>
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-500">
+              Fin
+              <input
+                type="datetime-local"
+                value={hasta}
+                min={desde}
+                onChange={(e) => setHasta(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-slate-800 focus:outline-none max-sm:appearance-none"
+              />
+            </label>
+          </div>
         </div>
+        <label className="block rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">Proyecto</span>
+          <select
+            value={proyecto}
+            onChange={(e) => setProyecto(e.target.value)}
+            className="mt-1 block w-full bg-transparent text-slate-800 focus:outline-none"
+          >
+            <option value="todos">Todos los proyectos</option>
+            {(proyectos ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+            <option value="sin">Sin proyecto</option>
+          </select>
+        </label>
+        {verRobots && (
+        <label className="block rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">Robot</span>
+          <select
+            value={robot}
+            onChange={(e) => setRobot(e.target.value)}
+            className="mt-1 block w-full bg-transparent text-slate-800 focus:outline-none"
+          >
+            <option value="todos">Todos los robots</option>
+            {(robots ?? []).map((r) => (
+              <option key={r.serial} value={r.serial}>
+                {r.nombre || r.serial}
+              </option>
+            ))}
+          </select>
+        </label>
+        )}
       </div>
 
       {/* Gráfica: cuadros de colores pegados a la esquina (estilo Search Console);
@@ -411,10 +523,34 @@ export function Analitica() {
         </div>
       </div>
 
+      {/* Por robot / Por proyecto: cada bloque se muestra solo mientras su filtro está en "Todos" */}
+      {!isLoading && totalInteracciones > 0 && ((verRobots && robot === 'todos') || proyecto === 'todos') && (
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {verRobots && robot === 'todos' && (
+            <TarjetaBarras
+              titulo="Por robot"
+              color="#9333ea"
+              filas={porRobot.map(([serial, total]) => ({ clave: serial, nombre: nombreRobot(serial), total }))}
+            />
+          )}
+          {proyecto === 'todos' && (
+            <TarjetaBarras
+              titulo="Por proyecto"
+              color="#f4846b"
+              filas={porProyecto.map(([id, total]) => ({
+                clave: id,
+                nombre: nombreProyecto(id === 'sin' ? null : id),
+                total,
+              }))}
+            />
+          )}
+        </div>
+      )}
+
       {/* Detalle de cada evento individual */}
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <h3 className="font-semibold text-slate-900">
-          Detalle de eventos{' '}
+          Detalle de interacciones{' '}
           <span className="font-normal text-slate-400">
             ({(detalle?.total ?? 0).toLocaleString('es-CO')})
           </span>
@@ -423,11 +559,12 @@ export function Analitica() {
 
         {/* 7 columnas no caben en un teléfono: la tabla se desliza de lado */}
         <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-slate-100">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">Evento</th>
-                <th className="px-4 py-2 font-medium">Robot</th>
+                {verRobots && <th className="px-4 py-2 font-medium">Robot</th>}
+                <th className="px-4 py-2 font-medium">Proyecto</th>
                 <th className="px-4 py-2 font-medium">Fecha</th>
                 <th className="px-4 py-2 font-medium">Hora</th>
                 <th className="px-4 py-2 font-medium">Seg. del video</th>
@@ -448,7 +585,8 @@ export function Analitica() {
                     />
                     {NOMBRE_TIPO[e.tipo] ?? e.tipo}
                   </td>
-                  <td className="px-4 py-2 text-slate-600">{e.serial}</td>
+                  {verRobots && <td className="px-4 py-2 text-slate-600">{nombreRobot(e.serial)}</td>}
+                  <td className="px-4 py-2 text-slate-600">{nombreProyecto(e.project_id)}</td>
                   <td className="px-4 py-2 text-slate-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {e.creado_at.slice(0, 10)}
                   </td>
@@ -464,7 +602,7 @@ export function Analitica() {
               ))}
               {(detalle?.eventos ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={verRobots ? 8 : 7} className="px-4 py-8 text-center text-slate-400">
                     Sin eventos en este rango.
                   </td>
                 </tr>
@@ -519,6 +657,40 @@ export function Analitica() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+/* ───────────── Barras horizontales por robot / proyecto ───────────── */
+
+function TarjetaBarras({
+  titulo,
+  color,
+  filas,
+}: {
+  titulo: string
+  color: string
+  filas: { clave: string; nombre: string; total: number }[]
+}) {
+  const maximo = Math.max(1, ...filas.map((f) => f.total))
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+      <h3 className="font-semibold text-slate-900">{titulo}</h3>
+      <div className="mt-4 max-h-72 space-y-4 overflow-y-auto pr-1">
+        {filas.map((f) => (
+          <div key={f.clave}>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="truncate text-slate-600">{f.nombre}</span>
+              <span className="font-semibold text-slate-800" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {f.total.toLocaleString('es-CO')}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full" style={{ width: `${(f.total / maximo) * 100}%`, backgroundColor: color }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

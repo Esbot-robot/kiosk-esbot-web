@@ -1,4 +1,4 @@
-/* Utilidades compartidas por las gráficas de Analítica e Inicio */
+/* Utilidades compartidas por las gráficas de Analítica */
 
 /* Fechas manejadas como texto plano (sin zonas horarias):
    los eventos se guardan tal cual y se comparan/agrupan por string. */

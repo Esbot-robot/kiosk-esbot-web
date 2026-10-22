@@ -201,7 +201,7 @@ export async function analizarArchivo(archivo: File): Promise<ResultadoCsv> {
       categorias: [],
       sinCategoria: 0,
       similares: [],
-      errorGeneral: 'Los archivos .xls (Excel antiguo) no se pueden leer. Guárdalo como .xlsx o como CSV UTF-8.',
+      errorGeneral: 'No es posible leer archivos .xls (formato antiguo de Excel). Guárdelo como .xlsx o CSV UTF-8.',
     }
   }
   return analizarCsv(decodificarArchivo(await archivo.arrayBuffer()))
@@ -225,12 +225,12 @@ export function analizarFilas(todas: string[][]): ResultadoCsv {
     return {
       ...vacio,
       errorGeneral:
-        `Falta la columna ${faltan.map((c) => `"${c}"`).join(', ')}. ` +
-        `El archivo trae: ${encontradas || 'ninguna columna con nombre'}. ` +
-        'Usa la plantilla para no equivocarte con los nombres.',
+        `No se encontró la columna ${faltan.map((c) => `«${c}»`).join(', ')}. ` +
+        `Columnas detectadas: ${encontradas || 'ninguna con nombre'}. ` +
+        'Se recomienda utilizar la plantilla para evitar diferencias en los nombres de columna.',
     }
   }
-  if (filas.length === 1) return { ...vacio, errorGeneral: 'El archivo solo tiene el encabezado, sin productos.' }
+  if (filas.length === 1) return { ...vacio, errorGeneral: 'El archivo contiene únicamente el encabezado y no incluye productos.' }
 
   const celda = (fila: string[], columna: string) => (indice[columna] === undefined ? '' : (fila[indice[columna]] ?? ''))
 
@@ -251,12 +251,12 @@ export function analizarFilas(todas: string[][]): ResultadoCsv {
       omitidas.push({
         fila: numero,
         motivo: celda(fila, 'precio').trim()
-          ? `"${nombre}": el precio "${celda(fila, 'precio').trim()}" no es un número`
-          : `"${nombre}": falta el precio`,
+          ? `«${nombre}»: el precio «${celda(fila, 'precio').trim()}» no es un valor numérico`
+          : `«${nombre}»: falta el precio`,
       })
       return
     }
-    if (precio.nota) advertencias.push(`Fila ${numero} ("${nombre}"): ${precio.nota}. Revisa el precio.`)
+    if (precio.nota) advertencias.push(`Fila ${numero} («${nombre}»): ${precio.nota}. Revise el precio.`)
 
     // stock: vacío = disponible
     let stock: number | null = null
@@ -264,19 +264,19 @@ export function analizarFilas(todas: string[][]): ResultadoCsv {
     if (stockBruto) {
       const n = Number(stockBruto.replace(/[.,]/g, ''))
       if (Number.isFinite(n) && n >= 0) stock = Math.round(n)
-      else advertencias.push(`Fila ${numero} ("${nombre}"): el stock "${stockBruto}" no es un número; se tomó como disponible.`)
+      else advertencias.push(`Fila ${numero} («${nombre}»): el stock «${stockBruto}» no es un valor numérico; se consideró disponible.`)
     }
 
     let precioAnterior: number | null = null
     const anteriorBruto = celda(fila, 'precio_anterior').trim()
     if (anteriorBruto) {
       const ant = leerPesos(anteriorBruto)
-      if (ant.valor === null) advertencias.push(`Fila ${numero} ("${nombre}"): el precio anterior "${anteriorBruto}" no es un número y se ignoró.`)
+      if (ant.valor === null) advertencias.push(`Fila ${numero} («${nombre}»): el precio anterior «${anteriorBruto}» no es un valor numérico y se omitió.`)
       else if (ant.valor > precio.valor && precio.valor > 0) precioAnterior = ant.valor
       else if (ant.valor > 0 && precio.valor > 0) {
         // Un "antes" menor o igual al precio no es un descuento: no se tacha, pero se avisa porque suele ser un error del archivo
         advertencias.push(
-          `Fila ${numero} ("${nombre}"): el precio anterior (${formatearPesos(ant.valor)}) no es mayor que el precio (${formatearPesos(precio.valor)}), así que no se mostrará tachado. ¿Están al revés?`
+          `Fila ${numero} («${nombre}»): el precio anterior (${formatearPesos(ant.valor)}) no supera al precio (${formatearPesos(precio.valor)}), por lo que no se mostrará tachado. Verifique que los valores no estén invertidos.`
         )
       }
     }
@@ -284,18 +284,18 @@ export function analizarFilas(todas: string[][]): ResultadoCsv {
     let imagen = celda(fila, 'url_imagen').trim()
     if (imagen) {
       if (!/^https?:\/\//i.test(imagen)) {
-        advertencias.push(`Fila ${numero} ("${nombre}"): el enlace de la imagen no empieza por http:// o https://; saldrá sin imagen.`)
+        advertencias.push(`Fila ${numero} («${nombre}»): la URL de la imagen debe iniciar con http:// o https://; el producto se mostrará sin imagen.`)
         imagen = ''
       } else if (esEnlaceDeCompartir(imagen)) {
         advertencias.push(
-          `Fila ${numero} ("${nombre}"): parece un enlace para compartir (Drive, Dropbox…), no una imagen directa; probablemente saldrá sin imagen.`
+          `Fila ${numero} («${nombre}»): la URL corresponde a un enlace para compartir (Drive, Dropbox u otro) y no a una imagen directa; es probable que el producto se muestre sin imagen.`
         )
       }
     }
 
     const categoria = limpiarTexto(celda(fila, 'categoria')).slice(0, MAX_CATEGORIA)
     const previo = nombresVistos.get(claveTexto(nombre))
-    if (previo !== undefined) advertencias.push(`Fila ${numero}: "${nombre}" ya aparece en la fila ${previo}.`)
+    if (previo !== undefined) advertencias.push(`Fila ${numero}: «${nombre}» ya figura en la fila ${previo}.`)
     else nombresVistos.set(claveTexto(nombre), numero)
 
     productos.push({
@@ -310,14 +310,14 @@ export function analizarFilas(todas: string[][]): ResultadoCsv {
   })
 
   if (productos.length === 0) {
-    return { ...vacio, omitidas, advertencias, errorGeneral: 'Ninguna fila tiene un producto válido (nombre y precio).' }
+    return { ...vacio, omitidas, advertencias, errorGeneral: 'Ninguna fila contiene un producto válido (nombre y precio).' }
   }
   if (productos.length > MAX_PRODUCTOS) {
     return {
       ...vacio,
       omitidas,
       advertencias,
-      errorGeneral: `El archivo tiene ${productos.length} productos y el máximo es ${MAX_PRODUCTOS}. Divídelo en varios proyectos o reduce el catálogo.`,
+      errorGeneral: `El archivo contiene ${productos.length} productos y el máximo permitido es ${MAX_PRODUCTOS}. Divida el catálogo o reduzca su tamaño.`,
     }
   }
 

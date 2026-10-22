@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from './Modal'
 import { Ayuda } from './Ayuda'
 import { Advertencia } from './Advertencia'
+import { Interruptor } from './Interruptor'
 import { CampoTexto } from './editor/ConfigFormulario'
 
 export const FRASE_QUIETO_MAX = 300
@@ -41,7 +42,7 @@ export function DialogDetener({ nombreRobot, enServicio, inicial, editando, onAc
     const seg = Number(segundos)
     if (sinVideo && frase.trim()) {
       if (!Number.isFinite(seg) || seg < FRASE_QUIETO_SEG_MIN || seg > FRASE_QUIETO_SEG_MAX) {
-        setError(`Escribe cada cuántos segundos dice la frase, entre ${FRASE_QUIETO_SEG_MIN} y ${FRASE_QUIETO_SEG_MAX}.`)
+        setError(`Indique cada cuántos segundos se reproduce el mensaje (entre ${FRASE_QUIETO_SEG_MIN} y ${FRASE_QUIETO_SEG_MAX}).`)
         return
       }
     }
@@ -72,30 +73,19 @@ export function DialogDetener({ nombreRobot, enServicio, inicial, editando, onAc
           <span className="flex items-center gap-2 font-semibold text-slate-800">
             Sin video
             <Ayuda>
-              El robot queda quieto en la pantalla inicial, sin reproducir el video de patrullaje. Los botones están siempre
-              activos (no hay que tocar primero) y no hay cuenta regresiva de inicio. Si alguien juega o ve productos, al
-              terminar vuelve a la pantalla inicial sin video. Sirve para dejarlo en la base de carga o en la entrada.
+              El robot permanece quieto en la pantalla inicial, sin reproducir el video de patrullaje. Los botones están
+              siempre activos y no hay cuenta regresiva de inicio. Tras una interacción (quiz, catálogo u otra), vuelve a
+              la pantalla inicial sin video. Recomendado para la base de carga o la entrada.
             </Ayuda>
           </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={sinVideo}
-            aria-label="Sin video"
-            onClick={() => setSinVideo((v) => !v)}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${sinVideo ? 'bg-indigo-600' : 'bg-slate-300'}`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${sinVideo ? 'left-[22px]' : 'left-0.5'}`}
-            />
-          </button>
+          <Interruptor activo={sinVideo} onChange={setSinVideo} etiqueta="Sin video" />
         </div>
 
         {sinVideo && (
           <div className="space-y-4">
             <CampoTexto
-              label="Frase que dirá el robot"
-              ayuda="La dice con la voz de Azure, sin animación, cada cierto tiempo mientras nadie esté usando la pantalla. Si la dejas vacía, el robot queda quieto sin decir nada."
+              label="Mensaje de voz del robot"
+              ayuda="Se reproduce con la voz de Azure, sin animación, a intervalos regulares mientras nadie utilice la pantalla. Si se deja vacío, el robot permanece quieto sin reproducir ningún mensaje."
               valor={frase}
               max={FRASE_QUIETO_MAX}
               filas={3}
@@ -103,10 +93,10 @@ export function DialogDetener({ nombreRobot, enServicio, inicial, editando, onAc
             />
             <div>
               <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-                Cada cuántos segundos la dice
+                Intervalo entre mensajes
                 <Ayuda>
-                  Entre {FRASE_QUIETO_SEG_MIN} y {FRASE_QUIETO_SEG_MAX} segundos. No habla si alguien tocó la pantalla hace
-                  poco o está jugando.
+                  Entre {FRASE_QUIETO_SEG_MIN} y {FRASE_QUIETO_SEG_MAX} segundos. No se reproduce si hubo una interacción
+                  reciente o si la pantalla está en uso.
                 </Ayuda>
               </p>
               <div className="flex items-center gap-3">

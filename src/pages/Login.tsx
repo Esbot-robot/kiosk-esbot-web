@@ -98,7 +98,7 @@ export function Login() {
       setError(credenciales ? 'Credenciales incorrectas' : describirError(error))
       return
     }
-    // la ruta por defecto decide: Inicio (super administrador) o Proyectos
+    // la ruta por defecto lleva a Proyectos
     navigate('/')
   }
 

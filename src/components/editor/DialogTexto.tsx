@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
+import { ModalPestanas } from '../ModalPestanas'
+import { Interruptor } from '../Interruptor'
+import { IconoPaleta } from '../iconosPopup'
 import { Ayuda } from '../Ayuda'
 import { CampoColor } from '../CampoColor'
 import { AparienciaBoton } from './AparienciaBoton'
@@ -44,8 +47,8 @@ export function DialogTexto({ titulo, valor, maxCaracteres, visible, onGuardar, 
       }}
     >
       <InterruptorMostrar
-        etiqueta="Mostrar este texto"
-        ayuda="Apagado, el robot lo oculta pero deja su espacio vacío: el resto de la pantalla no se mueve."
+        etiqueta="Texto visible"
+        ayuda="Deshabilitado, el robot lo oculta pero conserva su espacio: el resto de la pantalla no se desplaza."
         valor={mostrar}
         onChange={setMostrar}
       />
@@ -79,7 +82,7 @@ export function DialogTexto({ titulo, valor, maxCaracteres, visible, onGuardar, 
           max="100"
           value={opacidadFondo}
           onChange={(e) => setOpacidadFondo(Number(e.target.value))}
-          className="mt-3 w-full accent-indigo-600"
+          className="mt-3 w-full accent-[#1d293d]"
         />
       </div>
       <div className="mt-5 rounded-lg border border-slate-200 p-4">
@@ -92,7 +95,7 @@ export function DialogTexto({ titulo, valor, maxCaracteres, visible, onGuardar, 
             type="checkbox"
             checked={sombraActiva}
             onChange={(e) => setSombraActiva(e.target.checked)}
-            className="h-5 w-5 accent-indigo-600"
+            className="h-5 w-5 accent-[#1d293d]"
           />
         </label>
         {sombraActiva && (
@@ -132,7 +135,7 @@ export function InterruptorMostrar({ etiqueta, ayuda, valor, onChange }: Interru
         type="checkbox"
         checked={valor}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 accent-indigo-600"
+        className="h-4 w-4 accent-[#1d293d]"
       />
       <span className="flex items-center gap-2 font-semibold">
         {etiqueta}
@@ -152,7 +155,7 @@ interface DialogBotonProps {
   onCerrar: () => void
 }
 
-/** Diálogo "Editar botón" del mockup (incluye color de contorno) */
+/** Configuración del botón Jugar (quiz): habilitado, etiqueta y apariencia */
 export function DialogBoton({
   valor,
   projectId,
@@ -165,36 +168,42 @@ export function DialogBoton({
   const [visible, setVisible] = useState(activo)
 
   return (
-    <Modal
-      titulo="Editar botón"
-      textoAceptar="Guardar"
+    <ModalPestanas
+      titulo="Configuración del botón Jugar"
+      ayuda="Abre el quiz de preguntas. Si el evento no utiliza el quiz, el botón puede deshabilitarse."
+      pestanas={[{ id: 'apariencia', etiqueta: 'Apariencia', icono: <IconoPaleta /> }]}
+      activa="apariencia"
+      onCambiar={() => undefined}
       onCancelar={onCerrar}
       onAceptar={() => {
         onGuardar({ ...boton, texto: boton.texto.trim() }, visible)
         onCerrar()
       }}
     >
-      <InterruptorMostrar
-        etiqueta="Mostrar este botón"
-        ayuda="Apágalo si el evento no usa el quiz. Al menos un botón debe quedar activo."
-        valor={visible}
-        onChange={setVisible}
-      />
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-2 font-medium text-slate-800">
+            Botón habilitado
+            <Ayuda>Deshabilítelo si el evento no utiliza el quiz. Al menos un botón debe permanecer habilitado.</Ayuda>
+          </span>
+          <Interruptor activo={visible} onChange={setVisible} etiqueta="Botón habilitado" />
+        </div>
 
-      <p className="mb-2 font-medium text-slate-800">Texto del elemento</p>
-      <input
-        value={boton.texto}
-        onChange={(e) => setBoton((actual) => ({ ...actual, texto: e.target.value.slice(0, maxCaracteres) }))}
-        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-      />
-      <p className="mt-1 text-right text-sm text-slate-400">
-        {boton.texto.length} / {maxCaracteres} caracteres
-      </p>
+        <div>
+          <p className="mb-2 font-medium text-slate-800">Etiqueta del botón</p>
+          <input
+            value={boton.texto}
+            onChange={(e) => setBoton((actual) => ({ ...actual, texto: e.target.value.slice(0, maxCaracteres) }))}
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+          />
+          <p className="mt-1 text-right text-sm text-slate-400">
+            {boton.texto.length} / {maxCaracteres}
+          </p>
+        </div>
 
-      <div className="mt-4">
         <AparienciaBoton valor={boton} projectId={projectId} onChange={setBoton} />
       </div>
-    </Modal>
+    </ModalPestanas>
   )
 }
 
@@ -219,7 +228,7 @@ export function DialogTts({ titulo, valor, maxCaracteres, onGuardar, onCerrar }:
         onCerrar()
       }}
     >
-      <p className="mb-2 font-medium text-slate-800">Texto del Tts</p>
+      <p className="mb-2 font-medium text-slate-800">Texto del mensaje de voz</p>
       <textarea
         value={texto}
         onChange={(e) => setTexto(e.target.value.slice(0, maxCaracteres))}
@@ -296,7 +305,7 @@ export function DialogColoresOpciones({
   return (
     <Modal
       titulo="Colores de las opciones de respuesta"
-      ayuda="Cada botón tiene su color de fondo y de texto en la pantalla del robot. Deja vacío para usar el color original."
+      ayuda="Define el color de fondo y de texto de cada botón en la pantalla del robot. Si se deja vacío, se utiliza el color original."
       onCancelar={onCerrar}
       onAceptar={() => {
         onGuardar(fondo, texto)

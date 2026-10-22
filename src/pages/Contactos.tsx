@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { avisoConfirmar, avisoError, avisoGuardado } from '../lib/alertas'
 import { describirError } from '../lib/errores'
+import { neutralizarFormula } from '../lib/csv'
 import { Cargando } from '../components/Cargando'
 import type { Contacto } from '../types/config'
 import { esAdmin, usePerfil } from '../lib/perfil'
@@ -39,7 +40,7 @@ function urlFoto(id: string): string {
 
 /** Valor de una celda CSV: entre comillas si trae separador, comillas o saltos */
 function celdaCsv(valor: string | number | null): string {
-  const texto = valor === null ? '' : String(valor)
+  const texto = valor === null ? '' : neutralizarFormula(String(valor))
   return /[";\n\r]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto
 }
 
@@ -202,11 +203,11 @@ export function Contactos() {
   /** Botón Aplicar de las acciones en lote */
   async function aplicarAccion() {
     if (cantidadSeleccionada === 0) {
-      void avisoError('Sin selección', 'Marca al menos un contacto en la tabla.')
+      void avisoError('Sin selección', 'Seleccione al menos un contacto en la tabla.')
       return
     }
     if (!accion) {
-      void avisoError('Sin acción', 'Elige qué hacer con los contactos seleccionados.')
+      void avisoError('Sin acción', 'Seleccione la acción que desea aplicar a los contactos.')
       return
     }
     const cantidad = cantidadSeleccionada.toLocaleString('es-CO')
@@ -275,7 +276,7 @@ export function Contactos() {
       {cargandoProyectos ? (
         <Cargando />
       ) : !proyectoId ? (
-        <p className="mt-10 text-slate-500">Todavía no hay proyectos.</p>
+        <p className="mt-10 text-slate-500">No hay proyectos disponibles.</p>
       ) : (
         <>
           <div className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -402,7 +403,7 @@ export function Contactos() {
               </div>
             ) : filas.length === 0 ? (
               <p className="p-6 text-slate-500">
-                {filtro ? 'Ningún contacto coincide con la búsqueda.' : 'Aún no hay contactos en esta pestaña.'}
+                {filtro ? 'Ningún contacto coincide con la búsqueda.' : 'No hay contactos en esta pestaña.'}
               </p>
             ) : (
               <table className="w-full min-w-[40rem] text-left text-sm">
@@ -415,7 +416,7 @@ export function Contactos() {
                         checked={paginaMarcada}
                         onChange={(e) => marcarPagina(e.target.checked)}
                         aria-label="Seleccionar los contactos de esta página"
-                        className="h-4 w-4 cursor-pointer rounded accent-indigo-600"
+                        className="h-4 w-4 cursor-pointer rounded accent-[#1d293d]"
                       />
                     </th>
                     {origen === 'foto' && <th className="px-4 py-3 font-medium">Foto</th>}
@@ -440,7 +441,7 @@ export function Contactos() {
                           checked={todos || seleccion.has(c.id)}
                           onChange={(e) => marcarFila(c.id, e.target.checked)}
                           aria-label={`Seleccionar a ${c.nombre}`}
-                          className="h-4 w-4 cursor-pointer rounded accent-indigo-600"
+                          className="h-4 w-4 cursor-pointer rounded accent-[#1d293d]"
                         />
                       </td>
                       {origen === 'foto' && (
@@ -450,7 +451,7 @@ export function Contactos() {
                               href={urlFoto(c.foto_id)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title="Ver foto (si ya venció, no abre)"
+                              title="Ver foto (si el enlace venció, no se abrirá)"
                               className="font-semibold text-[#2A4470] hover:underline"
                             >
                               #{c.foto_numero}

@@ -72,7 +72,7 @@ export function AvisoSinConexion() {
 
   const { titulo, detalle } =
     estado === 'ok'
-      ? { titulo: 'Conexión restablecida', detalle: 'Ya puedes seguir trabajando con normalidad.' }
+      ? { titulo: 'Conexión restablecida', detalle: 'Puede continuar trabajando con normalidad.' }
       : estado === 'sin-red'
         ? { titulo: 'Sin conexión a internet', detalle: 'Los cambios no se guardarán hasta que vuelva la red.' }
         : {

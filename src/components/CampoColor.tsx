@@ -54,7 +54,7 @@ export function CampoColor({ label, value, onChange, ayuda }: CampoColorProps) {
           <input
             value={hexSinNumeral}
             onChange={(e) => cambiarDesdeTexto(e.target.value)}
-            placeholder="por defecto"
+            placeholder="Predeterminado"
             className="w-full min-w-0 bg-transparent py-1 uppercase placeholder:font-sans placeholder:normal-case placeholder:text-slate-400 focus:outline-none"
           />
         </div>

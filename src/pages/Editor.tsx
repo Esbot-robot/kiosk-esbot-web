@@ -51,10 +51,10 @@ type CampoTtsInicial =
 type CampoTtsRuleta = 'tts_acierta' | 'tts_no_acierta' | 'tts_agradecimiento' | 'tts_sin_respuesta'
 
 const TTS_INICIAL: { campo: CampoTtsInicial; label: string }[] = [
-  { campo: 'tts_toca_pantalla', label: 'Cuando usuario toca la pantalla' },
-  { campo: 'tts_llega_stand', label: 'Cuando robot llega al stand' },
+  { campo: 'tts_toca_pantalla', label: 'Al tocar la pantalla' },
+  { campo: 'tts_llega_stand', label: 'Al llegar al stand' },
   { campo: 'tts_despedida_stand', label: 'Despedida en el stand' },
-  { campo: 'tts_reanuda_patrulla', label: 'Cuando el robot reanuda patrulla' },
+  { campo: 'tts_reanuda_patrulla', label: 'Al reanudar el patrullaje' },
 ]
 
 /** Los TTS de la ruleta a mostrar dependen de los tipos de pregunta del proyecto */
@@ -64,13 +64,13 @@ function ttsRuletaVisibles(preguntas: Pregunta[]): { campo: CampoTtsRuleta; labe
   const hayTrivia = preguntas.length === 0 || preguntas.some((p) => p.tipo !== 'calificacion')
   const lista: { campo: CampoTtsRuleta; label: string }[] = []
   if (hayTrivia) {
-    lista.push({ campo: 'tts_acierta', label: 'Cuando el usuario acierta (trivia)' })
-    lista.push({ campo: 'tts_no_acierta', label: 'Cuando el usuario no acierta (trivia)' })
+    lista.push({ campo: 'tts_acierta', label: 'Al acertar (trivia)' })
+    lista.push({ campo: 'tts_no_acierta', label: 'Al no acertar (trivia)' })
   }
   if (hayCalif) {
     lista.push({ campo: 'tts_agradecimiento', label: 'Agradecimiento (calificación)' })
   }
-  lista.push({ campo: 'tts_sin_respuesta', label: 'Cuando no hubo respuesta' })
+  lista.push({ campo: 'tts_sin_respuesta', label: 'Sin respuesta' })
   return lista
 }
 
@@ -593,7 +593,7 @@ export function Editor() {
   function intentarGuardar() {
     if (rul.despues_quiz.modo === 'guiar_al_stand' && !rul.despues_quiz.secuencia_guia.trim()) {
       setPestana('ruleta')
-      setErrorGuardar('Falta el nombre de la secuencia de Temi para "Guiar al stand". Escríbelo antes de guardar.')
+      setErrorGuardar('Falta el nombre de la secuencia de Temi para «Guiar al stand». Ingréselo antes de guardar.')
       return
     }
     const botonIncompleto = botonesAdicionales.find((boton) =>
@@ -611,21 +611,21 @@ export function Editor() {
       setPestana('inicial')
       setErrorGuardar(
         botonIncompleto.accion === 'video'
-          ? `Completa el video, el texto final y la despedida de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+          ? `Complete el video, el mensaje final y la despedida de «${botonIncompleto.boton.texto || 'botón adicional'}».`
           : botonIncompleto.accion === 'secuencia'
-            ? `Completa la secuencia, el texto final y la despedida de "${botonIncompleto.boton.texto || 'botón adicional'}".`
-            : `Completa la ubicación y los textos de guía de "${botonIncompleto.boton.texto || 'botón adicional'}".`
+            ? `Complete la secuencia, el mensaje final y la despedida de «${botonIncompleto.boton.texto || 'botón adicional'}».`
+            : `Complete la ubicación y los mensajes de guía de «${botonIncompleto.boton.texto || 'botón adicional'}».`
       )
       return
     }
     if (botonFoto.activo && (!botonFoto.marco_url || !botonFoto.texto.trim())) {
       setPestana('inicial')
-      setErrorGuardar('Completa el marco de la promo y el texto del botón "Tomar foto".')
+      setErrorGuardar('Complete el marco de la promoción y el texto del botón «Tomar foto».')
       return
     }
     if (botonCatalogo.activo && botonCatalogo.productos.length === 0) {
       setPestana('inicial')
-      setErrorGuardar('Carga el archivo con los productos del botón de catálogo.')
+      setErrorGuardar('Cargue el archivo de productos del botón de catálogo.')
       return
     }
     // Sin ningún botón activo, el visitante toca la pantalla y no tiene qué hacer
@@ -637,7 +637,7 @@ export function Editor() {
       botonesAdicionales.some((boton) => boton.activo)
     if (!hayAlgunBoton) {
       setPestana('inicial')
-      setErrorGuardar('Deja al menos un botón activo: Jugar, uno adicional, el de tomar foto, el de registro o el de catálogo.')
+      setErrorGuardar('Debe permanecer al menos un botón habilitado: Jugar, uno adicional, Tomar foto, registro o catálogo.')
       return
     }
     setErrorGuardar('')
@@ -682,11 +682,11 @@ export function Editor() {
             onChange={(e) => setNombre(e.target.value)}
             readOnly={soloLectura}
             className="w-full rounded px-2 text-2xl font-bold text-slate-800 focus:bg-slate-50 focus:outline-none md:w-96"
-            title={soloLectura ? undefined : 'Nombre del proyecto (clic para editar)'}
+            title={soloLectura ? undefined : 'Nombre del proyecto (haga clic para editar)'}
           />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-sm text-slate-400">
             <span>Versión {config.version}</span>
-            {hayCambios && !guardar.isPending && !soloLectura && <Advertencia>Tienes cambios sin guardar</Advertencia>}
+            {hayCambios && !guardar.isPending && !soloLectura && <Advertencia>Hay cambios sin guardar</Advertencia>}
           </div>
         </div>
         <div className="flex">
@@ -765,7 +765,7 @@ export function Editor() {
                       ...(feria ? ESTILO_CINTA : {}),
                     }}
                   >
-                    {ini.titulo.texto || 'Título (clic en el lápiz)'}
+                    {ini.titulo.texto || 'Título (use el lápiz para editar)'}
                   </p>
                   <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
                     {!ini.titulo_visible && <EtiquetaOculto />}
@@ -1112,7 +1112,7 @@ export function Editor() {
                       ? 'Desactivado'
                       : botonFoto.marco_url
                         ? 'Toma foto, la enmarca y entrega un número'
-                        : 'Falta cargar el marco de la promo'
+                        : 'Falta cargar el marco de la promoción'
                   }
                   onClick={() => setDialogo({ tipo: 'boton-foto' })}
                 />
@@ -1162,7 +1162,7 @@ export function Editor() {
                         onChange={() =>
                           setRuleta({ despues_quiz: { ...rul.despues_quiz, modo: opcion.valor } })
                         }
-                        className="mt-1 accent-indigo-600"
+                        className="mt-1 accent-[#1d293d]"
                       />
                       <span>
                         <span className="block font-medium text-slate-800">{opcion.label}</span>
@@ -1176,7 +1176,7 @@ export function Editor() {
                     <ItemPanel
                       icono={<IconoPlay />}
                       label="Secuencia para guía"
-                      detalle={rul.despues_quiz.secuencia_guia || 'Vacío — escribe el nombre de Temi Center'}
+                      detalle={rul.despues_quiz.secuencia_guia || 'Sin definir: ingrese el nombre de la secuencia de Temi Center'}
                       onClick={() => setDialogo({ tipo: 'secuencia' })}
                     />
                   </div>
@@ -1237,14 +1237,14 @@ export function Editor() {
                 onClick={() => setConfirmarBorrar(true)}
                 disabled={guardar.isPending || borrar.isPending}
                 title="Eliminar proyecto"
-                className="rounded-lg border border-red-300 px-5 py-4 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                className="px-5 py-4 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
               >
                 Eliminar
               </button>
               <button
                 onClick={intentarGuardar}
                 disabled={guardar.isPending}
-                className="flex flex-1 items-center justify-center gap-3 rounded-lg bg-indigo-600 py-4 text-lg font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-3 bg-[#1d293d] py-4 text-lg font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 <IconoGuardar />
                 {guardar.isPending ? 'Guardando...' : guardadoOk ? 'Guardado ✓' : 'Guardar'}
@@ -1291,7 +1291,7 @@ export function Editor() {
             intentarGuardar()
           }}
           disabled={guardar.isPending}
-          className="bg-indigo-600 text-white shadow-indigo-600/30 hover:bg-indigo-700"
+          className="bg-[#1d293d] text-white shadow-[#1d293d]/30 hover:opacity-90"
         >
           <IconoGuardar className="h-5 w-5" />
         </AccionFlotante>
@@ -1342,7 +1342,7 @@ export function Editor() {
       {/* ─── Salir con cambios sin guardar ─── */}
       {salida.state === 'blocked' && (
         <Modal
-          titulo="Tienes cambios sin guardar"
+          titulo="Hay cambios sin guardar"
           textoAceptar="Salir sin guardar"
           onCancelar={() => salida.reset()}
           onAceptar={() => salida.proceed()}
@@ -1370,7 +1370,7 @@ export function Editor() {
 
           {(robotsFijados?.length ?? 0) > 0 ? (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <p className="font-semibold">⚠️ Este proyecto está fijado a estos robots:</p>
+              <p className="font-semibold">Este proyecto está asignado a los siguientes robots:</p>
               <ul className="mt-1 list-disc pl-5">
                 {robotsFijados!.map((s) => (
                   <li key={s} className="font-mono">
@@ -1398,7 +1398,7 @@ export function Editor() {
       {/* ─── Diálogos ─── */}
       {dialogo?.tipo === 'titulo' && (
         <DialogTexto
-          titulo="Editar titulo"
+          titulo="Editar título"
           valor={ini.titulo}
           maxCaracteres={LIMITES.TITULO_MAX}
           visible={ini.titulo_visible}
@@ -1408,7 +1408,7 @@ export function Editor() {
       )}
       {dialogo?.tipo === 'subtitulo' && (
         <DialogTexto
-          titulo="Editar subtitulo"
+          titulo="Editar subtítulo"
           valor={ini.subtitulo}
           maxCaracteres={LIMITES.SUBTITULO_MAX}
           visible={ini.subtitulo_visible}
@@ -1486,7 +1486,7 @@ export function Editor() {
           urlActual={ini.logo_url}
           nota="Resolución recomendada: 512 × 512 px, PNG con fondo transparente"
           mostrar={{
-            etiqueta: 'Mostrar el logo',
+            etiqueta: 'Logo visible',
             ayuda: 'Apagado, el robot lo oculta pero deja su espacio vacío: el resto de la pantalla no se mueve.',
             valor: ini.logo_visible,
             onGuardar: (logo_visible) => setInicial({ logo_visible }),
@@ -1530,7 +1530,7 @@ export function Editor() {
       {dialogo?.tipo === 'secuencia' && (
         <DialogTextoSimple
           titulo="Secuencia para guía"
-          etiqueta="Escribe el nombre de la secuencia creada en Temi center"
+          etiqueta="Ingrese el nombre de la secuencia creada en Temi Center"
           valor={rul.despues_quiz.secuencia_guia}
           onGuardar={(secuencia_guia) =>
             setRuleta({ despues_quiz: { ...rul.despues_quiz, secuencia_guia } })

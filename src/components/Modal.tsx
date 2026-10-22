@@ -70,7 +70,7 @@ export function Modal({
               <button
                 onClick={onAceptar}
                 disabled={aceptarDeshabilitado}
-                className="bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:px-8"
+                className="bg-[#1d293d] px-6 py-3 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 md:px-8"
               >
                 {textoAceptar}
               </button>

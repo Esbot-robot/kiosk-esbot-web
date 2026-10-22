@@ -8,6 +8,7 @@ import { nombreRol, usePerfil, type Rol } from '../lib/perfil'
 import { Modal } from '../components/Modal'
 import { Cargando } from '../components/Cargando'
 import { usePresencia } from '../lib/presencia'
+import { llamarUsuarios } from '../lib/usuariosApi'
 
 /** Fila que devuelve la función listar_usuarios (ver supabase/roles.sql) */
 interface Usuario {
@@ -27,25 +28,6 @@ interface ProyectoCorto {
   nombre: string
 }
 
-/**
- * Llama a la Edge Function "usuarios" (crear, editar, eliminar, entrar como).
- * Si responde con error, el mensaje es el que la función explica.
- */
-async function llamarUsuarios<T = { ok: true }>(cuerpo: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('usuarios', { body: cuerpo })
-  if (error) {
-    let mensaje = describirError(error)
-    try {
-      const respuesta = (error as { context?: Response }).context
-      const json = respuesta ? await respuesta.json() : null
-      if (json?.error) mensaje = json.error
-    } catch {
-      // sin cuerpo legible: queda el mensaje general
-    }
-    throw new Error(mensaje)
-  }
-  return data as T
-}
 
 /**
  * Respaldo si el canal en vivo no está disponible: el panel avisa a la base cada minuto
@@ -137,7 +119,7 @@ export function Usuarios() {
     setMenuAbierto(null)
     const ok = await avisoConfirmar(
       '¿Eliminar usuario?',
-      `${u.nombre} (${u.correo}) ya no podrá entrar al panel. No se puede deshacer.`
+      `${u.nombre} (${u.correo}) perderá el acceso al panel. Esta acción no se puede deshacer.`
     )
     if (!ok) return
     try {
@@ -167,7 +149,7 @@ export function Usuarios() {
       else window.open(url, '_blank')
     } catch (e) {
       pestana?.close()
-      void avisoError('No se pudo entrar como este usuario', describirError(e))
+      void avisoError('No fue posible ingresar como este usuario', describirError(e))
     }
   }
 
@@ -218,7 +200,7 @@ export function Usuarios() {
                   const motivoNoEliminar = esSuper
                     ? 'El super administrador no se puede eliminar'
                     : esYo
-                      ? 'No puedes eliminar tu propio usuario'
+                      ? 'No es posible eliminar el usuario propio'
                       : null
                   const nombresProyectos =
                     u.rol === 'lector'
@@ -266,7 +248,7 @@ export function Usuarios() {
                           opciones={[
                             {
                               texto: 'Editar',
-                              deshabilitado: puedeEditar ? null : 'No puedes editar al super administrador',
+                              deshabilitado: puedeEditar ? null : 'No es posible editar al super administrador',
                               accion: () => {
                                 setMenuAbierto(null)
                                 setEditando(u)
@@ -436,12 +418,12 @@ function DialogUsuario({
 
   async function guardar() {
     setError('')
-    if (nombre.trim().length < 2) return setError('Escribe el nombre.')
-    if (!/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/.test(correo.trim())) return setError('Revisa el correo.')
+    if (nombre.trim().length < 2) return setError('Ingrese el nombre.')
+    if (!/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/.test(correo.trim())) return setError('Verifique el correo electrónico.')
     if ((nuevo || contrasena) && contrasena.length < 8) {
       return setError('La contraseña debe tener al menos 8 caracteres.')
     }
-    if (rol === 'lector' && seleccion.length === 0) return setError('Elige al menos un proyecto para el cliente.')
+    if (rol === 'lector' && seleccion.length === 0) return setError('Seleccione al menos un proyecto para el cliente.')
 
     setGuardando(true)
     try {
@@ -575,7 +557,7 @@ function DialogUsuario({
             <input
               value={contrasena}
               onChange={(e) => setContrasena(e.target.value.slice(0, 72))}
-              placeholder={nuevo ? '' : 'Déjala vacía para no cambiarla'}
+              placeholder={nuevo ? '' : 'Dejar vacío para mantener la contraseña actual'}
               className={campo}
             />
             <button

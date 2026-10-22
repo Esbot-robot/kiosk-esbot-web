@@ -75,7 +75,7 @@ export function Ayuda({ children, ancho = 'w-72' }: AyudaProps) {
         aria-label="Ver ayuda"
         // cursor-default: sin esto el navegador muestra el puntero con "?" y no
         // gusta; el icono no se hace clic, solo se pasa por encima.
-        className="inline-flex cursor-default items-center"
+        className="inline-flex cursor-default items-center text-slate-300 transition-colors hover:text-slate-500 focus:text-slate-500 focus:outline-none"
         onMouseEnter={() => setAbierto(true)}
         onMouseLeave={() => setAbierto(false)}
         // Foco y blur dejan consultarla con el teclado, sin mouse.

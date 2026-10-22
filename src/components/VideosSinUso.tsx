@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Modal } from './Modal'
 import { supabase } from '../lib/supabase'
@@ -6,13 +6,9 @@ import { avisoCargando, avisoConfirmar, avisoError, avisoGuardado } from '../lib
 import { describirError } from '../lib/errores'
 import { tamanoLegible, type ArchivoMedia } from '../lib/media'
 
-/** Los subidos hace menos de esto no se pueden borrar: quizá aún no se ha
- *  guardado el proyecto, o un robot todavía los está mostrando */
-const DIAS_PROTEGIDO = 3
-
 /**
  * Lista de videos sin uso para borrarlos desde el panel (solo super
- * administrador, desde Inicio). Solo viajan nombres y tamaños: nada se
+ * administrador, desde Analítica › Almacenamiento). Solo viajan nombres y tamaños: nada se
  * reproduce ni se descarga, así que no suma egress. "Ver" abre un video
  * solo si se le da clic.
  */
@@ -29,12 +25,9 @@ export function VideosSinUso({
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
   const [borrando, setBorrando] = useState(false)
 
-  const protegido = (v: ArchivoMedia) =>
-    v.creado !== null && Date.now() - new Date(v.creado).getTime() < DIAS_PROTEGIDO * 24 * 3600_000
-  const borrables = useMemo(() => videos.filter((v) => !protegido(v)), [videos])
   const elegidos = videos.filter((v) => seleccion.has(v.ruta))
   const bytesElegidos = elegidos.reduce((t, v) => t + v.tamano, 0)
-  const todos = borrables.length > 0 && borrables.every((v) => seleccion.has(v.ruta))
+  const todos = videos.length > 0 && videos.every((v) => seleccion.has(v.ruta))
 
   function alternar(ruta: string) {
     setSeleccion((actual) => {
@@ -105,8 +98,7 @@ export function VideosSinUso({
                   <input
                     type="checkbox"
                     checked={todos}
-                    disabled={borrables.length === 0}
-                    onChange={() => setSeleccion(todos ? new Set() : new Set(borrables.map((v) => v.ruta)))}
+                    onChange={() => setSeleccion(todos ? new Set() : new Set(videos.map((v) => v.ruta)))}
                     aria-label="Seleccionar todos"
                     className="h-4 w-4 accent-[#2A4470]"
                   />
@@ -120,14 +112,12 @@ export function VideosSinUso({
             </thead>
             <tbody>
               {videos.map((v) => {
-                const bloqueado = protegido(v)
                 return (
-                  <tr key={v.ruta} className={`border-t border-slate-100 ${bloqueado ? 'text-slate-400' : 'text-slate-700'}`}>
+                  <tr key={v.ruta} className="border-t border-slate-100 text-slate-700">
                     <td className="px-3 py-2">
                       <input
                         type="checkbox"
                         checked={seleccion.has(v.ruta)}
-                        disabled={bloqueado}
                         onChange={() => alternar(v.ruta)}
                         aria-label={`Seleccionar ${v.nombre}`}
                         className="h-4 w-4 accent-[#2A4470]"
@@ -146,7 +136,6 @@ export function VideosSinUso({
                       {v.creado
                         ? new Date(v.creado).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
                         : '—'}
-                      {bloqueado && <span className="ml-1 text-xs">(reciente)</span>}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {/* Solo se descarga si se le da clic (eso sí gasta egress) */}
@@ -154,7 +143,7 @@ export function VideosSinUso({
                         href={supabase.storage.from('media').getPublicUrl(v.ruta).data.publicUrl}
                         target="_blank"
                         rel="noreferrer"
-                        title="Abrir el video en otra pestaña (gasta lo que pesa el video)"
+                        title="Abrir el video en otra pestaña (consume datos equivalentes al tamaño del video)"
                         className="text-xs font-semibold text-[#2A4470] hover:underline"
                       >
                         Ver

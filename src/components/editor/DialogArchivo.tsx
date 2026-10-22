@@ -12,7 +12,7 @@ import {
   type ProgresoSubida,
 } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
-import { IconoNube } from '../iconos'
+import { IconoNubeSubir } from '../iconosPopup'
 import { InterruptorMostrar } from './DialogTexto'
 
 interface DialogArchivoProps {
@@ -162,10 +162,10 @@ export function DialogArchivo({
         }}
         className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-8 py-16 text-center transition-colors ${
           subiendo ? 'cursor-default border-slate-300' : 'cursor-pointer'
-        } ${arrastrando ? 'border-indigo-500 bg-indigo-50' : subiendo ? '' : 'border-slate-300 hover:border-indigo-400'}`}
+        } ${arrastrando ? 'border-[#1d293d] bg-slate-50' : subiendo ? '' : 'border-slate-300 hover:border-slate-500'}`}
       >
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100">
-          <IconoNube />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-[#1d293d]">
+          <IconoNubeSubir className="h-9 w-9" />
         </div>
         {nombreMostrado ? (
           <p className="mt-4 break-all font-medium text-slate-800">
@@ -174,8 +174,8 @@ export function DialogArchivo({
           </p>
         ) : (
           <p className="mt-4 text-lg text-slate-700">
-            Arrastra un {tipo === 'imagen' ? 'una imagen' : 'video'} aquí o{' '}
-            <span className="font-medium text-indigo-600">haz clic para subir</span>
+            Arrastre {tipo === 'imagen' ? 'una imagen' : 'un video'} aquí o{' '}
+            <span className="font-medium text-[#1d293d] underline underline-offset-2">haga clic para seleccionar el archivo</span>
           </p>
         )}
         {/* Los formatos y el peso quedan a la vista: hacen falta antes de

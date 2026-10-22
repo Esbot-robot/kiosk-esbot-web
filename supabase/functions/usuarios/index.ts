@@ -125,12 +125,26 @@ Deno.serve(async (req) => {
       .select('user_id, nombre, rol')
       .eq('user_id', sesion.user.id)
       .single<Perfil>()
-    if (!yo || (yo.rol !== 'admin' && yo.rol !== 'superadmin')) {
-      throw new Rechazo('No tienes permiso para administrar usuarios.', 403)
-    }
+    if (!yo) throw new Rechazo('No tienes permiso para administrar usuarios.', 403)
 
     const cuerpo = await req.json()
     const accion = cuerpo?.accion as string
+
+    // ── Ajustes del propio perfil: cualquier rol puede cambiar SOLO su nombre ──
+    if (accion === 'mi_nombre') {
+      const nombre = typeof cuerpo?.nombre === 'string' ? cuerpo.nombre.trim() : ''
+      if (nombre.length < 2) throw new Rechazo('Ingrese el nombre.')
+      if (nombre.length > 80) throw new Rechazo('El nombre es demasiado largo.')
+      const { error } = await admin.auth.admin.updateUserById(yo.user_id, { user_metadata: { nombre } })
+      if (error) throw new Rechazo('No se pudo actualizar la cuenta.')
+      const { error: errorPerfil } = await admin.from('perfiles').update({ nombre }).eq('user_id', yo.user_id)
+      if (errorPerfil) throw new Rechazo('No se pudo actualizar el perfil.')
+      return respuesta({ ok: true })
+    }
+
+    if (yo.rol !== 'admin' && yo.rol !== 'superadmin') {
+      throw new Rechazo('No tienes permiso para administrar usuarios.', 403)
+    }
 
     // ── Crear ──
     if (accion === 'crear') {

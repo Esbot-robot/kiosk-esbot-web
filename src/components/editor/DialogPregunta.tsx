@@ -72,7 +72,7 @@ export function DialogPregunta({
       <div className="mb-5 rounded-lg border border-slate-200 p-4">
         <p className="mb-3 flex items-center gap-2 font-medium text-slate-800">
           Color en la ruleta
-          <Ayuda>Cuando la rueda se detiene en este color, sale esta pregunta. Cada pregunta debería tener un color distinto.</Ayuda>
+          <Ayuda>Al detenerse la rueda en este color, se presenta esta pregunta. Cada pregunta debe tener un color distinto.</Ayuda>
         </p>
         <div className="mb-3 flex flex-wrap gap-2">
           {PALETA_RULETA.map((c) => (
@@ -92,28 +92,26 @@ export function DialogPregunta({
         <CampoColor label="Otro color" value={color} onChange={setColor} />
       </div>
 
-      {/* Tipo de pregunta */}
-      <p className="mb-2 font-medium text-slate-800">Tipo de pregunta</p>
-      <div className="mb-5 grid grid-cols-2 gap-3">
+      {/* Tipo de pregunta: opciones en una fila, como el formato visual de los botones */}
+      <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <p className="font-medium text-slate-800">Tipo de pregunta</p>
         {(
           [
             { v: 'trivia', label: 'Trivia', detalle: 'Tiene respuesta correcta' },
             { v: 'calificacion', label: 'Calificación', detalle: 'Opinión, sin respuesta correcta' },
           ] as const
         ).map((op) => (
-          <button
-            key={op.v}
-            type="button"
-            onClick={() => setTipo(op.v)}
-            className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-              tipo === op.v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'
-            }`}
-          >
-            <span className="flex items-center gap-2 font-semibold text-slate-800">
-              {op.label}
-              <Ayuda>{op.detalle}</Ayuda>
-            </span>
-          </button>
+          <label key={op.v} className="flex cursor-pointer items-center gap-2 text-slate-800">
+            <input
+              type="radio"
+              name="tipo-pregunta"
+              checked={tipo === op.v}
+              onChange={() => setTipo(op.v)}
+              className="accent-[#1d293d]"
+            />
+            {op.label}
+            <Ayuda>{op.detalle}</Ayuda>
+          </label>
         ))}
       </div>
 
@@ -122,7 +120,7 @@ export function DialogPregunta({
         value={texto}
         onChange={(e) => setTexto(e.target.value.slice(0, LIMITES.PREGUNTA_MAX))}
         rows={2}
-        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+        className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-[#1d293d] focus:outline-none"
       />
       <p className="mt-1 text-right text-sm text-slate-400">
         {texto.length} / {LIMITES.PREGUNTA_MAX} caracteres
@@ -130,7 +128,7 @@ export function DialogPregunta({
 
       <div className="mt-4 flex items-center justify-between">
         <p className="font-medium text-slate-800">Opciones de respuesta</p>
-        {!esCalificacion && <p className="text-sm text-indigo-600">Marcar respuesta correcta →</p>}
+        {!esCalificacion && <p className="text-sm text-[#1d293d]">Marcar respuesta correcta →</p>}
       </div>
 
       <div className="mt-3 space-y-3">
@@ -138,7 +136,7 @@ export function DialogPregunta({
           <div key={i} className="flex items-center gap-3">
             <div
               className={`flex flex-1 items-center rounded-lg border px-4 py-3 ${
-                !esCalificacion && correcta === i ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-300'
+                !esCalificacion && correcta === i ? 'border-[#1d293d] ring-1 ring-[#1d293d]' : 'border-slate-300'
               }`}
             >
               <input
@@ -154,8 +152,8 @@ export function DialogPregunta({
                   title="Marcar como correcta"
                   className={`ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
                     correcta === i
-                      ? 'border-indigo-600 bg-indigo-600 text-white'
-                      : 'border-slate-300 text-transparent hover:border-indigo-400'
+                      ? 'border-[#1d293d] bg-[#1d293d] text-white'
+                      : 'border-slate-300 text-transparent hover:border-slate-500'
                   }`}
                 >
                   ✓
@@ -181,7 +179,7 @@ export function DialogPregunta({
           <button
             type="button"
             onClick={agregarOpcion}
-            className="font-medium text-indigo-600 hover:text-indigo-800"
+            className="font-medium text-[#1d293d] hover:opacity-80"
           >
             + Agregar opción
           </button>

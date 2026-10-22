@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import { Modal } from '../Modal'
+import { useEffect, useRef, useState } from 'react'
+import { ModalPestanas } from '../ModalPestanas'
 import { Ayuda } from '../Ayuda'
 import { BarraSubida } from '../BarraSubida'
+import { Interruptor } from '../Interruptor'
 import { AparienciaBoton } from './AparienciaBoton'
+import { CargadorArchivo } from './CargadorArchivo'
+import { IconoPaleta, IconoPlay, IconoSecuencia, IconoUbicacion, IconoVideo, IconoVoz } from '../iconosPopup'
 import { formatoMB, nombreDesdeUrl, rutaMedia, subirArchivo, type ProgresoSubida } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
 import type { BotonAdicionalInicial } from '../../types/config'
@@ -19,6 +22,40 @@ const MAX_VIDEO_BYTES = 50 * 1024 * 1024
 const MAX_BOTON = 20
 const MAX_TTS = 300
 
+type Pestana = 'apariencia' | 'accion' | 'voces'
+
+const PESTANAS = [
+  { id: 'apariencia', etiqueta: 'Apariencia', icono: <IconoPaleta /> },
+  { id: 'accion', etiqueta: 'Acción', icono: <IconoPlay /> },
+  { id: 'voces', etiqueta: 'Mensajes de voz', icono: <IconoVoz /> },
+]
+
+const ACCIONES: {
+  valor: BotonAdicionalInicial['accion']
+  etiqueta: string
+  ayuda: string
+  icono: React.ReactNode
+}[] = [
+  {
+    valor: 'video',
+    etiqueta: 'Reproducir video',
+    ayuda: 'Pausa el contador de reanudación hasta que el video finalice.',
+    icono: <IconoVideo className="h-5 w-5" />,
+  },
+  {
+    valor: 'ir_ubicacion',
+    etiqueta: 'Ir a una ubicación',
+    ayuda: 'Guía al visitante hasta la ubicación y, luego, retoma el recorrido.',
+    icono: <IconoUbicacion />,
+  },
+  {
+    valor: 'secuencia',
+    etiqueta: 'Reproducir secuencia',
+    ayuda: 'Ejecuta una secuencia de Temi Center y pausa el contador de reanudación hasta que finalice.',
+    icono: <IconoSecuencia />,
+  },
+]
+
 /** Configura una de las dos acciones opcionales de la pantalla inicial. */
 export function DialogBotonAdicional({
   indice,
@@ -28,12 +65,11 @@ export function DialogBotonAdicional({
   onCerrar,
 }: DialogBotonAdicionalProps) {
   const [boton, setBoton] = useState(() => structuredClone(valor))
+  const [pestana, setPestana] = useState<Pestana>('apariencia')
   const [error, setError] = useState('')
   const [subiendoCampo, setSubiendoCampo] = useState('')
   const [progreso, setProgreso] = useState<ProgresoSubida | null>(null)
   const cancelador = useRef<AbortController | null>(null)
-  const videoInput = useRef<HTMLInputElement>(null)
-  const trayectoInput = useRef<HTMLInputElement>(null)
 
   // Si el diálogo se cierra a mitad de la subida, la subida se cancela
   useEffect(() => () => cancelador.current?.abort(), [])
@@ -42,11 +78,11 @@ export function DialogBotonAdicional({
     setError('')
     if (!file) return
     if (!file.type.startsWith('video/')) {
-      setError('Selecciona un archivo de video MP4 o MOV.')
+      setError('Seleccione un archivo de video en formato MP4 o MOV.')
       return
     }
     if (file.size > MAX_VIDEO_BYTES) {
-      setError(`El video pesa ${formatoMB(file.size)}. El máximo es 50MB.`)
+      setError(`El video pesa ${formatoMB(file.size)}. El máximo permitido es 50 MB.`)
       return
     }
     const controlador = new AbortController()
@@ -61,58 +97,59 @@ export function DialogBotonAdicional({
       setBoton((actual) => ({ ...actual, [campo]: url }))
     } catch (e) {
       if (controlador.signal.aborted) return
-      setError(`No se pudo subir el video. ${describirError(e)}`)
+      setError(`No fue posible subir el video. ${describirError(e)}`)
     } finally {
       cancelador.current = null
       setSubiendoCampo('')
     }
   }
 
+  /** Muestra el error y lleva a la pestaña donde se corrige */
+  function fallar(en: Pestana, mensaje: string) {
+    setPestana(en)
+    setError(mensaje)
+  }
+
   function guardar() {
     const texto = boton.boton.texto.trim()
-    if (boton.activo && !texto) {
-      setError('Escribe el texto que verá el visitante en el botón.')
+    if (!boton.activo) {
+      onGuardar({ ...boton, boton: { ...boton.boton, texto } })
+      onCerrar()
       return
     }
-    if (boton.activo && boton.accion === 'video' && !boton.video_url) {
-      setError('Carga el video que reproducirá este botón.')
-      return
+    if (!texto) return fallar('apariencia', 'Ingrese la etiqueta del botón.')
+
+    if (boton.accion === 'video') {
+      if (!boton.video_url) return fallar('accion', 'Cargue el video que reproducirá este botón.')
+      if (!boton.tts_despues_video.trim()) {
+        return fallar('voces', 'Ingrese el mensaje que se reproducirá al finalizar el video.')
+      }
+      if (!boton.tts_despedida.trim()) {
+        return fallar('voces', 'Ingrese el mensaje de despedida previo a la reanudación del recorrido.')
+      }
     }
-    if (boton.activo && boton.accion === 'video' && !boton.tts_despues_video.trim()) {
-      setError('Escribe el texto que Temi dirá al terminar el video.')
-      return
+    if (boton.accion === 'secuencia') {
+      if (!boton.secuencia?.trim()) {
+        return fallar('accion', 'Ingrese el nombre exacto de la secuencia creada en Temi Center.')
+      }
+      if (!boton.tts_despues_video.trim()) {
+        return fallar('voces', 'Ingrese el mensaje que se reproducirá al finalizar la secuencia.')
+      }
+      if (!boton.tts_despedida.trim()) {
+        return fallar('voces', 'Ingrese el mensaje de despedida previo a la reanudación del recorrido.')
+      }
     }
-    if (boton.activo && boton.accion === 'video' && !boton.tts_despedida.trim()) {
-      setError('Escribe la despedida antes de que Temi reanude el patrullaje.')
-      return
-    }
-    if (boton.activo && boton.accion === 'secuencia' && !boton.secuencia?.trim()) {
-      setError('Escribe el nombre exacto de la secuencia creada en Temi Center.')
-      return
-    }
-    if (boton.activo && boton.accion === 'secuencia' && !boton.tts_despues_video.trim()) {
-      setError('Escribe el texto que Temi dirá al terminar la secuencia.')
-      return
-    }
-    if (boton.activo && boton.accion === 'secuencia' && !boton.tts_despedida.trim()) {
-      setError('Escribe la despedida antes de que Temi reanude el patrullaje.')
-      return
-    }
-    if (boton.activo && boton.accion === 'ir_ubicacion' && !boton.ubicacion.trim()) {
-      setError('Escribe el nombre exacto de la ubicación creada en Temi.')
-      return
-    }
-    if (boton.activo && boton.accion === 'ir_ubicacion' && !boton.tts_antes_de_ir.trim()) {
-      setError('Escribe el texto que Temi dirá antes de iniciar el recorrido.')
-      return
-    }
-    if (boton.activo && boton.accion === 'ir_ubicacion' && !boton.tts_al_llegar.trim()) {
-      setError('Escribe el texto que Temi dirá al llegar a la ubicación.')
-      return
-    }
-    if (boton.activo && boton.accion === 'ir_ubicacion' && !boton.tts_despedida.trim()) {
-      setError('Escribe la despedida antes de que Temi reanude el patrullaje.')
-      return
+    if (boton.accion === 'ir_ubicacion') {
+      if (!boton.ubicacion.trim()) return fallar('accion', 'Ingrese el nombre exacto de la ubicación creada en Temi.')
+      if (!boton.tts_antes_de_ir.trim()) {
+        return fallar('voces', 'Ingrese el mensaje que se reproducirá antes de iniciar el desplazamiento.')
+      }
+      if (!boton.tts_al_llegar.trim()) {
+        return fallar('voces', 'Ingrese el mensaje que se reproducirá al llegar a la ubicación.')
+      }
+      if (!boton.tts_despedida.trim()) {
+        return fallar('voces', 'Ingrese el mensaje de despedida previo a la reanudación del recorrido.')
+      }
     }
     onGuardar({ ...boton, boton: { ...boton.boton, texto } })
     onCerrar()
@@ -121,12 +158,10 @@ export function DialogBotonAdicional({
   const VideoUpload = ({
     campo,
     titulo,
-    input,
     ayudaExtra,
   }: {
     campo: 'video_url' | 'video_trayecto_url'
     titulo: string
-    input: RefObject<HTMLInputElement | null>
     /** se suma a la ayuda de formato, para lo propio de cada video */
     ayudaExtra?: string
   }) => {
@@ -134,255 +169,218 @@ export function DialogBotonAdicional({
     const subiendo = subiendoCampo === campo
     return (
       <div className="rounded-lg border border-slate-200 p-4">
-        <p className="flex items-center gap-2 font-medium text-slate-800">
+        <p className="mb-3 flex items-center gap-2 font-medium text-slate-800">
           {titulo}
-          <Ayuda>MP4 o MOV, máximo 50MB.{ayudaExtra ? ` ${ayudaExtra}` : ''}</Ayuda>
+          <Ayuda>MP4 o MOV, máximo 50 MB.{ayudaExtra ? ` ${ayudaExtra}` : ''}</Ayuda>
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={Boolean(subiendoCampo)}
-            onClick={() => input.current?.click()}
-            className="rounded-md border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-          >
-            {subiendo ? 'Subiendo...' : cargado ? 'Reemplazar video' : 'Cargar video'}
-          </button>
-          {cargado && !subiendo && (
-            <>
-              <span className="break-all text-sm text-emerald-700">{nombreDesdeUrl(cargado)}</span>
-              <button
-                type="button"
-                onClick={() => setBoton((actual) => ({ ...actual, [campo]: '' }))}
-                className="text-sm font-medium text-rose-600 hover:text-rose-700"
-              >
-                Quitar
-              </button>
-            </>
-          )}
-        </div>
-        {subiendo && (
-          <div className="mt-3">
-            <BarraSubida progreso={progreso} />
-          </div>
-        )}
-        <input
-          ref={input}
-          type="file"
+        <CargadorArchivo
+          entidad="video"
+          tipo="video"
+          etiquetaCarga="Cargar video"
+          detalle="MP4 o MOV (máx. 50 MB)"
           accept="video/mp4,video/quicktime"
-          className="hidden"
-          onChange={(e) => {
-            void subirVideo(campo, e.target.files?.[0])
-            e.target.value = ''
-          }}
+          url={cargado}
+          nombre={cargado ? nombreDesdeUrl(cargado) : undefined}
+          subiendo={subiendo}
+          estadoSubida={<BarraSubida progreso={progreso} />}
+          deshabilitado={Boolean(subiendoCampo)}
+          onElegir={(archivo) => void subirVideo(campo, archivo)}
+          onQuitar={() => setBoton((actual) => ({ ...actual, [campo]: '' }))}
         />
       </div>
     )
   }
 
   return (
-    <Modal
-      titulo={`Configurar botón adicional ${indice + 1}`}
+    <ModalPestanas
+      titulo={`Configuración del botón adicional ${indice + 1}`}
+      ayuda="Acción opcional de la pantalla inicial: reproduce un video, guía al visitante a una ubicación o ejecuta una secuencia de Temi Center."
+      pestanas={PESTANAS}
+      activa={pestana}
+      onCambiar={(id) => setPestana(id as Pestana)}
       onCancelar={onCerrar}
       onAceptar={guardar}
       aceptarDeshabilitado={Boolean(subiendoCampo)}
       textoAceptar={subiendoCampo ? 'Subiendo video...' : 'Guardar'}
       aviso={error}
     >
-      <div className="space-y-5">
-        <label className="flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 text-slate-800">
-          <input
-            type="checkbox"
-            checked={boton.activo}
-            onChange={(e) => setBoton((actual) => ({ ...actual, activo: e.target.checked }))}
-            className="h-4 w-4 accent-indigo-600"
-          />
-          <span className="flex items-center gap-2 font-semibold">
-            Mostrar este botón
-            <Ayuda>Los botones desactivados no aparecen en el robot.</Ayuda>
-          </span>
-        </label>
-
-        <div>
-          <p className="mb-2 font-medium text-slate-800">Texto del botón</p>
-          <input
-            value={boton.boton.texto}
-            maxLength={MAX_BOTON}
-            onChange={(e) =>
-              setBoton((actual) => ({
-                ...actual,
-                boton: { ...actual.boton, texto: e.target.value.slice(0, MAX_BOTON) },
-              }))
-            }
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-          />
-          <p className="mt-1 text-right text-sm text-slate-400">
-            {boton.boton.texto.length} / {MAX_BOTON} caracteres
-          </p>
-        </div>
-
-        <AparienciaBoton
-          valor={boton.boton}
-          projectId={projectId}
-          onChange={(visual) => setBoton((actual) => ({ ...actual, boton: visual }))}
-        />
-
-        <div>
-          <p className="mb-2 font-medium text-slate-800">Acción al tocar</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label
-              className={`cursor-pointer rounded-lg border p-4 ${
-                boton.accion === 'video' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
-              }`}
-            >
-              <input
-                type="radio"
-                name={`accion-${boton.id}`}
-                checked={boton.accion === 'video'}
-                onChange={() => setBoton((actual) => ({ ...actual, accion: 'video' }))}
-                className="mr-2 accent-indigo-600"
-              />
-              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
-                Reproducir video
-                <Ayuda>Pausa el contador hasta que termine.</Ayuda>
-              </span>
-            </label>
-            <label
-              className={`cursor-pointer rounded-lg border p-4 ${
-                boton.accion === 'ir_ubicacion' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
-              }`}
-            >
-              <input
-                type="radio"
-                name={`accion-${boton.id}`}
-                checked={boton.accion === 'ir_ubicacion'}
-                onChange={() => setBoton((actual) => ({ ...actual, accion: 'ir_ubicacion' }))}
-                className="mr-2 accent-indigo-600"
-              />
-              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
-                Ir a ubicación
-                <Ayuda>Guía al visitante y retoma el patrullaje.</Ayuda>
-              </span>
-            </label>
-            <label
-              className={`cursor-pointer rounded-lg border p-4 ${
-                boton.accion === 'secuencia' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
-              }`}
-            >
-              <input
-                type="radio"
-                name={`accion-${boton.id}`}
-                checked={boton.accion === 'secuencia'}
-                onChange={() => setBoton((actual) => ({ ...actual, accion: 'secuencia' }))}
-                className="mr-2 accent-indigo-600"
-              />
-              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
-                Reproducir secuencia
-                <Ayuda>Reproduce una secuencia de Temi Center y pausa el contador hasta que termine.</Ayuda>
-              </span>
-            </label>
+      {/* ───────── Apariencia ───────── */}
+      {pestana === 'apariencia' && (
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-2 font-medium text-slate-800">
+              Botón habilitado
+              <Ayuda>Los botones deshabilitados no se muestran en el robot.</Ayuda>
+            </span>
+            <Interruptor
+              activo={boton.activo}
+              onChange={(activo) => setBoton((actual) => ({ ...actual, activo }))}
+              etiqueta="Botón habilitado"
+            />
           </div>
-        </div>
 
-        {boton.accion === 'secuencia' ? (
-          <>
+          <div>
+            <p className="mb-2 font-medium text-slate-800">Etiqueta del botón</p>
+            <input
+              value={boton.boton.texto}
+              maxLength={MAX_BOTON}
+              onChange={(e) =>
+                setBoton((actual) => ({
+                  ...actual,
+                  boton: { ...actual.boton, texto: e.target.value.slice(0, MAX_BOTON) },
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="mt-1 text-right text-sm text-slate-400">
+              {boton.boton.texto.length} / {MAX_BOTON}
+            </p>
+          </div>
+
+          <AparienciaBoton
+            valor={boton.boton}
+            projectId={projectId}
+            onChange={(visual) => setBoton((actual) => ({ ...actual, boton: visual }))}
+          />
+        </div>
+      )}
+
+      {/* ───────── Acción ───────── */}
+      {pestana === 'accion' && (
+        <div className="space-y-5">
+          <div>
+            <p className="mb-2 font-medium text-slate-800">Acción al seleccionar</p>
+            {/* Selector en una sola fila: la opción elegida muestra su texto; las demás, solo el icono */}
+            <div
+              role="radiogroup"
+              aria-label="Acción al seleccionar"
+              className="inline-flex max-w-full gap-1 rounded-full border border-slate-200 bg-white p-1"
+            >
+              {ACCIONES.map(({ valor: accion, etiqueta, icono }) => {
+                const elegida = boton.accion === accion
+                return (
+                  <button
+                    key={accion}
+                    type="button"
+                    role="radio"
+                    aria-checked={elegida}
+                    aria-label={etiqueta}
+                    title={etiqueta}
+                    onClick={() => setBoton((actual) => ({ ...actual, accion }))}
+                    className={`flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-colors ${
+                      elegida
+                        ? 'bg-[#1d293d] px-5 text-white'
+                        : 'w-11 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                    }`}
+                  >
+                    {icono}
+                    {elegida && etiqueta}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-sm text-slate-500">{ACCIONES.find((a) => a.valor === boton.accion)?.ayuda}</p>
+          </div>
+
+          {boton.accion === 'secuencia' && (
             <div>
               <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
                 Secuencia de Temi
-                <Ayuda>Nombre exacto de la secuencia creada en Temi Center. Necesita internet en el robot.</Ayuda>
+                <Ayuda>
+                  Nombre exacto de la secuencia creada en Temi Center. Requiere conexión a internet en el robot.
+                </Ayuda>
               </p>
               <input
                 value={boton.secuencia ?? ''}
                 onChange={(e) => setBoton((actual) => ({ ...actual, secuencia: e.target.value }))}
-                placeholder="Nombre exacto creado en Temi Center"
+                placeholder="Nombre exacto en Temi Center"
                 className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
               />
             </div>
+          )}
+
+          {boton.accion === 'video' && (
+            <VideoUpload campo="video_url" titulo="Video a reproducir" />
+          )}
+
+          {boton.accion === 'ir_ubicacion' && (
+            <>
+              <div>
+                <p className="mb-2 font-medium text-slate-800">Ubicación de Temi</p>
+                <input
+                  value={boton.ubicacion}
+                  onChange={(e) => setBoton((actual) => ({ ...actual, ubicacion: e.target.value }))}
+                  placeholder="Nombre exacto en Temi Center"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+              <VideoUpload
+                campo="video_trayecto_url"
+                titulo="Video durante el trayecto (opcional)"
+                ayudaExtra="Si su duración es menor que la del trayecto, se repite hasta llegar."
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ───────── Mensajes de voz ───────── */}
+      {pestana === 'voces' && (
+        <div className="space-y-5">
+          {boton.accion === 'ir_ubicacion' && (
+            <>
+              <TtsField
+                titulo="Mensaje antes de iniciar el desplazamiento"
+                value={boton.tts_antes_de_ir}
+                onChange={(tts_antes_de_ir) => setBoton((actual) => ({ ...actual, tts_antes_de_ir }))}
+              />
+              <TtsField
+                titulo="Mensaje al llegar a la ubicación"
+                value={boton.tts_al_llegar}
+                onChange={(tts_al_llegar) => setBoton((actual) => ({ ...actual, tts_al_llegar }))}
+              />
+            </>
+          )}
+          {boton.accion !== 'ir_ubicacion' && (
             <TtsField
-              titulo="Texto al terminar la secuencia"
+              titulo={boton.accion === 'secuencia' ? 'Mensaje al finalizar la secuencia' : 'Mensaje al finalizar el video'}
+              ayuda={
+                boton.accion === 'video'
+                  ? 'Tras reproducirlo, se reanuda el contador que estaba en pausa.'
+                  : undefined
+              }
               value={boton.tts_despues_video}
               onChange={(tts_despues_video) => setBoton((actual) => ({ ...actual, tts_despues_video }))}
             />
-            <TtsField
-              titulo="Despedida antes de reanudar patrullaje"
-              value={boton.tts_despedida}
-              onChange={(tts_despedida) => setBoton((actual) => ({ ...actual, tts_despedida }))}
-            />
-          </>
-        ) : boton.accion === 'video' ? (
-          <>
-            <VideoUpload campo="video_url" titulo="Video que se reproducirá" input={videoInput} />
-            <div>
-              <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
-                Texto al terminar el video
-                <Ayuda>Después de decirlo, continúa el contador que estaba pausado.</Ayuda>
-              </p>
-              <textarea
-                value={boton.tts_despues_video}
-                maxLength={MAX_TTS}
-                rows={3}
-                onChange={(e) =>
-                  setBoton((actual) => ({ ...actual, tts_despues_video: e.target.value.slice(0, MAX_TTS) }))
-                }
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
-            <TtsField
-              titulo="Despedida antes de reanudar patrullaje"
-              value={boton.tts_despedida}
-              onChange={(tts_despedida) => setBoton((actual) => ({ ...actual, tts_despedida }))}
-            />
-          </>
-        ) : (
-          <>
-            <div>
-              <p className="mb-2 font-medium text-slate-800">Ubicación de Temi</p>
-              <input
-                value={boton.ubicacion}
-                onChange={(e) => setBoton((actual) => ({ ...actual, ubicacion: e.target.value }))}
-                placeholder="Nombre exacto creado en Temi Center"
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
-            <TtsField
-              titulo="Texto antes de iniciar el recorrido"
-              value={boton.tts_antes_de_ir}
-              onChange={(tts_antes_de_ir) => setBoton((actual) => ({ ...actual, tts_antes_de_ir }))}
-            />
-            <VideoUpload
-              campo="video_trayecto_url"
-              titulo="Video durante el trayecto (opcional)"
-              input={trayectoInput}
-              ayudaExtra="Si dura menos que el trayecto, se repetirá hasta llegar."
-            />
-            <TtsField
-              titulo="Texto al llegar a la ubicación"
-              value={boton.tts_al_llegar}
-              onChange={(tts_al_llegar) => setBoton((actual) => ({ ...actual, tts_al_llegar }))}
-            />
-            <TtsField
-              titulo="Despedida antes de reanudar patrullaje"
-              value={boton.tts_despedida}
-              onChange={(tts_despedida) => setBoton((actual) => ({ ...actual, tts_despedida }))}
-            />
-          </>
-        )}
-      </div>
-    </Modal>
+          )}
+          <TtsField
+            titulo="Mensaje de despedida antes de reanudar el recorrido"
+            value={boton.tts_despedida}
+            onChange={(tts_despedida) => setBoton((actual) => ({ ...actual, tts_despedida }))}
+          />
+        </div>
+      )}
+    </ModalPestanas>
   )
 }
 
 function TtsField({
   titulo,
+  ayuda,
   value,
   onChange,
 }: {
   titulo: string
+  ayuda?: string
   value: string
   onChange: (value: string) => void
 }) {
   return (
     <div>
-      <p className="mb-2 font-medium text-slate-800">{titulo}</p>
+      <p className="mb-2 flex items-center gap-2 font-medium text-slate-800">
+        {titulo}
+        {ayuda && <Ayuda>{ayuda}</Ayuda>}
+      </p>
       <textarea
         value={value}
         maxLength={MAX_TTS}

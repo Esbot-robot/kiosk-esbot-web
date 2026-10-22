@@ -121,8 +121,8 @@ export function Projects() {
             <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">Proyectos</h2>
             <p className="mt-2 text-slate-600">
               {admin
-                ? 'Gestiona y personaliza tus módulos interactivos desde un solo lugar.'
-                : 'Los proyectos de tu evento.'}
+                ? 'Gestión y personalización de los módulos interactivos desde un solo lugar.'
+                : 'Proyectos del evento.'}
             </p>
           </div>
           {/* En teléfono este botón se cambia por el flotante de abajo */}
@@ -163,11 +163,11 @@ export function Projects() {
               key={proyecto.id}
               onClick={() => navigate(`/editor/${proyecto.id}`)}
               className={`relative cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md ${
-                fijado ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'
+                fijado ? 'border-[#1d293d] ring-1 ring-[#1d293d]' : 'border-slate-200'
               }`}
             >
               {fijado && (
-                <span className="absolute right-3 top-3 z-10 rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
+                <span className="absolute right-3 top-3 z-10 rounded-full bg-[#1d293d] px-3 py-1 text-xs font-bold text-white">
                   {serials.length === 1 ? 'FIJADO' : `${serials.length} ROBOTS`}
                 </span>
               )}
@@ -209,7 +209,7 @@ export function Projects() {
                     disabled={duplicar.isPending}
                     title="Duplicar proyecto"
                     aria-label="Duplicar proyecto"
-                    className="rounded-lg px-2 py-1 text-blue-700 transition-colors hover:bg-indigo-50 disabled:opacity-40"
+                    className="rounded-lg px-2 py-1 text-[#1d293d] transition-colors hover:bg-slate-100 disabled:opacity-40"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -222,7 +222,7 @@ export function Projects() {
                       setProyectoAFijar(proyecto)
                     }}
                     title="Fijar proyecto a robot"
-                    className="rounded-lg px-2 py-1 transition-colors hover:bg-indigo-50"
+                    className="rounded-lg px-2 py-1 text-[#1d293d] transition-colors hover:bg-slate-100"
                   >
                     <IconoFijar />
                   </button>
@@ -239,8 +239,8 @@ export function Projects() {
             {busqueda
               ? 'Sin resultados para esa búsqueda.'
               : admin
-                ? 'Aún no hay proyectos. Crea el primero.'
-                : 'Todavía no tienes proyectos asignados.'}
+                ? 'No hay proyectos. Cree el primero.'
+                : 'No tiene proyectos asignados.'}
           </p>
         )}
       </div>

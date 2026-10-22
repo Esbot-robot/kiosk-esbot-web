@@ -263,8 +263,7 @@ export function Robots() {
 
       {!isLoading && (robots ?? []).length === 0 && (
         <p className="mt-10 text-slate-500">
-          Aún no hay reportes. Los robots aparecen aquí automáticamente al abrir la app Kiosk
-          Esbot.
+          No hay reportes. Los robots aparecen automáticamente al abrir la app Kiosk Esbot.
         </p>
       )}
 
@@ -496,7 +495,7 @@ function ControlComandos({
     }
     if (Date.now() - seguimiento.desde > LIMITE_ORDEN_MS) {
       terminar()
-      void avisoError('El robot no terminó a tiempo', 'Revisa su conexión a internet y el estado de la versión.')
+      void avisoError('El robot no terminó a tiempo', 'Verifique la conexión a internet del robot y el estado de la versión.')
       return
     }
     if (seguimiento.tipo === 'videollamada') {
@@ -559,7 +558,7 @@ function ControlComandos({
       <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-500">
         App del robot
         <Ayuda>
-          Actualizar config: el robot busca ya la última versión del proyecto, sin reiniciar. Si sigue diciendo "falta cargar", reinicia la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Mostrar carita: el robot deja de patrullar y repite sin parar la secuencia de la carita de Temi Center, aunque alguien esté muy cerca, hasta que toques Quitar carita. Decir algo: el robot lee la frase que escribas con la voz de Temi; tarda unos segundos en llegar. Solo funcionan si el robot está en línea: si aparece Desconectado, la app no está escuchando órdenes.
+          Actualizar config: el robot busca de inmediato la última versión del proyecto, sin reiniciar. Si continúa indicando «falta cargar», reinicie la app. Reiniciar app: la cierra y la vuelve a abrir; arranca con su ruta y su modo quieto. Mostrar carita: el robot deja de patrullar y repite de forma continua la secuencia de la carita de Temi Center, aunque haya personas cerca, hasta que se seleccione «Quitar carita». Decir algo: el robot reproduce el mensaje ingresado con la voz de Temi; puede tardar unos segundos en llegar. Estas órdenes solo funcionan con el robot en línea: si aparece «Desconectado», la app no está recibiendo órdenes.
         </Ayuda>
       </p>
       {/* Tres botones del mismo ancho; en tarjeta angosta, uno debajo del otro */}
@@ -622,7 +621,7 @@ function ControlComandos({
             rows={4}
             autoFocus
             onChange={(e) => setFrase(e.target.value.slice(0, MAX_FRASE))}
-            placeholder="Escribe lo que quieres que diga"
+            placeholder="Ingrese el mensaje que debe reproducir el robot"
             className="mt-4 w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-indigo-500 focus:outline-none"
           />
           <p className="mt-1 text-right text-sm text-slate-400">
@@ -716,7 +715,7 @@ function ControlComandos({
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-indigo-500 focus:outline-none"
             />
           </label>
-          <p className="mt-1 text-xs text-slate-500">Debe llamarse exactamente igual que en Temi Center. Necesita internet.</p>
+          <p className="mt-1 text-xs text-slate-500">Debe coincidir exactamente con el nombre en Temi Center. Requiere conexión a internet.</p>
           {!enServicio && (
             <Advertencia className="mt-3">
               Este robot no está en línea: la carita se mostrará cuando vuelva a conectarse.
@@ -762,7 +761,7 @@ function ControlComandos({
           }}
         >
           <p className="text-slate-700">
-            La app de <span className="font-semibold">{robot.nombre || 'el robot'}</span> se cerrará y volverá a abrir en unos segundos. Si está atendiendo a alguien, la interacción se corta. Al abrir sigue con su ruta (o quieto, si lo detuviste).
+            La app de <span className="font-semibold">{robot.nombre || 'el robot'}</span> se cerrará y volverá a abrir en unos segundos. Si está atendiendo a alguien, la interacción se corta. Al abrir, continúa con su ruta (o permanece quieto, si se había detenido).
           </p>
           {!enServicio && (
             <Advertencia className="mt-3">

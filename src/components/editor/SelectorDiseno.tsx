@@ -105,7 +105,7 @@ export function SelectorDiseno({
             label="Color del panel de abajo"
             value={colorPanel}
             onChange={onColorPanel}
-            ayuda="Es el fondo de la zona donde están el título, el subtítulo y los botones. El texto se ajusta solo para que se lea."
+            ayuda="Color de fondo de la zona que contiene el título, el subtítulo y los botones. El color del texto se ajusta automáticamente para garantizar la legibilidad."
           />
         </div>
       )}

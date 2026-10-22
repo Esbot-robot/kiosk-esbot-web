@@ -1,7 +1,9 @@
 import { Advertencia } from '../Advertencia'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { CampoColor } from '../CampoColor'
 import { Ayuda } from '../Ayuda'
+import { Interruptor } from '../Interruptor'
+import { CargadorArchivo } from './CargadorArchivo'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
 import { useDiseno } from '../../lib/disenos'
@@ -20,8 +22,6 @@ const MAX_ICONO_BYTES = 2 * 1024 * 1024
 export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonProps) {
   const [error, setError] = useState('')
   const [subiendo, setSubiendo] = useState(false)
-  const inputImagen = useRef<HTMLInputElement>(null)
-  const inputIcono = useRef<HTMLInputElement>(null)
   const [subiendoIcono, setSubiendoIcono] = useState(false)
   const esTarjeta = valor.forma === 'tarjeta'
   // Cada diseño usa solo parte de estos campos: el resto se oculta para no llenar el diálogo
@@ -34,7 +34,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
     setError('')
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      setError('Selecciona una imagen PNG, JPG o WEBP.')
+      setError('Seleccione una imagen en formato PNG, JPG o WEBP.')
       return
     }
     if (file.size > MAX_IMAGE_BYTES) {
@@ -47,7 +47,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
       const imagen_url = await subirArchivo('media', rutaMedia(projectId, file.name), file)
       onChange({ ...valor, imagen_url })
     } catch (e) {
-      setError(`No se pudo subir la imagen. ${describirError(e)}`)
+      setError(`No fue posible subir la imagen. ${describirError(e)}`)
     } finally {
       setSubiendo(false)
     }
@@ -57,7 +57,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
     setError('')
     if (!file) return
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-      setError('El ícono debe ser PNG, JPG o WEBP (mejor PNG con fondo transparente).')
+      setError('El ícono debe estar en formato PNG, JPG o WEBP (se recomienda PNG con fondo transparente).')
       return
     }
     if (file.size > MAX_ICONO_BYTES) {
@@ -69,7 +69,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
       const icono_url = await subirArchivo('media', rutaMedia(projectId, file.name), file)
       onChange({ ...valor, icono_url })
     } catch (e) {
-      setError(`No se pudo subir el ícono. ${describirError(e)}`)
+      setError(`No fue posible subir el ícono. ${describirError(e)}`)
     } finally {
       setSubiendoIcono(false)
     }
@@ -91,7 +91,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <p className="flex items-center gap-2 font-medium text-slate-800">
           Formato visual
-          <Ayuda>Píldora: el formato bajo y alargado. Tarjeta: más alta, con bordes redondeados.</Ayuda>
+          <Ayuda>Píldora: formato bajo y alargado. Tarjeta: formato más alto, con bordes redondeados.</Ayuda>
         </p>
         <label className="flex cursor-pointer items-center gap-2 text-slate-800">
           <input
@@ -99,7 +99,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
             name={`forma-${valor.imagen_url || valor.texto}`}
             checked={!esTarjeta}
             onChange={() => onChange({ ...valor, forma: 'pildora' })}
-            className="accent-indigo-600"
+            className="accent-[#1d293d]"
           />
           Píldora
         </label>
@@ -109,7 +109,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
             name={`forma-${valor.imagen_url || valor.texto}`}
             checked={esTarjeta}
             onChange={() => onChange({ ...valor, forma: 'tarjeta' })}
-            className="accent-indigo-600"
+            className="accent-[#1d293d]"
           />
           Tarjeta
         </label>
@@ -119,40 +119,21 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
         <div className="rounded-lg border border-slate-200 p-4">
           <p className="flex items-center gap-2 font-medium text-slate-800">
             Imagen de la tarjeta
-            <Ayuda>Se mostrará directamente, sin capas, filtros ni oscurecimiento.</Ayuda>
+            <Ayuda>Se muestra tal cual, sin capas, filtros ni oscurecimiento.</Ayuda>
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={subiendo}
-              onClick={() => inputImagen.current?.click()}
-              className="rounded-md border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-            >
-              {subiendo ? 'Subiendo...' : valor.imagen_url ? 'Reemplazar imagen' : 'Cargar imagen'}
-            </button>
-            {valor.imagen_url && (
-              <>
-                <span className="text-sm text-emerald-700">Imagen cargada</span>
-                <button
-                  type="button"
-                  onClick={() => onChange({ ...valor, imagen_url: '' })}
-                  className="text-sm font-medium text-rose-600 hover:text-rose-700"
-                >
-                  Quitar
-                </button>
-              </>
-            )}
+          <div className="mt-3">
+            <CargadorArchivo
+              entidad="imagen"
+              tipo="imagen"
+              etiquetaCarga="Cargar imagen"
+              detalle="PNG, JPG o WEBP (máx. 10 MB)"
+              accept="image/png,image/jpeg,image/webp"
+              url={valor.imagen_url}
+              subiendo={subiendo}
+              onElegir={(archivo) => void subirImagen(archivo)}
+              onQuitar={() => onChange({ ...valor, imagen_url: '' })}
+            />
           </div>
-          <input
-            ref={inputImagen}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              void subirImagen(e.target.files?.[0])
-              e.target.value = ''
-            }}
-          />
           {error && <Advertencia className="mt-3">{error}</Advertencia>}
         </div>
       )}
@@ -163,43 +144,24 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
             Ícono de la tarjeta
             <Ayuda>
               {diseno === 'banner'
-                ? 'La tarjeta se dibuja con su color de fondo en degradado y este ícono encima, con una franja abajo para el texto. '
-                : 'La tarjeta se dibuja con su color de fondo, rayas diagonales del mismo tono y este ícono dentro de un círculo. '}
-              Solo se usa cuando la tarjeta no tiene imagen. Usa un PNG cuadrado con fondo transparente. Máximo 2MB.
+                ? 'La tarjeta se compone con su color de fondo en degradado, este ícono y una franja inferior para el texto. '
+                : 'La tarjeta se compone con su color de fondo, rayas diagonales del mismo tono y este ícono dentro de un círculo. '}
+              Se utiliza únicamente cuando la tarjeta no tiene imagen. Formato recomendado: PNG cuadrado con fondo transparente, de máximo 2 MB.
             </Ayuda>
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={subiendoIcono}
-              onClick={() => inputIcono.current?.click()}
-              className="rounded-md border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-            >
-              {subiendoIcono ? 'Subiendo...' : valor.icono_url ? 'Reemplazar ícono' : 'Cargar ícono'}
-            </button>
-            {valor.icono_url && (
-              <>
-                <img src={valor.icono_url} alt="" className="h-8 w-8 rounded-full border border-slate-200 object-contain p-1" />
-                <button
-                  type="button"
-                  onClick={() => onChange({ ...valor, icono_url: '' })}
-                  className="text-sm font-medium text-rose-600 hover:text-rose-700"
-                >
-                  Quitar
-                </button>
-              </>
-            )}
+          <div className="mt-3">
+            <CargadorArchivo
+              entidad="ícono"
+              tipo="icono"
+              etiquetaCarga="Cargar ícono"
+              detalle="PNG, JPG o WEBP (máx. 2 MB)"
+              accept="image/png,image/jpeg,image/webp"
+              url={valor.icono_url ?? ''}
+              subiendo={subiendoIcono}
+              onElegir={(archivo) => void subirIcono(archivo)}
+              onQuitar={() => onChange({ ...valor, icono_url: '' })}
+            />
           </div>
-          <input
-            ref={inputIcono}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              void subirIcono(e.target.files?.[0])
-              e.target.value = ''
-            }}
-          />
           {/* Feria: círculo del ícono (relleno y contorno) y rayas */}
           {diseno === 'feria' && (
             <>
@@ -215,18 +177,17 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
                   onChange={(contorno_circulo) => onChange({ ...valor, contorno_circulo })}
                 />
               </div>
-              <label className="mt-4 flex items-center gap-3 text-sm text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={valor.rayas !== false}
-                  onChange={(e) => onChange({ ...valor, rayas: e.target.checked })}
-                  className="h-4 w-4 accent-indigo-600"
-                />
+              <div className="mt-4 flex items-center gap-3 text-sm text-slate-800">
                 <span className="flex items-center gap-2 font-medium">
                   Rayas diagonales
                   <Ayuda>Salen del color de fondo de la tarjeta: un tono más oscuro del mismo color.</Ayuda>
                 </span>
-              </label>
+                <Interruptor
+                  activo={valor.rayas !== false}
+                  onChange={(rayas) => onChange({ ...valor, rayas })}
+                  etiqueta="Rayas diagonales"
+                />
+              </div>
             </>
           )}
           {/* Banner: la franja de abajo, donde va el texto, tiene su propio color */}
@@ -236,7 +197,7 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
                 label="Color de la franja del texto"
                 value={valor.color_franja ?? ''}
                 onChange={(color_franja) => onChange({ ...valor, color_franja })}
-                ayuda="Es el color de la franja de abajo, donde va el texto de la tarjeta. Si lo dejas vacío, usa un tono más oscuro del color de la tarjeta."
+                ayuda="Color de la franja inferior de la tarjeta, donde se ubica el texto. Si no se define, se utiliza un tono más oscuro del color de la tarjeta."
               />
             </div>
           )}

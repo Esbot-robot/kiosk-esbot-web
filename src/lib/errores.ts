@@ -5,7 +5,7 @@
  */
 export function describirError(e: unknown): string {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return 'Sin conexión a internet. Revisa la red e intenta de nuevo.'
+    return 'Sin conexión a internet. Verifique la red e intente nuevamente.'
   }
 
   const err = (e ?? {}) as { message?: unknown; status?: unknown; statusCode?: unknown; code?: unknown; name?: unknown }
@@ -16,7 +16,7 @@ export function describirError(e: unknown): string {
 
   // corte por LIMITE_PETICION_MS (lib/supabase.ts)
   if (err.name === 'TimeoutError' || texto.includes('timed out') || texto.includes('timeout')) {
-    return 'El servidor tardó demasiado en responder. Revisa el internet e intenta de nuevo.'
+    return 'El servidor tardó demasiado en responder. Verifique la conexión a internet e intente nuevamente.'
   }
   // fetch caído: el navegador dice "online" pero la petición no llegó al servidor
   if (
@@ -26,19 +26,19 @@ export function describirError(e: unknown): string {
     texto.includes('load failed') ||
     texto.includes('network request failed')
   ) {
-    return 'No se pudo conectar con el servidor. Revisa el internet e intenta de nuevo.'
+    return 'No fue posible conectar con el servidor. Verifique la conexión a internet e intente nuevamente.'
   }
   if (estado === 401 || codigo === 'PGRST301' || texto.includes('jwt')) {
-    return 'Tu sesión expiró. Cierra sesión y vuelve a entrar.'
+    return 'La sesión expiró. Cierre sesión e ingrese nuevamente.'
   }
   if (estado === 403 || texto.includes('row-level security') || texto.includes('row level security')) {
-    return 'No tienes permiso para esta acción. Cierra sesión y vuelve a entrar.'
+    return 'No tiene permiso para realizar esta acción. Cierre sesión e ingrese nuevamente.'
   }
   if (estado === 413 || texto.includes('maximum allowed size') || texto.includes('too large')) {
-    return 'El archivo es más grande de lo que permite el servidor.'
+    return 'El archivo supera el tamaño máximo permitido por el servidor.'
   }
   if (estado >= 500) {
-    return 'El servidor no responde en este momento. Intenta de nuevo en unos minutos.'
+    return 'El servidor no responde en este momento. Intente nuevamente en unos minutos.'
   }
-  return mensaje || 'Ocurrió un error inesperado. Intenta de nuevo.'
+  return mensaje || 'Ocurrió un error inesperado. Intente nuevamente.'
 }

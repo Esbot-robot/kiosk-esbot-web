@@ -52,8 +52,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="max-w-md text-slate-700">
           {error
-            ? `No se pudo cargar tu perfil. ${describirError(error)}`
-            : 'Tu usuario no tiene un perfil asignado. Pide a un administrador que lo revise.'}
+            ? `No fue posible cargar el perfil. ${describirError(error)}`
+            : 'El usuario no tiene un perfil asignado. Solicite a un administrador que lo revise.'}
         </p>
         <div className="flex gap-3">
           {error && (
@@ -78,18 +78,16 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   return <PerfilContext.Provider value={perfil}>{children}</PerfilContext.Provider>
 }
 
-/** Página solo para el super administrador (Inicio): los demás van a Proyectos */
+/** Página solo para el super administrador: los demás van a Proyectos */
 export function SoloSuperadmin({ children }: { children: React.ReactNode }) {
   const perfil = usePerfil()
   if (perfil.rol !== 'superadmin') return <Navigate to="/proyectos" replace />
   return <>{children}</>
 }
 
-/** Al entrar al panel (o a una ruta que no existe): Inicio para el super
- *  administrador, Proyectos para los demás */
+/** Al entrar al panel (o a una ruta que no existe): Proyectos, para todos los roles */
 export function PaginaPorDefecto() {
-  const perfil = usePerfil()
-  return <Navigate to={perfil.rol === 'superadmin' ? '/inicio' : '/proyectos'} replace />
+  return <Navigate to="/proyectos" replace />
 }
 
 /** Páginas solo para administradores: el cliente lector vuelve a Proyectos */

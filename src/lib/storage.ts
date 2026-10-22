@@ -53,7 +53,7 @@ export async function subirArchivo(
       clearTimeout(vigilante)
       vigilante = setTimeout(() => {
         xhr.abort()
-        terminar(new Error('La subida se detuvo: el internet está muy lento o se cayó. Intenta de nuevo.'))
+        terminar(new Error('La carga se interrumpió: la conexión a internet es muy lenta o se perdió. Intente nuevamente.'))
       }, SIN_AVANCE_MS)
     }
     const cancelar = () => {

@@ -12,11 +12,19 @@ const GRIS: RGB = [112, 122, 140]
 const LINEA: RGB = [226, 232, 240]
 const FONDO: RGB = [245, 248, 252]
 
-/* Colores de cada tipo de evento: los mismos de la gráfica del panel */
-const COLOR_TOQUE: RGB = [42, 120, 214]
-const COLOR_JUGAR: RGB = [27, 175, 122]
-const COLOR_VIDEO: RGB = [139, 92, 246]
-const COLOR_UBICACION: RGB = [229, 122, 40]
+/** "#rrggbb" → [r, g, b] */
+function hexARgb(hex: string): RGB {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+/** Un tipo de interacción con su total y su serie en el tiempo (color: el de la gráfica del panel) */
+export interface TipoReporte {
+  nombre: string
+  color: string
+  valor: number
+  serie: number[]
+}
 
 export interface RespuestaDist {
   texto: string
@@ -28,22 +36,29 @@ export interface PreguntaDist {
   respuestas: RespuestaDist[]
 }
 
+/** Respuestas del quiz de una parte del reporte (un robot o un proyecto) */
+export interface GrupoDist {
+  /** vacío cuando el reporte no se desglosa */
+  titulo: string
+  detalle?: string
+  preguntas: PreguntaDist[]
+}
+
 export interface DatosReporte {
   robotLabel: string
+  proyectoLabel: string
+  /** el cliente lector no ve robots: el reporte no los menciona */
+  ocultarRobot?: boolean
+  /** interacciones por robot: solo cuando proyecto y robot están en "Todos" */
+  tablaRobots?: { nombre: string; total: number }[]
   desde: string // "YYYY-MM-DDTHH:mm"
   hasta: string
   granularidad: 'hora' | 'dia'
-  totalToques: number
-  totalJugar: number
-  totalVideos: number
-  totalUbicaciones: number
+  /** todos los botones, aunque no se hayan usado (valor 0) */
+  tipos: TipoReporte[]
   buckets: string[]
-  serieToques: number[]
-  serieJugar: number[]
-  serieVideos: number[]
-  serieUbicaciones: number[]
   etiquetaBucket: (b: string) => string
-  distribucion: PreguntaDist[]
+  grupos: GrupoDist[]
 }
 
 /** Imágenes que el documento incrusta (data URL PNG) */
@@ -155,13 +170,15 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
   }
 
   const robotTxt = d.robotLabel === 'todos' ? 'Todos los robots' : `Robot ${d.robotLabel}`
+  const proyectoTxt = d.proyectoLabel === 'todos' ? 'Todos los proyectos' : d.proyectoLabel
+  const alcanceTxt = d.ocultarRobot ? proyectoTxt : `${proyectoTxt} · ${robotTxt}`
   const rangoTxt = `${fechaLarga(d.desde)} — ${fechaLarga(d.hasta)}`
 
   /** Encabezado de las páginas interiores */
   const encabezado = (seccion: string) => {
     logo(M, 26, 92)
     etiqueta(seccion, W - M, 44, REAL, 'right')
-    texto(`${robotTxt} · ${fechaCorta(d.desde)} – ${fechaCorta(d.hasta)}`, W - M, 58, { tam: 8.5, color: GRIS, alinear: 'right' })
+    texto(`${alcanceTxt} · ${fechaCorta(d.desde)} – ${fechaCorta(d.hasta)}`, W - M, 58, { tam: 8.5, color: GRIS, alinear: 'right' })
     doc.setDrawColor(...CELESTE)
     doc.setLineWidth(1)
     doc.line(M, 84, W - M, 84)
@@ -199,7 +216,7 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
   const anioHasta = d.hasta.slice(0, 4)
   texto(anioDesde === anioHasta ? anioHasta : `${anioDesde}–${anioHasta}`, M, 715, { tam: 54, color: [255, 255, 255], negrita: true })
   texto(rangoTxt, M, 742, { tam: 11, color: [255, 255, 255] })
-  texto(robotTxt, M, 760, { tam: 10, color: CELESTE })
+  texto(alcanceTxt, M, 760, { tam: 10, color: CELESTE })
 
   // ═════════════ Página 2: resumen ═════════════
 
@@ -207,12 +224,7 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
   encabezado('Resumen')
   titular('RESUMEN DE', 'INTERACCIONES', M, 126, 22)
 
-  const tipos = [
-    { nombre: 'Toques de pantalla', valor: d.totalToques, serie: d.serieToques, color: COLOR_TOQUE },
-    { nombre: 'Botón jugar', valor: d.totalJugar, serie: d.serieJugar, color: COLOR_JUGAR },
-    { nombre: 'Botón video', valor: d.totalVideos, serie: d.serieVideos, color: COLOR_VIDEO },
-    { nombre: 'Guías a ubicación', valor: d.totalUbicaciones, serie: d.serieUbicaciones, color: COLOR_UBICACION },
-  ]
+  const tipos = d.tipos.map((t) => ({ ...t, color: hexARgb(t.color) }))
   const total = tipos.reduce((s, t) => s + t.valor, 0)
   const porBucket = d.buckets.map((_, i) => tipos.reduce((s, t) => s + (t.serie[i] ?? 0), 0))
   const iPico = porBucket.reduce((mejor, v, i) => (v > porBucket[mejor] ? i : mejor), 0)
@@ -244,10 +256,10 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
   // Los cuatro tipos, numerados
   const gridY = 282
   const celdaW = (W - 2 * M - 24) / 2
-  const celdaH = 74
+  const celdaH = 62
   tipos.forEach((tipo, i) => {
     const x = M + (i % 2) * (celdaW + 24)
-    const y = gridY + Math.floor(i / 2) * (celdaH + 14)
+    const y = gridY + Math.floor(i / 2) * (celdaH + 10)
     doc.setFillColor(...tipo.color)
     doc.circle(x + 14, y + 16, 14, 'F')
     texto(String(i + 1), x + 14, y + 20.5, { tam: 12, color: [255, 255, 255], negrita: true, alinear: 'center' })
@@ -263,7 +275,7 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
   })
 
   // Gráfica de actividad
-  const secY = gridY + 2 * (celdaH + 14) + 22
+  const secY = gridY + Math.ceil(tipos.length / 2) * (celdaH + 10) + 18
   etiqueta(`Actividad por ${unidad}`, M, secY, REAL)
   let leyendaX = W - M
   ;[...tipos].reverse().forEach((tipo) => {
@@ -274,13 +286,14 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
     texto(tipo.nombre, leyendaX, secY, { tam: 8, color: GRIS })
     doc.setFillColor(...tipo.color)
     doc.circle(leyendaX - 7, secY - 2.6, 3, 'F')
-    leyendaX -= 22
+    leyendaX -= 18
   })
 
   const gX = M + 26
   const gY = secY + 22
   const gW = W - M - gX
-  const gH = 190
+  // La gráfica ocupa el espacio que dejan las tarjetas, sin pasar del pie de página
+  const gH = Math.max(110, Math.min(190, H - 80 - gY))
   const n = d.buckets.length
   const maxV = Math.max(1, ...tipos.flatMap((t) => t.serie))
   // Escala "redonda" para el eje: 4 divisiones
@@ -302,8 +315,8 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
     // Área suave bajo los toques, la serie principal
     if (n > 1) {
       poligono(
-        [[xDe(0), gY + gH], ...d.serieToques.map((v, i) => [xDe(i), yDe(v)] as [number, number]), [xDe(n - 1), gY + gH]],
-        COLOR_TOQUE,
+        [[xDe(0), gY + gH], ...(tipos[0]?.serie ?? []).map((v, i) => [xDe(i), yDe(v)] as [number, number]), [xDe(n - 1), gY + gH]],
+        tipos[0]?.color ?? REAL,
         0.12
       )
     }
@@ -322,60 +335,109 @@ export function construirReportePdf(d: DatosReporte, recursos: RecursosReporte =
     texto(d.etiquetaBucket(d.buckets[i]), xDe(i), gY + gH + 14, { tam: 7, color: GRIS, alinear: 'center' })
   }
 
-  // ═════════════ Página 3 en adelante: respuestas del quiz ═════════════
+  // ═════════════ Página 3 en adelante: robots y respuestas del quiz ═════════════
 
-  if (d.distribucion.length === 0) {
+  const hayPreguntas = d.grupos.some((g) => g.preguntas.length > 0)
+  const tablaRobots = d.tablaRobots ?? []
+  const hayRobots = tablaRobots.length > 0
+
+  if (!hayPreguntas && !hayRobots) {
     texto('No se registraron respuestas del quiz en este rango.', M, gY + gH + 44, { tam: 9.5, color: GRIS })
   } else {
+    const seccion = hayRobots ? 'Detalle' : 'Quiz'
     doc.addPage()
-    encabezado('Quiz')
-    titular('RESPUESTAS DEL', 'QUIZ', M, 126, 22)
-
-    const colW = (W - 2 * M - 28) / 2
-    const altoPregunta = (p: PreguntaDist) => {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10)
-      const lineas = doc.splitTextToSize(p.pregunta, colW - 40).length
-      return 38 + Math.max(lineas, 1) * 13 + p.respuestas.length * 30
-    }
-    let y = 150
-    for (let i = 0; i < d.distribucion.length; i += 2) {
-      const fila = d.distribucion.slice(i, i + 2)
-      const altoFila = Math.max(...fila.map(altoPregunta))
-      if (y + altoFila > H - 70) {
+    encabezado(seccion)
+    let y = 112
+    /** Pasa a una página nueva si lo que sigue no cabe en esta */
+    const asegurar = (alto: number) => {
+      if (y + alto > H - 70) {
         doc.addPage()
-        encabezado('Quiz')
+        encabezado(seccion)
         y = 112
       }
-      fila.forEach((p, j) => {
-        const x = M + j * (colW + 28)
-        const num = i + j + 1
-        // Número de la pregunta
+    }
+
+    if (hayRobots) {
+      titular('INTERACCIONES POR', 'ROBOT', M, y + 14, 22)
+      y += 38
+      const maxRobot = Math.max(1, ...tablaRobots.map((r) => r.total))
+      tablaRobots.forEach((r) => {
+        asegurar(34)
+        texto(doc.splitTextToSize(r.nombre, W - 2 * M - 80)[0], M, y + 8, { tam: 9.5, color: TINTA })
+        texto(numero(r.total), W - M, y + 8, { tam: 10, color: REAL, negrita: true, alinear: 'right' })
+        doc.setFillColor(...LINEA)
+        doc.rect(M, y + 13, W - 2 * M, 6, 'F')
         doc.setFillColor(...REAL)
-        doc.rect(x, y, 26, 26, 'F')
-        texto(String(num).padStart(2, '0'), x + 13, y + 17.5, { tam: 11, color: [255, 255, 255], negrita: true, alinear: 'center' })
+        doc.rect(M, y + 13, Math.max(2, ((W - 2 * M) * r.total) / maxRobot), 6, 'F')
+        y += 30
+      })
+      y += 20
+    }
+
+    if (hayPreguntas) {
+      asegurar(120)
+      titular('RESPUESTAS DEL', 'QUIZ', M, y + 14, 22)
+      y += 38
+
+      const colW = (W - 2 * M - 28) / 2
+      const altoPregunta = (p: PreguntaDist) => {
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(10)
-        const lineas = doc.splitTextToSize(p.pregunta, colW - 40)
-        texto(lineas, x + 38, y + 10, { tam: 10, color: MARINO, negrita: true })
-        let yy = y + 18 + lineas.length * 13
-        texto(`${numero(p.total)} ${p.total === 1 ? 'respuesta' : 'respuestas'}`, x + 38, yy, { tam: 8, color: GRIS })
-        yy += 16
-        const maxConteo = Math.max(...p.respuestas.map((r) => r.conteo))
-        p.respuestas.forEach((r) => {
-          const pct = p.total > 0 ? Math.round((r.conteo / p.total) * 100) : 0
-          const gana = r.conteo === maxConteo && r.conteo > 0
-          const etq = doc.splitTextToSize(r.texto, colW - 60)[0]
-          texto(etq, x, yy + 8, { tam: 9, color: TINTA, negrita: gana })
-          texto(`${pct}%`, x + colW, yy + 8, { tam: gana ? 11 : 9, color: gana ? REAL : GRIS, negrita: true, alinear: 'right' })
-          doc.setFillColor(...LINEA)
-          doc.rect(x, yy + 13, colW, 6, 'F')
-          doc.setFillColor(...(gana ? REAL : CELESTE))
-          doc.rect(x, yy + 13, Math.max(2, (colW * pct) / 100), 6, 'F')
-          yy += 30
-        })
-      })
-      y += altoFila + 26
+        const lineas = doc.splitTextToSize(p.pregunta, colW - 40).length
+        return 38 + Math.max(lineas, 1) * 13 + p.respuestas.length * 30
+      }
+
+      for (const grupo of d.grupos) {
+        if (grupo.preguntas.length === 0) continue
+        if (grupo.titulo) {
+          // Franja con el nombre del robot o proyecto al que pertenecen las respuestas
+          asegurar(34 + altoPregunta(grupo.preguntas[0]))
+          doc.setFillColor(...FONDO)
+          doc.rect(M, y, W - 2 * M, 24, 'F')
+          doc.setFillColor(...REAL)
+          doc.rect(M, y, 4, 24, 'F')
+          texto(doc.splitTextToSize(grupo.titulo, W - 2 * M - 160)[0], M + 14, y + 16, { tam: 10.5, color: MARINO, negrita: true })
+          if (grupo.detalle) texto(grupo.detalle, W - M - 10, y + 16, { tam: 8.5, color: GRIS, alinear: 'right' })
+          y += 40
+        }
+        for (let i = 0; i < grupo.preguntas.length; i += 2) {
+          const fila = grupo.preguntas.slice(i, i + 2)
+          const altoFila = Math.max(...fila.map(altoPregunta))
+          asegurar(altoFila)
+          fila.forEach((p, j) => {
+            const x = M + j * (colW + 28)
+            const num = i + j + 1
+            // Número de la pregunta
+            doc.setFillColor(...REAL)
+            doc.rect(x, y, 26, 26, 'F')
+            texto(String(num).padStart(2, '0'), x + 13, y + 17.5, { tam: 11, color: [255, 255, 255], negrita: true, alinear: 'center' })
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(10)
+            const lineas = doc.splitTextToSize(p.pregunta, colW - 40)
+            texto(lineas, x + 38, y + 10, { tam: 10, color: MARINO, negrita: true })
+            let yy = y + 18 + lineas.length * 13
+            texto(`${numero(p.total)} ${p.total === 1 ? 'respuesta' : 'respuestas'}`, x + 38, yy, { tam: 8, color: GRIS })
+            yy += 16
+            const maxConteo = Math.max(...p.respuestas.map((r) => r.conteo))
+            p.respuestas.forEach((r) => {
+              const pct = p.total > 0 ? Math.round((r.conteo / p.total) * 100) : 0
+              const gana = r.conteo === maxConteo && r.conteo > 0
+              const etq = doc.splitTextToSize(r.texto, colW - 60)[0]
+              texto(etq, x, yy + 8, { tam: 9, color: TINTA, negrita: gana })
+              texto(`${pct}%`, x + colW, yy + 8, { tam: gana ? 11 : 9, color: gana ? REAL : GRIS, negrita: true, alinear: 'right' })
+              doc.setFillColor(...LINEA)
+              doc.rect(x, yy + 13, colW, 6, 'F')
+              doc.setFillColor(...(gana ? REAL : CELESTE))
+              doc.rect(x, yy + 13, Math.max(2, (colW * pct) / 100), 6, 'F')
+              yy += 30
+            })
+          })
+          y += altoFila + 26
+        }
+      }
+    } else {
+      asegurar(30)
+      texto('No se registraron respuestas del quiz en este rango.', M, y + 10, { tam: 9.5, color: GRIS })
     }
   }
 

@@ -234,7 +234,7 @@ export function Notificaciones({ oscuro = false }: { oscuro?: boolean }) {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {nuevas.length === 0 && (
               <p className={`px-4 text-center text-sm text-slate-400 ${lista.length === 0 ? 'py-10' : 'py-6'}`}>
-                No tienes notificaciones nuevas.
+                No hay notificaciones nuevas.
               </p>
             )}
             {nuevas.map((g) => fila(g, false))}

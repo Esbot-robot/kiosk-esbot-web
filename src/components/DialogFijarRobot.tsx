@@ -59,7 +59,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
           .eq('id', existente.project_id)
           .maybeSingle()
         throw new Error(
-          `Ese robot ya está fijado al proyecto "${dueno?.nombre ?? 'otro'}". Quítalo de allá primero.`
+          `Este robot ya está asignado al proyecto «${dueno?.nombre ?? 'otro'}». Retírelo de ese proyecto antes de continuar.`
         )
       }
 
@@ -93,7 +93,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
       titulo="Fijar proyecto a robot"
       onCancelar={onCerrar}
       onAceptar={onCerrar}
-      textoAceptar="Listo"
+      textoAceptar="Aceptar"
     >
       {/* Robots ya fijados a este proyecto */}
       {(robotsFijados?.length ?? 0) > 0 && (
@@ -146,7 +146,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
       </div>
       {serial.trim().length > 0 && !serialValido && (
         <Advertencia className="mt-2">
-          El ID del robot debe tener {LARGO_SERIAL} caracteres (tienes {serial.trim().length}).
+          El ID del robot debe tener {LARGO_SERIAL} caracteres (se ingresaron {serial.trim().length}).
         </Advertencia>
       )}
 
