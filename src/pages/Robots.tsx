@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { FilaVinculo } from '../components/VinculoRobotPanel'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/alertas'
@@ -321,6 +322,7 @@ export function Robots() {
                       )
                     })()}
                     <BateriaCompacta nivel={r.bateria} enServicio={enServicio} />
+                    <FilaVinculo serial={r.serial} />
                   </div>
                 </div>
 
