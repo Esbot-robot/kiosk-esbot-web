@@ -37,8 +37,13 @@ function minutosSegundos(ms: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
+/** ¿El robot quedó vinculado después de generar este código? (con 5 s de margen entre relojes) */
+function quedoVinculado(vinculo: Vinculo | undefined, creado: number): boolean {
+  return !!vinculo?.vinculado && !!vinculo.vinculado_at && new Date(vinculo.vinculado_at).getTime() >= creado - 5_000
+}
+
 /** Línea de la tarjeta del robot: estado del vínculo y sus acciones */
-export function FilaVinculo({ serial }: { serial: string }) {
+export function FilaVinculo({ serial, enServicio }: { serial: string; enServicio: boolean }) {
   const queryClient = useQueryClient()
   const { data: vinculos } = useVinculos()
   const vinculo = vinculos?.get(serial)
@@ -69,7 +74,28 @@ export function FilaVinculo({ serial }: { serial: string }) {
     onError: (e) => void avisoError('No se pudo revocar el vínculo', describirError(e)),
   })
 
+  const quitar = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('quitar_robot_sin_vincular', { p_serial: serial })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['vinculos-robots'] })
+      void queryClient.invalidateQueries({ queryKey: ['robot-status'] })
+      void avisoGuardado('Robot quitado del panel')
+    },
+    onError: (e) => void avisoError('No se pudo quitar el robot', describirError(e)),
+  })
+
   if (!vinculo) return null
+
+  async function pedirQuitar() {
+    const ok = await avisoConfirmar(
+      '¿Quitar este robot del panel?',
+      'Se borra su ficha. Si el robot vuelve a conectarse con la app anterior, aparecerá de nuevo.'
+    )
+    if (ok) quitar.mutate()
+  }
 
   async function pedirRevocar() {
     const ok = await avisoConfirmar(
@@ -99,13 +125,18 @@ export function FilaVinculo({ serial }: { serial: string }) {
             Revocar
           </button>
         )}
+        {!vinculo.vinculado && !enServicio && (
+          <button type="button" onClick={() => void pedirQuitar()} disabled={quitar.isPending} className="text-slate-400 hover:text-red-600 hover:underline disabled:opacity-50">
+            Quitar
+          </button>
+        )}
       </p>
 
       {codigo && (
         <DialogCodigo
           codigo={codigo.texto}
           creado={codigo.creado}
-          vinculado={vinculo.vinculado && !!vinculo.vinculado_at && new Date(vinculo.vinculado_at).getTime() >= codigo.creado - 5_000}
+          vinculado={quedoVinculado(vinculo, codigo.creado)}
           onCerrar={() => setCodigo(null)}
         />
       )}
@@ -153,5 +184,90 @@ function DialogCodigo({
         </>
       )}
     </Modal>
+  )
+}
+
+/** Alta manual: un administrador escribe el serial de un robot nuevo y obtiene su código de vinculación */
+export function BotonAgregarRobot() {
+  const queryClient = useQueryClient()
+  const { data: vinculos } = useVinculos()
+  const [abierto, setAbierto] = useState(false)
+  const [serial, setSerial] = useState('')
+  const [error, setError] = useState('')
+  const [codigo, setCodigo] = useState<{ serial: string; texto: string; creado: number } | null>(null)
+
+  const serialLimpio = serial.trim()
+  const valido = /^[A-Za-z0-9]{11}$/.test(serialLimpio)
+
+  const generar = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('crear_codigo_vinculacion', { p_serial: serialLimpio })
+      if (error) throw error
+      return data as string
+    },
+    onSuccess: (texto) => {
+      setCodigo({ serial: serialLimpio, texto, creado: Date.now() })
+      setAbierto(false)
+      setSerial('')
+      setError('')
+      void queryClient.invalidateQueries({ queryKey: ['vinculos-robots'] })
+      void queryClient.invalidateQueries({ queryKey: ['robot-status'] })
+    },
+    onError: (e) => setError(describirError(e)),
+  })
+
+  // Sin las funciones de la base (SQL sin aplicar) el botón no se muestra
+  if (!vinculos) return null
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setError('')
+          setAbierto(true)
+        }}
+        className="h-10 bg-[#1d293d] px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+      >
+        Agregar robot
+      </button>
+
+      {abierto && (
+        <Modal
+          titulo="Agregar robot"
+          ancho="max-w-lg"
+          onCancelar={() => setAbierto(false)}
+          onAceptar={() => generar.mutate()}
+          aceptarDeshabilitado={!valido || generar.isPending}
+          textoAceptar={generar.isPending ? 'Generando…' : 'Generar código'}
+          aviso={error || undefined}
+        >
+          <label className="block">
+            <span className="font-medium text-slate-800">Número de serie del robot</span>
+            <input
+              value={serial}
+              onChange={(e) => setSerial(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 11))}
+              placeholder="00125190031"
+              inputMode="numeric"
+              autoFocus
+              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 font-mono tracking-wider focus:border-[#1d293d] focus:outline-none"
+            />
+          </label>
+          <p className="mt-3 text-sm text-slate-500">
+            Son 11 caracteres. Es el número que aparece junto al símbolo # en la ficha de cada robot. Al continuar se crea la ficha
+            del robot y se genera el código que se escribe en su pantalla de administración.
+          </p>
+        </Modal>
+      )}
+
+      {codigo && (
+        <DialogCodigo
+          codigo={codigo.texto}
+          creado={codigo.creado}
+          vinculado={quedoVinculado(vinculos.get(codigo.serial), codigo.creado)}
+          onCerrar={() => setCodigo(null)}
+        />
+      )}
+    </>
   )
 }
