@@ -220,7 +220,15 @@ export function Robots() {
   })
 
   // Filtro por conexión (solo en pantalla: no consulta nada nuevo)
-  const [filtro, setFiltro] = useState<'todos' | 'en_linea' | 'desconectados'>('todos')
+  const [filtro, setFiltro] = useState<FiltroEstado>(filtroEstadoGuardado)
+  function cambiarFiltro(nuevo: FiltroEstado) {
+    setFiltro(nuevo)
+    try {
+      sessionStorage.setItem(CLAVE_FILTRO_ESTADO, nuevo)
+    } catch {
+      // sin almacenamiento: el filtro funciona igual, solo que no se recuerda
+    }
+  }
   const enLinea = (r: RobotStatus) => edadMs(r.updated_at, ahora) <= UMBRAL_SIN_REPORTE_MS
   const visibles = (robots ?? []).filter((r) =>
     filtro === 'todos' ? true : filtro === 'en_linea' ? enLinea(r) : !enLinea(r)
@@ -243,7 +251,7 @@ export function Robots() {
           Estado -
           <select
             value={filtro}
-            onChange={(e) => setFiltro(e.target.value as typeof filtro)}
+            onChange={(e) => cambiarFiltro(e.target.value as FiltroEstado)}
             className="cursor-pointer appearance-none bg-transparent py-1 pr-6 font-semibold text-slate-800 focus:outline-none"
           >
             <option value="todos">Todos</option>
@@ -356,6 +364,20 @@ function minutosSegundos(ms: number): string {
 }
 
 /** Orden que el panel está esperando que el robot termine */
+type FiltroEstado = 'todos' | 'en_linea' | 'desconectados'
+
+/** El filtro de estado se recuerda mientras la pestaña siga abierta (se pierde al cerrarla) */
+const CLAVE_FILTRO_ESTADO = 'kiosk.robots.filtroEstado'
+function filtroEstadoGuardado(): FiltroEstado {
+  try {
+    const valor = sessionStorage.getItem(CLAVE_FILTRO_ESTADO)
+    if (valor === 'en_linea' || valor === 'desconectados') return valor
+  } catch {
+    // sin almacenamiento (ventana privada o bloqueado): queda en "todos"
+  }
+  return 'todos'
+}
+
 /** Nombre de la secuencia de la carita que se usó la última vez (por navegador) */
 const CLAVE_CARITA = 'kiosk.secuenciaCarita'
 function nombreCaritaGuardado(): string {
