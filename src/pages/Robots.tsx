@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FilaVinculo } from '../components/VinculoRobotPanel'
+import { BotonAgregarRobot, FilaVinculo } from '../components/VinculoRobotPanel'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/alertas'
@@ -236,6 +236,8 @@ export function Robots() {
             Estado en vivo de cada robot: conexión, batería y versión de la config.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <BotonAgregarRobot />
         {/* "Estado - En línea ▾": select sin borde, como la referencia */}
         <label className="relative flex items-center gap-1.5 text-sm text-slate-500">
           Estado -
@@ -252,6 +254,7 @@ export function Robots() {
             <path d="M5.5 8h9L10 13z" />
           </svg>
         </label>
+        </div>
       </div>
 
       {isLoading && <Cargando texto="Cargando robots…" />}
@@ -322,7 +325,7 @@ export function Robots() {
                       )
                     })()}
                     <BateriaCompacta nivel={r.bateria} enServicio={enServicio} />
-                    <FilaVinculo serial={r.serial} />
+                    <FilaVinculo serial={r.serial} enServicio={enServicio} />
                   </div>
                 </div>
 
