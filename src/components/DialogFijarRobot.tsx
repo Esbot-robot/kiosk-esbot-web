@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Modal } from './Modal'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
+import { archivosDeConfig, comprobarArchivos } from '../lib/archivosProyecto'
+import { useArchivosFaltantes } from '../lib/useArchivosFaltantes'
 import { describirError } from '../lib/errores'
 import type { Project } from '../types/config'
 import { Advertencia } from './Advertencia'
@@ -17,6 +19,8 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
   const [serial, setSerial] = useState('')
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
+  // Archivos del proyecto que ya no están en el almacenamiento: si falta alguno, no se fija
+  const { faltantes, comprobando } = useArchivosFaltantes(proyecto.config)
 
   // Robots que ya tienen fijado ESTE proyecto
   const { data: robotsFijados } = useQuery({
@@ -44,6 +48,16 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
   const fijar = useMutation({
     mutationFn: async () => {
       const s = serial.trim()
+
+      // Comprobación fresca justo antes de fijar (la de la pantalla puede tener unos minutos)
+      const revision = await comprobarArchivos(archivosDeConfig(proyecto.config))
+      const sinArchivo = revision.filter((a) => a.estado === 'falta')
+      if (sinArchivo.length > 0) {
+        throw new Error(
+          `Faltan archivos del proyecto en el almacenamiento: ${sinArchivo.map((a) => a.nombre).join(', ')}. ` +
+            'Súbalos de nuevo en el editor y guarde el proyecto antes de fijar el robot.'
+        )
+      }
 
       // ¿Ya está tomado por OTRO proyecto?
       const { data: existente } = await supabase
@@ -138,15 +152,34 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
         </div>
         <button
           onClick={() => fijar.mutate()}
-          disabled={!serialValido || fijar.isPending}
+          disabled={!serialValido || fijar.isPending || comprobando || faltantes.length > 0}
           className="rounded-lg bg-indigo-600 px-6 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
         >
-          {fijar.isPending ? 'Fijando...' : 'Fijar'}
+          {fijar.isPending ? 'Fijando...' : comprobando ? 'Comprobando...' : 'Fijar'}
         </button>
       </div>
       {serial.trim().length > 0 && !serialValido && (
         <Advertencia className="mt-2">
           El ID del robot debe tener {LARGO_SERIAL} caracteres (se ingresaron {serial.trim().length}).
+        </Advertencia>
+      )}
+
+      {faltantes.length > 0 && (
+        <div className="mt-4">
+          <Advertencia>
+            Este proyecto usa archivos que ya no están en el almacenamiento, así que todavía no se puede fijar a un robot:
+          </Advertencia>
+          <ul className="mt-1 list-disc pl-10 text-sm text-slate-700">
+            {faltantes.map((a, i) => (
+              <li key={`${a.url}-${i}`}>{a.nombre}</li>
+            ))}
+          </ul>
+          <p className="mt-1 pl-6 text-sm text-slate-500">Súbalos de nuevo en el editor, guarde el proyecto y vuelva aquí.</p>
+        </div>
+      )}
+      {!proyecto.config.pantalla_inicial.video_patrullaje_url && (
+        <Advertencia className="mt-3">
+          Este proyecto no tiene video de patrullaje: el robot mostrará la pantalla sin video.
         </Advertencia>
       )}
 

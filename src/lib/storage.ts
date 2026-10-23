@@ -131,6 +131,22 @@ export async function pesoDesdeUrl(urlPublica: string): Promise<number | null> {
 }
 
 /**
+ * ¿El archivo sigue en el almacenamiento? true si existe, false si Supabase dice que no
+ * (un archivo borrado responde 400 o 404), y null si no se pudo saber (sin internet,
+ * error del servidor): en ese caso no se debe decir que falta.
+ */
+export async function existeArchivo(urlPublica: string): Promise<boolean | null> {
+  try {
+    const respuesta = await fetch(urlPublica, { method: 'HEAD', cache: 'no-store' })
+    if (respuesta.ok) return true
+    if (respuesta.status === 400 || respuesta.status === 404) return false
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Dirección pública del panel, donde vive el formulario de registro. Fija y no
  * window.location.origin: si se guarda desde localhost, los QR del robot
  * apuntarían al computador de quien guardó.

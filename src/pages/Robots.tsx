@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BotonAgregarRobot, FilaVinculo } from '../components/VinculoRobotPanel'
 import { BotonVersionesApp, FilaAppRobot } from '../components/VersionesApp'
+import { IconoArchivosFaltantes } from '../components/ArchivosFaltantes'
+import { archivosDeConfig, comprobarArchivos, type ResultadoArchivo } from '../lib/archivosProyecto'
+import type { EventConfig } from '../types/config'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
 import { avisoCargando, avisoError, avisoGuardado, cerrarAviso } from '../lib/alertas'
@@ -224,6 +227,37 @@ export function Robots() {
     refetchInterval: 10_000,
   })
 
+  // Archivos que faltan en el proyecto fijado de cada robot (se comprueba al abrir y cada 5 minutos, no con cada refresco)
+  const { data: fijados } = useQuery({
+    queryKey: ['robots-fijados-proyecto'],
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('robots').select('serial, project_id')
+      if (error) throw error
+      return data as { serial: string; project_id: string | null }[]
+    },
+  })
+  const idsFijados = useMemo(
+    () => [...new Set((fijados ?? []).map((f) => f.project_id).filter((id): id is string => !!id))].sort(),
+    [fijados]
+  )
+  const { data: faltantesPorProyecto } = useQuery({
+    queryKey: ['archivos-faltantes-fijados', idsFijados.join(',')],
+    enabled: idsFijados.length > 0,
+    staleTime: 5 * 60_000,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('id, nombre, config').in('id', idsFijados)
+      if (error) throw error
+      const resultado: Record<string, { nombre: string; faltan: ResultadoArchivo[] }> = {}
+      for (const p of data as { id: string; nombre: string; config: EventConfig }[]) {
+        const revision = await comprobarArchivos(archivosDeConfig(p.config))
+        resultado[p.id] = { nombre: p.nombre, faltan: revision.filter((a) => a.estado === 'falta') }
+      }
+      return resultado
+    },
+  })
+
   // Filtro por conexión (solo en pantalla: no consulta nada nuevo)
   const [filtro, setFiltro] = useState<FiltroEstado>(filtroEstadoGuardado)
   function cambiarFiltro(nuevo: FiltroEstado) {
@@ -320,9 +354,18 @@ export function Robots() {
                     </p>
                     {(() => {
                       const version = estadoVersion(r, versiones?.[r.serial])
+                      const idProyecto = fijados?.find((f) => f.serial === r.serial)?.project_id
+                      const infoArchivos = idProyecto ? faltantesPorProyecto?.[idProyecto] : undefined
+                      const iconoArchivos =
+                        idProyecto && infoArchivos && infoArchivos.faltan.length > 0 ? (
+                          <IconoArchivosFaltantes proyectoId={idProyecto} proyectoNombre={infoArchivos.nombre} faltan={infoArchivos.faltan} />
+                        ) : null
                       if (version.tipo === 'aviso') {
                         return (
-                          <Advertencia>{version.texto}</Advertencia>
+                          <Advertencia>
+                            {version.texto}
+                            {iconoArchivos}
+                          </Advertencia>
                         )
                       }
                       return (
@@ -335,6 +378,7 @@ export function Robots() {
                             {version.texto}
                             {version.tipo === 'ok' && <span className="text-emerald-700"> · Sincronizado</span>}
                           </span>
+                          {iconoArchivos}
                         </p>
                       )
                     })()}
