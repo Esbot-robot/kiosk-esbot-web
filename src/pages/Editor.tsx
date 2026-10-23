@@ -3,6 +3,8 @@ import { useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { eliminarConfigRobot, nombreDesdeUrl, publicarConfigRobot } from '../lib/storage'
+import { useArchivosFaltantes } from '../lib/useArchivosFaltantes'
+import { AvisoArchivosFaltantes } from '../components/ArchivosFaltantes'
 import { avisoError, avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
 import { botonCatalogoVacio, botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonCatalogo, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
@@ -213,11 +215,14 @@ function ItemPanel({
   icono,
   label,
   detalle,
+  alerta = false,
   onClick,
 }: {
   icono: React.ReactNode
   label: string
   detalle: string
+  /** el detalle se muestra en rojo (por ejemplo, el archivo ya no existe) */
+  alerta?: boolean
   onClick: () => void
 }) {
   return (
@@ -228,7 +233,7 @@ function ItemPanel({
       <span className="mt-0.5 shrink-0 text-blue-700">{icono}</span>
       <span className="min-w-0">
         <span className="block truncate font-semibold text-slate-800">{label}</span>
-        <span className="block truncate text-sm text-slate-500">{detalle}</span>
+        <span className={`block truncate text-sm ${alerta ? 'text-rose-600' : 'text-slate-500'}`}>{detalle}</span>
       </span>
     </button>
   )
@@ -250,6 +255,8 @@ export function Editor() {
   /** nombre + config tal como están en Supabase, para saber si hay cambios sin guardar */
   const [guardadoJson, setGuardadoJson] = useState('')
   const eliminado = useRef(false)
+  // Archivos de la configuración que ya no están en el almacenamiento (borrados a mano en Supabase)
+  const { faltantes: archivosFaltantes } = useArchivosFaltantes(config)
   // El cliente lector ve todo el proyecto, pero no puede cambiar ni guardar nada
   const soloLectura = usePerfil().rol === 'lector'
 
@@ -490,6 +497,7 @@ export function Editor() {
 
   const ini = config.pantalla_inicial
   const rul = config.pantalla_ruleta
+  const falta = (direccion: string) => !!direccion && archivosFaltantes.some((a) => a.url === direccion)
   const botonesAdicionales = ini.botones_adicionales ?? botonesAdicionalesVacios()
   const botonFoto = ini.boton_foto ?? botonFotoVacio()
   const botonRegistro = ini.boton_registro ?? botonRegistroVacio()
@@ -687,6 +695,7 @@ export function Editor() {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-sm text-slate-400">
             <span>Versión {config.version}</span>
             {hayCambios && !guardar.isPending && !soloLectura && <Advertencia>Hay cambios sin guardar</Advertencia>}
+            <AvisoArchivosFaltantes faltan={archivosFaltantes} />
           </div>
         </div>
         <div className="flex">
@@ -991,13 +1000,19 @@ export function Editor() {
                   <ItemPanel
                     icono={<IconoEditar />}
                     label="Imagen de fondo"
-                    detalle={ini.fondo_url ? nombreDesdeUrl(ini.fondo_url) : 'Vacío'}
+                    detalle={falta(ini.fondo_url) ? 'El archivo no existe: súbalo de nuevo' : ini.fondo_url ? nombreDesdeUrl(ini.fondo_url) : 'Vacío'}
+                    alerta={falta(ini.fondo_url)}
                     onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'inicial' })}
                   />
                   <ItemPanel
                     icono={<IconoEditar />}
                     label="Logo de la empresa"
-                    detalle={`${ini.logo_url ? nombreDesdeUrl(ini.logo_url) : 'Vacío'}${ini.logo_visible ? '' : ' · Oculto'}`}
+                    detalle={
+                      falta(ini.logo_url)
+                        ? 'El archivo no existe: súbalo de nuevo'
+                        : `${ini.logo_url ? nombreDesdeUrl(ini.logo_url) : 'Vacío'}${ini.logo_visible ? '' : ' · Oculto'}`
+                    }
+                    alerta={falta(ini.logo_url)}
                     onClick={() => setDialogo({ tipo: 'logo' })}
                   />
                   <ItemPanel
@@ -1018,7 +1033,8 @@ export function Editor() {
                   <ItemPanel
                     icono={<IconoEditar />}
                     label="Imagen de fondo"
-                    detalle={rul.fondo_url ? nombreDesdeUrl(rul.fondo_url) : 'Vacío'}
+                    detalle={falta(rul.fondo_url) ? 'El archivo no existe: súbalo de nuevo' : rul.fondo_url ? nombreDesdeUrl(rul.fondo_url) : 'Vacío'}
+                    alerta={falta(rul.fondo_url)}
                     onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'ruleta' })}
                   />
                   <ItemPanel
@@ -1064,7 +1080,14 @@ export function Editor() {
                 <ItemPanel
                   icono={<IconoPlay />}
                   label="Video para patrullaje"
-                  detalle={ini.video_patrullaje_url ? 'Video cargado' : 'Vacío'}
+                  detalle={
+                    falta(ini.video_patrullaje_url)
+                      ? 'El archivo no existe: súbalo de nuevo'
+                      : ini.video_patrullaje_url
+                        ? 'Video cargado'
+                        : 'Vacío'
+                  }
+                  alerta={falta(ini.video_patrullaje_url)}
                   onClick={() => setDialogo({ tipo: 'video' })}
                 />
                 <ItemPanel

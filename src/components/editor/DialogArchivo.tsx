@@ -4,6 +4,7 @@ import { Modal } from '../Modal'
 import { Ayuda } from '../Ayuda'
 import { BarraSubida } from '../BarraSubida'
 import {
+  existeArchivo,
   formatoMB,
   nombreDesdeUrl,
   pesoDesdeUrl,
@@ -62,6 +63,8 @@ export function DialogArchivo({
   const cambioVisible = mostrar !== undefined && visible !== mostrar.valor
   const [archivo, setArchivo] = useState<File | null>(null)
   const [pesoActual, setPesoActual] = useState<number | null>(null)
+  /** false = el almacenamiento dice que el archivo actual ya no existe; null = no se sabe */
+  const [existe, setExiste] = useState<boolean | null>(null)
   const [error, setError] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const [progreso, setProgreso] = useState<ProgresoSubida | null>(null)
@@ -74,6 +77,18 @@ export function DialogArchivo({
     let vigente = true
     void pesoDesdeUrl(urlActual).then((peso) => {
       if (vigente) setPesoActual(peso)
+    })
+    return () => {
+      vigente = false
+    }
+  }, [urlActual])
+
+  // ¿El archivo actual sigue en el almacenamiento? (alguien pudo borrarlo a mano en Supabase)
+  useEffect(() => {
+    if (!urlActual) return
+    let vigente = true
+    void existeArchivo(urlActual).then((resultado) => {
+      if (vigente) setExiste(resultado)
     })
     return () => {
       vigente = false
@@ -177,6 +192,11 @@ export function DialogArchivo({
             Arrastre {tipo === 'imagen' ? 'una imagen' : 'un video'} aquí o{' '}
             <span className="font-medium text-[#1d293d] underline underline-offset-2">haga clic para seleccionar el archivo</span>
           </p>
+        )}
+        {!archivo && urlActual && existe === false && (
+          <Advertencia className="mt-3 text-left">
+            Este archivo ya no está en el almacenamiento. Suba uno nuevo y guarde el proyecto.
+          </Advertencia>
         )}
         {/* Los formatos y el peso quedan a la vista: hacen falta antes de
             elegir el archivo. La recomendación se va al icono. */}
