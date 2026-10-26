@@ -36,7 +36,8 @@ const CONFIG_TIPO = {
     accept: 'image/jpeg,image/png,image/webp',
     maxMB: 5,
     ayuda: 'JPG, PNG o WEBP (Máx. 5MB)',
-    extra: 'Resolución recomendada: 1587 × 991 px',
+    // La pantalla del temi: el robot estira el fondo a ese tamaño, así que otra proporción se deforma
+    extra: 'Resolución recomendada: 1920 × 1080 px (la pantalla del robot). Otra proporción se verá estirada.',
   },
   video: {
     accept: 'video/mp4,video/quicktime',

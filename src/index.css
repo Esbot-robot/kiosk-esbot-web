@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@600;700&display=swap');
+/* Roboto es la letra de Android: la vista previa del editor la usa para medir como el robot */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 @import "tailwindcss";
 
 /* Montserrat en todo el panel (antes solo en el login).

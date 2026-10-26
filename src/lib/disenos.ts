@@ -53,6 +53,9 @@ export const FERIA = {
   contorno: '#111111',
 } as const
 
+/** Roboto es la letra normal de Android (Typeface.DEFAULT), la del robot en el clásico y el banner */
+export const FUENTE_ROBOT = "'Roboto', 'Arial', sans-serif"
+
 /** Roboto Condensed es la sans-serif-condensed de Android, la del robot */
 export const FUENTE_FERIA = "'Roboto Condensed', 'Arial Narrow', sans-serif"
 
