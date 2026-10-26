@@ -119,7 +119,10 @@ export function AparienciaBoton({ valor, projectId, onChange }: AparienciaBotonP
         <div className="rounded-lg border border-slate-200 p-4">
           <p className="flex items-center gap-2 font-medium text-slate-800">
             Imagen de la tarjeta
-            <Ayuda>Se muestra tal cual, sin capas, filtros ni oscurecimiento.</Ayuda>
+            <Ayuda>
+              Se muestra tal cual, sin capas, filtros ni oscurecimiento. El robot la estira hasta llenar la tarjeta: use la
+              misma proporción que tiene la tarjeta en la vista previa para que no se deforme.
+            </Ayuda>
           </p>
           <div className="mt-3">
             <CargadorArchivo

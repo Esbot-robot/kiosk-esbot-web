@@ -21,8 +21,10 @@ import { Cargando } from '../components/Cargando'
 import { SoloLecturaContext, usePerfil } from '../lib/perfil'
 import { Advertencia } from '../components/Advertencia'
 import { SelectorDiseno } from '../components/editor/SelectorDiseno'
-import { BANNER, colorContraste, DisenoContext, disenoDe, FERIA, FUENTE_FERIA } from '../lib/disenos'
+import { BANNER, colorContraste, DisenoContext, disenoDe, FERIA, FUENTE_FERIA, FUENTE_ROBOT } from '../lib/disenos'
 import { TarjetaFeria } from '../components/editor/TarjetaFeria'
+import { TextoAjustado } from '../components/editor/TextoAjustado'
+import { ANCHO_VISTA_REM, dp } from '../lib/pantallaRobot'
 
 type Pestana = 'inicial' | 'ruleta'
 
@@ -99,27 +101,18 @@ function fondoRuleta(preguntas: Pregunta[]): string {
   return `conic-gradient(${tramos.join(', ')})`
 }
 
-/**
- * Ancho del lienzo de la vista previa, en rem: 48rem = 768 px al tamaño base
- * normal (16 px). Va en rem y no en px porque los textos y botones de adentro
- * también van en rem: así guardan la misma proporción aunque el panel cambie
- * su tamaño base (en computador se ve al 80%, ver index.css).
- */
-const ANCHO_VISTA_REM = 48
-
-/** Cinta del título con muescas semicirculares a los lados, como un boleto */
+/** Cinta del título con muescas semicirculares de 14 dp a los lados, como un boleto (TicketDrawable) */
+const MUESCAS_CINTA = `radial-gradient(circle ${dp(14)} at 0 50%, #0000 calc(${dp(14)} - 0.05rem), #000 ${dp(14)}), radial-gradient(circle ${dp(14)} at 100% 50%, #0000 calc(${dp(14)} - 0.05rem), #000 ${dp(14)})`
 const ESTILO_CINTA: React.CSSProperties = {
   fontFamily: FUENTE_FERIA,
-  maskImage:
-    'radial-gradient(circle 0.6rem at 0 50%, #0000 0.55rem, #000 0.6rem), radial-gradient(circle 0.6rem at 100% 50%, #0000 0.55rem, #000 0.6rem)',
+  maskImage: MUESCAS_CINTA,
   maskComposite: 'intersect',
-  WebkitMaskImage:
-    'radial-gradient(circle 0.6rem at 0 50%, #0000 0.55rem, #000 0.6rem), radial-gradient(circle 0.6rem at 100% 50%, #0000 0.55rem, #000 0.6rem)',
+  WebkitMaskImage: MUESCAS_CINTA,
   WebkitMaskComposite: 'source-in',
 }
 
 /**
- * La vista previa se dibuja siempre sobre el mismo lienzo (16:10, como la
+ * La vista previa se dibuja siempre sobre el mismo lienzo (16:9, como la
  * pantalla del temi) y se escala con zoom al espacio disponible, hasta 48rem
  * (max-w-3xl: el mismo ancho del lienzo, así en computador queda a escala 1).
  * Así se ve igual que en el robot en cualquier pantalla: los textos y botones
@@ -559,8 +552,18 @@ export function Editor() {
       : []),
   ]
 
-  // Banner: el panel ocupa más alto cuando algún botón es tarjeta (igual que en el robot)
-  const pctPanel = botonesVistaPrevia.some((b) => b.estilo.forma === 'tarjeta') ? 62 : 45
+  // Medidas de la pantalla inicial en dp, las mismas de la app (MainActivity.configureAdditionalButtons)
+  const hayTarjeta = botonesVistaPrevia.some((b) => b.estilo.forma === 'tarjeta')
+  const variosBotones = botonesVistaPrevia.length > 1
+  const altoBase = variosBotones ? 104 : 140
+  const textoBoton = ({ 1: 50, 2: 38, 3: 32, 4: 26 } as Record<number, number>)[botonesVistaPrevia.length] ?? 22
+  // la tipografía condensada del feria es más angosta: aguanta más tamaño
+  const tamanoBoton = feria ? textoBoton * 1.15 : textoBoton
+  const margenFila = banner ? 24 : feria ? 36 : variosBotones || hayTarjeta ? 42 : 110
+  const lateralFila = banner ? 64 : feria ? 120 : 40
+
+  // Banner: el panel ocupa más alto cuando algún botón es tarjeta (guía al 38% en vez del 55%, igual que en el robot)
+  const pctPanel = hayTarjeta ? 62 : 45
 
   function setInicial(cambios: Partial<EventConfig['pantalla_inicial']>) {
     setConfig((c) => c && { ...c, pantalla_inicial: { ...c.pantalla_inicial, ...cambios } })
@@ -652,10 +655,14 @@ export function Editor() {
     guardar.mutate()
   }
 
-  const estiloFondo = (url: string) =>
-    url
-      ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-      : { background: 'linear-gradient(160deg, #1e2a4a 0%, #10173a 100%)' }
+  // El robot estira el fondo a toda la pantalla sin conservar su proporción: aquí igual.
+  // Y escribe con Roboto, no con la letra del panel (más ancha): el lienzo la usa para medir igual.
+  const estiloFondo = (url: string): React.CSSProperties => ({
+    fontFamily: FUENTE_ROBOT,
+    ...(url
+      ? { backgroundImage: `url(${url})`, backgroundSize: '100% 100%' }
+      : { background: 'linear-gradient(160deg, #1e2a4a 0%, #10173a 100%)' }),
+  })
 
   const colorConOpacidad = (color: string, opacidad: number | undefined) => {
     const hex = (color || '#ffffff').replace('#', '')
@@ -721,48 +728,52 @@ export function Editor() {
           <VistaEscalada>
           {pestana === 'inicial' ? (
             <div
-              className="relative aspect-[16/10] w-full max-w-3xl overflow-hidden rounded-xl shadow-lg"
+              className="relative aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-xl shadow-lg"
               style={estiloFondo(ini.fondo_url)}
             >
-              <div className="absolute right-3 top-3">
+              {/* Banner: panel de color de la guía hacia abajo, detrás de todo lo demás */}
+              {banner && (
+                <div className="absolute inset-x-0 bottom-0" style={{ height: `${pctPanel}%`, backgroundColor: colorPanel }} />
+              )}
+              <div className="absolute right-3 top-3 z-10">
                 <Lapiz
                   title="Cambiar imagen de fondo"
                   onClick={() => setDialogo({ tipo: 'fondo', pantalla: 'inicial' })}
                 />
               </div>
-              <div className="flex h-full flex-col items-center pt-8">
-                {/* Logo de la empresa (imgLogo en el robot) */}
-                <div className="flex items-center gap-2">
+              <div className="relative flex h-full flex-col items-center">
+                {/* Logo (imgLogo en el robot): caja de 650 × 250 dp a 48 dp del borde;
+                    la imagen se ajusta adentro sin deformarse */}
+                <div className="relative shrink-0" style={{ width: dp(650), height: dp(250), marginTop: dp(48) }}>
                   {/* Oculto: se ve tenue para poder editarlo; en el robot queda el espacio vacío */}
-                  <div className={ini.logo_visible ? '' : 'opacity-25'}>
+                  <div className={`h-full w-full ${ini.logo_visible ? '' : 'opacity-25'}`}>
                     {ini.logo_url ? (
-                      <img src={ini.logo_url} alt="" className="h-20 max-w-72 object-contain" />
+                      <img src={ini.logo_url} alt="" className="h-full w-full object-contain" />
                     ) : (
-                      <div className="flex h-20 w-56 items-center justify-center rounded-lg border-2 border-dashed border-white/50 text-sm text-white/70">
+                      <div className="flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-white/50 text-sm text-white/70">
                         Logo de la empresa
                       </div>
                     )}
                   </div>
-                  {!ini.logo_visible && <EtiquetaOculto />}
-                  <Lapiz title="Cambiar logo" onClick={() => setDialogo({ tipo: 'logo' })} />
+                  <div className="absolute left-full top-1/2 ml-2 flex -translate-y-1/2 items-center gap-2">
+                    {!ini.logo_visible && <EtiquetaOculto />}
+                    <Lapiz title="Cambiar logo" onClick={() => setDialogo({ tipo: 'logo' })} />
+                  </div>
                 </div>
 
-                {/* Banner: título, subtítulo y botones van dentro del panel de color de abajo */}
+                {/* Banner: título, subtítulo y botones van sobre el panel, 36 dp debajo
+                    de la guía y a 64 dp de los bordes */}
                 <div
-                  className={banner ? 'absolute inset-x-0 bottom-0 flex flex-col px-[3.5%] pt-5' : 'contents'}
-                  style={banner ? { height: `${pctPanel}%`, backgroundColor: colorPanel } : undefined}
+                  className={banner ? 'absolute inset-x-0 flex flex-col' : 'contents'}
+                  style={banner ? { top: `calc(${100 - pctPanel}% + ${dp(36)})`, paddingInline: dp(64) } : undefined}
                 >
-                {/* Título y subtítulo: franjas de lado a lado, como en el robot */}
-                <div className={`relative ${banner ? 'w-full' : `mt-6 ${feria ? 'mx-auto w-[68.75%]' : 'w-full'}`}`}>
+                {/* Título: franja de lado a lado; en feria, cinta con 300 dp de margen a cada lado */}
+                <div className="relative w-full shrink-0" style={feria ? { paddingInline: dp(300) } : undefined}>
                   <p
-                    className={`w-full ${banner ? '' : 'text-center'} ${
-                      banner
-                        ? 'px-0 text-[1.6rem] font-bold leading-tight'
-                        : feria
-                          ? 'px-12 py-3 text-[1.75rem] font-bold leading-tight'
-                          : 'px-16 py-2 text-2xl font-bold'
-                    } ${ini.titulo_visible ? '' : 'opacity-25'}`}
+                    className={`w-full font-bold ${banner ? 'text-left' : 'text-center'} ${ini.titulo_visible ? '' : 'opacity-25'}`}
                     style={{
+                      fontSize: dp(banner ? 52 : feria ? 56 : 50),
+                      padding: feria ? `${dp(18)} ${dp(48)}` : 0,
                       color: ini.titulo.color_texto || (banner ? textoPanel : feria ? FERIA.tituloTexto : '#1e2a4a'),
                       backgroundColor: banner
                         ? 'transparent'
@@ -782,16 +793,14 @@ export function Editor() {
                   </div>
                 </div>
 
-                <div className={`relative ${banner ? 'mt-1 w-full' : feria ? 'mx-auto w-3/4' : 'w-full'}`}>
+                {/* Subtítulo: debajo del título; en feria, barra con 240 dp de margen */}
+                <div className="relative w-full shrink-0" style={feria ? { paddingInline: dp(240) } : undefined}>
                   <p
-                    className={`w-full ${banner ? '' : 'text-center'} ${
-                      banner
-                        ? 'px-0 text-xl font-semibold'
-                        : feria
-                          ? 'rounded-b-xl px-10 py-2 text-xl font-semibold leading-tight'
-                          : 'px-16 py-2 text-xl font-semibold'
-                    } ${ini.subtitulo_visible ? '' : 'opacity-25'}`}
+                    className={`w-full font-bold ${banner ? 'text-left' : 'text-center'} ${ini.subtitulo_visible ? '' : 'opacity-25'}`}
                     style={{
+                      fontSize: dp(banner ? 32 : feria ? 34 : 50),
+                      padding: feria ? `${dp(12)} ${dp(40)} ${dp(14)}` : 0,
+                      borderRadius: feria ? `0 0 ${dp(14)} ${dp(14)}` : undefined,
                       color:
                         ini.subtitulo.color_texto ||
                         (banner ? colorContraste(colorPanel, 0.75) : feria ? FERIA.subtituloTexto : '#1e2a4a'),
@@ -813,70 +822,84 @@ export function Editor() {
                   </div>
                 </div>
 
+                {/* Fila de botones: un botón mide 520 dp; varios se reparten el ancho con 12 dp entre ellos */}
                 <div
-                  className={`flex w-full flex-nowrap items-center justify-center gap-3 ${
-                    banner ? 'mt-4 px-0' : feria ? 'mt-6 px-12' : 'mt-8 px-5'
-                  } ${botonesVistaPrevia.length === 1 ? 'max-w-xl' : ''}`}
+                  className="flex w-full shrink-0 items-start justify-center"
+                  style={{ marginTop: dp(margenFila), paddingInline: banner ? 0 : dp(lateralFila) }}
                 >
                   {botonesVistaPrevia.map(({ id, estilo, textoDefecto, editar }) => {
                     const esTarjeta = estilo.forma === 'tarjeta'
                     const tieneImagen = esTarjeta && Boolean(estilo.imagen_url)
-                    // Feria + tarjeta sin imagen: se dibuja sola (rayas, círculo con ícono y franja)
-                    const tarjetaFeria = (feria || banner) && esTarjeta && !tieneImagen
+                    // Feria o banner + tarjeta sin imagen: se dibuja sola (rayas, círculo con ícono y franja)
+                    const tarjetaDibujada = (feria || banner) && esTarjeta && !tieneImagen
+                    // Las tarjetas miden el triple de alto (en el banner, 250 dp)
+                    const alto = esTarjeta ? (banner ? 250 : altoBase * 3) : altoBase
+                    const texto = estilo.texto || textoDefecto
                     return (
-                      <div key={id} className="flex min-w-0 flex-1 items-center gap-1.5">
-                        {tarjetaFeria ? (
+                      <div
+                        key={id}
+                        className="relative flex min-w-0"
+                        style={{
+                          width: variosBotones ? undefined : dp(520),
+                          flex: variosBotones ? '1 1 0' : 'none',
+                          // en el robot todos menos Jugar llevan 12 dp a la izquierda
+                          marginLeft: id === 'jugar' ? 0 : dp(12),
+                        }}
+                      >
+                        {tarjetaDibujada ? (
                           <TarjetaFeria
                             estilo={estilo}
-                            texto={estilo.texto || textoDefecto}
+                            texto={texto}
+                            alto={alto}
+                            tamanoTexto={tamanoBoton}
                             plano={banner}
                             fondoDefecto={banner ? colorPanel : undefined}
                           />
                         ) : (
-                        <span
-                          className={`flex min-w-0 flex-1 items-center justify-center truncate text-center font-bold ${
-                            esTarjeta
-                              ? 'h-42 rounded-[28px] px-4 text-base leading-tight'
-                              : `rounded-full py-3 ${botonesVistaPrevia.length === 3 ? 'px-4 text-base' : 'px-6 text-lg'}`
-                          }`}
-                          style={{
-                            color: banner
-                              ? esTarjeta
-                                ? '#ffffff' // tarjeta con imagen: texto blanco, como en el robot
-                                : estilo.color_texto || colorContraste(estilo.color_fondo || colorPanel)
-                              : estilo.color_texto || (feria ? FERIA.botonTexto : '#ffffff'),
-                            backgroundColor: estilo.color_fondo || (banner ? colorPanel : feria ? FERIA.botonFondo : '#031046'),
-                            backgroundImage: tieneImagen ? `url(${estilo.imagen_url})` : undefined,
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            backgroundSize: 'cover',
-                            ...(banner
-                              ? {
-                                  // Banner: sin contorno si hay color de fondo; si no, contorno del color del texto
-                                  border: tieneImagen
-                                    ? 'none'
-                                    : `4px solid ${estilo.color_contorno || estilo.color_fondo || colorContraste(colorPanel)}`,
-                                  boxShadow: esTarjeta ? '0 10px 18px rgba(100, 116, 139, 0.32)' : undefined,
-                                }
-                              : feria
-                              ? {
-                                  // Feria: borde grueso (también sobre la imagen) y sombra dura hacia abajo
-                                  border: `4px solid ${estilo.color_contorno || FERIA.contorno}`,
-                                  boxShadow: `0 6px 0 ${estilo.color_contorno || FERIA.contorno}`,
-                                  fontFamily: FUENTE_FERIA,
-                                  textTransform: 'uppercase' as const,
-                                }
-                              : {
-                                  border: tieneImagen ? 'none' : `4px solid ${estilo.color_contorno || '#FFD700'}`,
-                                  // Sombra fija del contenedor: da profundidad sin alterar la imagen.
-                                  boxShadow: esTarjeta ? '0 10px 18px rgba(100, 116, 139, 0.32)' : undefined,
-                                }),
-                          }}
-                        >
-                          {estilo.texto || textoDefecto}
-                        </span>
+                          <span
+                            className="flex w-full min-w-0 items-center justify-center text-center font-bold"
+                            style={{
+                              // en feria la sombra dura de 8 dp va dentro del alto del botón
+                              height: dp(feria ? alto - 8 : alto),
+                              borderRadius: dp(esTarjeta ? 28 : 70),
+                              paddingInline: dp(16),
+                              color: banner
+                                ? esTarjeta
+                                  ? '#ffffff' // tarjeta con imagen: texto blanco, como en el robot
+                                  : estilo.color_texto || colorContraste(estilo.color_fondo || colorPanel)
+                                : estilo.color_texto || (feria ? FERIA.botonTexto : '#ffffff'),
+                              backgroundColor: estilo.color_fondo || (banner ? colorPanel : feria ? FERIA.botonFondo : '#031046'),
+                              // el robot estira la imagen a la tarjeta, sin conservar su proporción
+                              backgroundImage: tieneImagen ? `url(${estilo.imagen_url})` : undefined,
+                              backgroundSize: '100% 100%',
+                              ...(banner
+                                ? {
+                                    // Banner: sin contorno si hay color de fondo; si no, contorno del color del texto
+                                    border: tieneImagen
+                                      ? 'none'
+                                      : `${dp(4)} solid ${estilo.color_contorno || estilo.color_fondo || colorContraste(colorPanel)}`,
+                                    boxShadow: esTarjeta ? `0 ${dp(10)} ${dp(18)} rgba(100, 116, 139, 0.32)` : undefined,
+                                  }
+                                : feria
+                                ? {
+                                    // Feria: borde grueso (también sobre la imagen) y sombra dura hacia abajo
+                                    border: `${dp(5)} solid ${estilo.color_contorno || FERIA.contorno}`,
+                                    boxShadow: `0 ${dp(8)} 0 ${estilo.color_contorno || FERIA.contorno}`,
+                                    fontFamily: FUENTE_FERIA,
+                                    textTransform: 'uppercase' as const,
+                                  }
+                                : {
+                                    border: tieneImagen ? 'none' : `${dp(6)} solid ${estilo.color_contorno || '#FFD700'}`,
+                                    // Sombra fija del contenedor: da profundidad sin alterar la imagen.
+                                    boxShadow: esTarjeta ? `0 ${dp(10)} ${dp(18)} rgba(100, 116, 139, 0.32)` : undefined,
+                                  }),
+                            }}
+                          >
+                            <TextoAjustado texto={texto} tamano={tamanoBoton} />
+                          </span>
                         )}
-                        <span className="shrink-0">
+                        {/* El lápiz va encima del botón para no quitarle ancho: en el robot no existe */}
+                        <span className="absolute -right-2 -top-2 z-10">
                           <Lapiz title="Editar botón" onClick={editar} />
                         </span>
                       </div>
@@ -887,16 +910,24 @@ export function Editor() {
               </div>
               {banner && (
                 <>
-                  {/* Contador del banner: barra en el borde del panel y etiqueta sobre la imagen */}
+                  {/* Contador del banner: barra de 10 dp en el borde del panel y etiqueta sobre la imagen */}
                   <div
-                    className="absolute inset-x-0 h-1.5"
-                    style={{ bottom: `${pctPanel}%`, backgroundColor: colorContraste(colorPanel, 0.18) }}
+                    className="absolute inset-x-0"
+                    style={{ bottom: `${pctPanel}%`, height: dp(10), backgroundColor: colorContraste(colorPanel, 0.18) }}
                   >
                     <div className="h-full w-[62%]" style={{ backgroundColor: ini.color_contador || '#FFD700' }} />
                   </div>
                   <span
-                    className="absolute right-[5%] rounded-t-lg px-3 py-1 text-sm font-bold"
-                    style={{ bottom: `calc(${pctPanel}% + 0.375rem)`, backgroundColor: colorPanel, color: textoPanel }}
+                    className="absolute font-bold"
+                    style={{
+                      right: dp(96),
+                      bottom: `calc(${pctPanel}% + ${dp(10)})`,
+                      padding: `${dp(12)} ${dp(36)}`,
+                      fontSize: dp(36),
+                      borderRadius: `${dp(22)} ${dp(22)} 0 0`,
+                      backgroundColor: colorPanel,
+                      color: textoPanel,
+                    }}
                   >
                     Continuaré en <span style={{ color: ini.color_contador || '#FFD700' }}>15</span>
                   </span>
@@ -905,7 +936,7 @@ export function Editor() {
             </div>
           ) : (
             <div
-              className="relative aspect-[16/10] w-full max-w-3xl overflow-hidden rounded-xl shadow-lg"
+              className="relative aspect-[16/9] w-full max-w-3xl overflow-hidden rounded-xl shadow-lg"
               style={estiloFondo(rul.fondo_url)}
             >
               <div className="absolute right-3 top-3">
@@ -1507,7 +1538,7 @@ export function Editor() {
           tipo="imagen"
           projectId={projectId!}
           urlActual={ini.logo_url}
-          nota="Resolución recomendada: 512 × 512 px, PNG con fondo transparente"
+          nota="El robot lo muestra en un espacio de 731 × 281 px sin deformarlo. PNG con fondo transparente."
           mostrar={{
             etiqueta: 'Logo visible',
             ayuda: 'Apagado, el robot lo oculta pero deja su espacio vacío: el resto de la pantalla no se mueve.',
