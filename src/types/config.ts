@@ -403,13 +403,69 @@ export interface Tiempos {
   countdown_stand_seg: number
 }
 
+/**
+ * Tipo de proyecto. Se elige al crearlo y no se cambia después. Sin el campo,
+ * el proyecto es un Evento: así se leen todos los proyectos anteriores.
+ */
+export type TipoProyecto = 'evento' | 'retail'
+
+/**
+ * Un cupón del Retail: una fila de la plantilla que entrega el cliente.
+ * Las frases y la imagen las define la empresa; nosotros no generamos diseños.
+ */
+export interface CuponRetail {
+  /** identificador estable: la analítica lo usa para saber qué cupón se ofreció y cuál se tocó */
+  id: string
+  /** nombre de la zona en el mapa del temi: debe escribirse igual que allá */
+  zona: string
+  /** nombra el cupón en el editor y en la analítica, y va en la invitación a tocar */
+  producto: string
+  /** lo que dice el robot al detectar a la persona */
+  frase_detectar: string
+  /** lo que dice al mostrar el cupón (también se lee debajo de la imagen) */
+  frase_mostrar: string
+  frase_despedida: string
+  /** AAAA-MM-DD, días incluidos; se comparan con la fecha de Colombia */
+  vigencia_desde: string
+  vigencia_hasta: string
+  /** imagen del cupón en el servidor del cliente */
+  imagen_url: string
+}
+
+export interface ConfigRetail {
+  /** video mientras recorre, igual al de patrullaje de los eventos */
+  video_url: string
+  /** cuánto se ve el cupón después de tocarlo, antes de despedirse */
+  segundos_cupon: number
+  /** nombre del archivo importado, para mostrarlo en el editor */
+  archivo_nombre: string
+  cupones: CuponRetail[]
+}
+
+export const SEGUNDOS_CUPON_MIN = 5
+export const SEGUNDOS_CUPON_MAX = 20
+export const SEGUNDOS_CUPON_DEFECTO = 10
+
+export function retailVacio(): ConfigRetail {
+  return { video_url: '', segundos_cupon: SEGUNDOS_CUPON_DEFECTO, archivo_nombre: '', cupones: [] }
+}
+
 export interface EventConfig {
   /** se incrementa en cada guardado; la app recarga cuando cambia */
   version: number
   empresa: string
+  /** ausente = 'evento' (ver tipoDe) */
+  tipo?: TipoProyecto
   pantalla_inicial: PantallaInicial
   pantalla_ruleta: PantallaRuleta
   tiempos: Tiempos
+  /** solo en proyectos Retail */
+  retail?: ConfigRetail
+}
+
+/** Tipo del proyecto: los que no traen el campo son Eventos */
+export function tipoDe(config: Pick<EventConfig, 'tipo'>): TipoProyecto {
+  return config.tipo === 'retail' ? 'retail' : 'evento'
 }
 
 /** Límites de validación del panel (acordados con la app) */

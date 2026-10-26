@@ -41,6 +41,8 @@ export function archivosDeConfig(config: EventConfig): ArchivoProyecto[] {
     ['Ícono del botón de registro', ini.boton_registro.boton.icono_url],
     ['Ícono del botón de catálogo', ini.boton_catalogo?.boton.icono_url],
   ]
+  // Retail: el video del recorrido (las imágenes de los cupones están en el servidor del cliente)
+  lista.push(['Video del recorrido', config.retail?.video_url])
   ini.botones_adicionales.forEach((b, i) => {
     lista.push(
       [`Imagen del botón adicional ${i + 1}`, b.boton.imagen_url],
