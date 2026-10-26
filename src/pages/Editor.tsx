@@ -7,7 +7,7 @@ import { useArchivosFaltantes } from '../lib/useArchivosFaltantes'
 import { AvisoArchivosFaltantes } from '../components/ArchivosFaltantes'
 import { avisoError, avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
-import { botonCatalogoVacio, botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonCatalogo, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo } from '../types/config'
+import { botonCatalogoVacio, botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonCatalogo, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo, tipoDe } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
@@ -486,6 +486,53 @@ export function Editor() {
   }
   if (isLoading || !config) {
     return <Cargando texto="Cargando proyecto…" className="py-24" />
+  }
+
+  // Retail: su editor llega en el paso 5 del plan. Mientras tanto no se muestra
+  // el de eventos, que editaría campos que un proyecto Retail no usa
+  if (tipoDe(config) === 'retail') {
+    return (
+      <div className="px-4 py-10 sm:px-8 md:px-12">
+        <div className="mx-auto max-w-xl rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-[#1d293d]">RETAIL</span>
+          <h2 className="mt-4 text-2xl font-bold text-slate-900">{nombre}</h2>
+          <p className="mt-3 text-slate-600">
+            El editor de proyectos Retail está en construcción. Este proyecto ya quedó creado con su tipo y podrá
+            configurarse cuando el editor esté disponible.
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              onClick={() => navigate('/proyectos')}
+              className="bg-[#1d293d] px-6 py-3 font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Volver a proyectos
+            </button>
+            {!soloLectura && (
+              <button
+                onClick={() => setConfirmarBorrar(true)}
+                disabled={borrar.isPending}
+                className="px-6 py-3 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              >
+                Eliminar
+              </button>
+            )}
+          </div>
+        </div>
+        {confirmarBorrar && (
+          <Modal
+            titulo="Eliminar proyecto"
+            textoAceptar={borrar.isPending ? 'Eliminando...' : 'Sí, eliminar'}
+            aceptarDeshabilitado={borrar.isPending}
+            onCancelar={() => setConfirmarBorrar(false)}
+            onAceptar={() => borrar.mutate()}
+          >
+            <p className="text-slate-700">
+              Vas a eliminar el proyecto <span className="font-semibold">"{nombre}"</span>. Esta acción no se puede deshacer.
+            </p>
+          </Modal>
+        )}
+      </div>
+    )
   }
 
   const ini = config.pantalla_inicial

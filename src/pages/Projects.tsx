@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
-import { configVacia, type Project } from '../types/config'
+import { configVacia, retailVacio, tipoDe, type EventConfig, type Project, type TipoProyecto } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
+import { DialogNuevoProyecto } from '../components/DialogNuevoProyecto'
 import { IconoFijar, IconoReloj } from '../components/iconos'
 import robotPng from '../assets/icons/robot.png'
 import { Cargando } from '../components/Cargando'
@@ -34,6 +35,7 @@ function tiempoRelativo(iso: string): string {
 export function Projects() {
   const [busqueda, setBusqueda] = useState('')
   const [proyectoAFijar, setProyectoAFijar] = useState<Project | null>(null)
+  const [nuevoAbierto, setNuevoAbierto] = useState(false)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   // El cliente lector solo ve sus proyectos (lo filtra la base) y no crea,
@@ -63,17 +65,21 @@ export function Projects() {
     robotsPorProyecto.set(r.project_id, lista)
   }
 
+  // El tipo se guarda en la config desde el primer momento y no se cambia después
   const crearProyecto = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (tipo: TipoProyecto) => {
+      const config: EventConfig =
+        tipo === 'retail' ? { ...configVacia(), tipo: 'retail', retail: retailVacio() } : { ...configVacia(), tipo: 'evento' }
       const { data, error } = await supabase
         .from('projects')
-        .insert({ nombre: 'Nuevo proyecto', config: configVacia() })
+        .insert({ nombre: tipo === 'retail' ? 'Nuevo proyecto Retail' : 'Nuevo proyecto', config })
         .select()
         .single()
       if (error) throw error
       return data as Project
     },
     onSuccess: (proyecto) => {
+      setNuevoAbierto(false)
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       navigate(`/editor/${proyecto.id}`)
     },
@@ -128,7 +134,7 @@ export function Projects() {
           {/* En teléfono este botón se cambia por el flotante de abajo */}
           {admin && (
           <button
-            onClick={() => crearProyecto.mutate()}
+            onClick={() => setNuevoAbierto(true)}
             disabled={crearProyecto.isPending}
             className="hidden shrink-0 bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 md:block"
           >
@@ -166,6 +172,11 @@ export function Projects() {
                 fijado ? 'border-[#1d293d] ring-1 ring-[#1d293d]' : 'border-slate-200'
               }`}
             >
+              {tipoDe(proyecto.config) === 'retail' && (
+                <span className="absolute left-3 top-3 z-10 rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1d293d] shadow-sm ring-1 ring-slate-200">
+                  RETAIL
+                </span>
+              )}
               {fijado && (
                 <span className="absolute right-3 top-3 z-10 rounded-full bg-[#1d293d] px-3 py-1 text-xs font-bold text-white">
                   {serials.length === 1 ? 'FIJADO' : `${serials.length} ROBOTS`}
@@ -249,7 +260,7 @@ export function Projects() {
           z-30 queda por debajo del menú lateral (z-40/50) cuando se abre */}
       {admin && (
       <button
-        onClick={() => crearProyecto.mutate()}
+        onClick={() => setNuevoAbierto(true)}
         disabled={crearProyecto.isPending}
         aria-label="Nuevo proyecto"
         title="Nuevo proyecto"
@@ -259,6 +270,15 @@ export function Projects() {
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
+      )}
+
+      {nuevoAbierto && (
+        <DialogNuevoProyecto
+          creando={crearProyecto.isPending}
+          error={crearProyecto.error ? `No se pudo crear el proyecto. ${describirError(crearProyecto.error)}` : undefined}
+          onCrear={(tipo) => crearProyecto.mutate(tipo)}
+          onCerrar={() => setNuevoAbierto(false)}
+        />
       )}
 
       {proyectoAFijar && (
