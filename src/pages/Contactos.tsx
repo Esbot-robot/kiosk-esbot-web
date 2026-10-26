@@ -66,9 +66,13 @@ export function Contactos() {
   const { data: proyectos, isLoading: cargandoProyectos } = useQuery({
     queryKey: ['proyectos-nombres'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('projects').select('id, nombre').order('updated_at', { ascending: false })
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, nombre, tipo:config->>tipo')
+        .order('updated_at', { ascending: false })
       if (error) throw error
-      return data as { id: string; nombre: string }[]
+      // Los proyectos Retail no tienen registro ni fotos: no tienen contactos
+      return (data as { id: string; nombre: string; tipo: string | null }[]).filter((p) => p.tipo !== 'retail')
     },
   })
 

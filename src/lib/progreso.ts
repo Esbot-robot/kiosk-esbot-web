@@ -1,8 +1,9 @@
-import type { EventConfig } from '../types/config'
+import { tipoDe, type EventConfig } from '../types/config'
+import { estadoCupon } from './retail'
 
 /**
- * Progreso de un proyecto: 16 puntos fijos, iguales para todos los proyectos
- * (se usen o no). Lo que está apagado y falta se marca como "no usado" para
+ * Progreso de un proyecto: 16 puntos fijos, iguales para todos los Eventos
+ * (se usen o no); los Retail tienen sus propios 4 (puntosRetail). Lo que está apagado y falta se marca como "no usado" para
  * explicar por qué un proyecto no llega al 100 %.
  */
 export interface PuntoProgreso {
@@ -14,7 +15,19 @@ export interface PuntoProgreso {
 
 const lleno = (v: unknown) => typeof v === 'string' && v.trim() !== ''
 
+/** Retail: lo que necesita para funcionar en una tienda */
+function puntosRetail(cfg: EventConfig, tieneRobot: boolean): PuntoProgreso[] {
+  const cupones = cfg.retail?.cupones ?? []
+  return [
+    { nombre: 'Video del recorrido', hecho: lleno(cfg.retail?.video_url), usado: true },
+    { nombre: 'Cupones cargados', hecho: cupones.length > 0, usado: true },
+    { nombre: 'Cupones activos hoy', hecho: cupones.some((c) => estadoCupon(c).estado === 'activo'), usado: true },
+    { nombre: 'Robot asignado', hecho: tieneRobot, usado: true },
+  ]
+}
+
 export function puntosProgreso(cfg: EventConfig | null | undefined, tieneRobot: boolean): PuntoProgreso[] {
+  if (cfg && tipoDe(cfg) === 'retail') return puntosRetail(cfg, tieneRobot)
   const pi = cfg?.pantalla_inicial
   const pr = cfg?.pantalla_ruleta
   const jugar = pi?.boton_activo ?? true

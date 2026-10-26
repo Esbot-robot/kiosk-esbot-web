@@ -83,22 +83,24 @@ export function AnaliticaRobots() {
   }, [])
   const enLinea = (r: EstadoRobot) => ahora - new Date(r.updated_at).getTime() <= ROBOT_EN_LINEA_MS
 
-  // Total de interacciones del robot elegido
+  const idProyecto = actual ? fijados?.find((r) => r.serial === actual.serial)?.project_id : null
+  const proyecto = idProyecto ? (proyectos?.find((p) => p.id === idProyecto)?.nombre ?? 'Proyecto eliminado') : 'Sin proyecto'
+
+  // Interacciones del robot elegido CON el proyecto asociado: las dos cifras de la
+  // tarjeta hablan de lo mismo. Las de proyectos anteriores de ese robot no cuentan.
   const { data: totalInteracciones } = useQuery({
-    queryKey: ['robot-total-interacciones', actual?.serial],
-    enabled: !!actual,
+    queryKey: ['robot-total-interacciones', actual?.serial, idProyecto],
+    enabled: !!actual && !!idProyecto,
     queryFn: async () => {
       const { count, error } = await supabase
         .from('events')
         .select('id', { count: 'exact', head: true })
         .eq('serial', actual!.serial)
+        .eq('project_id', idProyecto!)
       if (error) throw error
       return count ?? 0
     },
   })
-
-  const idProyecto = actual ? fijados?.find((r) => r.serial === actual.serial)?.project_id : null
-  const proyecto = idProyecto ? (proyectos?.find((p) => p.id === idProyecto)?.nombre ?? 'Proyecto eliminado') : 'Sin proyecto'
 
   return (
     <div className="px-4 pb-16 pt-6 sm:px-8 md:px-12 md:py-10">
@@ -153,7 +155,7 @@ export function AnaliticaRobots() {
                 <div>
                   <dt className="text-xs text-slate-500">Interacciones registradas</dt>
                   <dd className="mt-1 font-semibold text-slate-800" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {totalInteracciones !== undefined ? totalInteracciones.toLocaleString('es-CO') : '…'}
+                    {!idProyecto ? '—' : totalInteracciones !== undefined ? totalInteracciones.toLocaleString('es-CO') : '…'}
                   </dd>
                 </div>
                 <div>

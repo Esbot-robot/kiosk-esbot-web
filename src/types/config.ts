@@ -463,6 +463,16 @@ export interface EventConfig {
   retail?: ConfigRetail
 }
 
+/** Config de un proyecto nuevo según su tipo; el tipo queda guardado desde el primer momento */
+export function configNueva(tipo: TipoProyecto): EventConfig {
+  return tipo === 'retail' ? { ...configVacia(), tipo: 'retail', retail: retailVacio() } : { ...configVacia(), tipo: 'evento' }
+}
+
+/** Nombre con que nace un proyecto nuevo */
+export function nombreNuevo(tipo: TipoProyecto): string {
+  return tipo === 'retail' ? 'Nuevo proyecto Retail' : 'Nuevo proyecto'
+}
+
 /** Tipo del proyecto: los que no traen el campo son Eventos */
 export function tipoDe(config: Pick<EventConfig, 'tipo'>): TipoProyecto {
   return config.tipo === 'retail' ? 'retail' : 'evento'
