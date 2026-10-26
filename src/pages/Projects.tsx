@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { describirError } from '../lib/errores'
-import { configVacia, retailVacio, tipoDe, type EventConfig, type Project, type TipoProyecto } from '../types/config'
+import { configNueva, nombreNuevo, tipoDe, type Project, type TipoProyecto } from '../types/config'
 import { DialogFijarRobot } from '../components/DialogFijarRobot'
 import { DialogNuevoProyecto } from '../components/DialogNuevoProyecto'
 import { IconoFijar, IconoReloj } from '../components/iconos'
@@ -68,11 +68,9 @@ export function Projects() {
   // El tipo se guarda en la config desde el primer momento y no se cambia después
   const crearProyecto = useMutation({
     mutationFn: async (tipo: TipoProyecto) => {
-      const config: EventConfig =
-        tipo === 'retail' ? { ...configVacia(), tipo: 'retail', retail: retailVacio() } : { ...configVacia(), tipo: 'evento' }
       const { data, error } = await supabase
         .from('projects')
-        .insert({ nombre: tipo === 'retail' ? 'Nuevo proyecto Retail' : 'Nuevo proyecto', config })
+        .insert({ nombre: nombreNuevo(tipo), config: configNueva(tipo) })
         .select()
         .single()
       if (error) throw error
@@ -199,7 +197,7 @@ export function Projects() {
                 <p className="flex items-center gap-1.5 text-sm text-slate-500">
                   <IconoReloj /> {tiempoRelativo(proyecto.updated_at)}
                 </p>
-                {!admin && proyecto.galeria_token && (
+                {!admin && proyecto.galeria_token && tipoDe(proyecto.config) === 'evento' && (
                   <a
                     href={`/galeria#${proyecto.galeria_token}`}
                     target="_blank"
@@ -277,7 +275,10 @@ export function Projects() {
           creando={crearProyecto.isPending}
           error={crearProyecto.error ? `No se pudo crear el proyecto. ${describirError(crearProyecto.error)}` : undefined}
           onCrear={(tipo) => crearProyecto.mutate(tipo)}
-          onCerrar={() => setNuevoAbierto(false)}
+          onCerrar={() => {
+            setNuevoAbierto(false)
+            crearProyecto.reset()
+          }}
         />
       )}
 

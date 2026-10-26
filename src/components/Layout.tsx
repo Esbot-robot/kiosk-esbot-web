@@ -8,9 +8,9 @@ import { MenuPerfil } from './MenuPerfil'
 import { sesionPrestada, supabase } from '../lib/supabase'
 import { Cargando } from './Cargando'
 import { AvisoSinConexion } from './AvisoSinConexion'
-import { configVacia } from '../types/config'
+import { configNueva, nombreNuevo, type TipoProyecto } from '../types/config'
+import { DialogNuevoProyecto } from './DialogNuevoProyecto'
 import { describirError } from '../lib/errores'
-import { avisoError } from '../lib/alertas'
 import { iniciarPresencia } from '../lib/presencia'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
@@ -76,11 +76,13 @@ export function Layout() {
     },
   })
 
+  // Como en Proyectos: primero se elige el tipo (Evento o Retail)
+  const [nuevoAbierto, setNuevoAbierto] = useState(false)
   const crearProyecto = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (tipo: TipoProyecto) => {
       const { data, error } = await supabase
         .from('projects')
-        .insert({ nombre: 'Nuevo proyecto', config: configVacia() })
+        .insert({ nombre: nombreNuevo(tipo), config: configNueva(tipo) })
         .select('id')
         .single()
       if (error) throw error
@@ -88,10 +90,10 @@ export function Layout() {
     },
     onSuccess: ({ id }) => {
       void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      setNuevoAbierto(false)
       cerrarMenu()
       navigate(`/editor/${id}`)
     },
-    onError: (e) => void avisoError('No se pudo crear el proyecto', describirError(e)),
   })
 
   // "En línea" (página Usuarios): al instante, por Presence (quién tiene el panel abierto y a la vista)
@@ -221,7 +223,7 @@ export function Layout() {
                   admin && (
                     <button
                       type="button"
-                      onClick={() => crearProyecto.mutate()}
+                      onClick={() => setNuevoAbierto(true)}
                       disabled={crearProyecto.isPending}
                       aria-label="Nuevo proyecto"
                       title="Nuevo proyecto"
@@ -268,6 +270,18 @@ export function Layout() {
           </Suspense>
         </div>
       </main>
+
+      {nuevoAbierto && (
+        <DialogNuevoProyecto
+          creando={crearProyecto.isPending}
+          error={crearProyecto.error ? `No se pudo crear el proyecto. ${describirError(crearProyecto.error)}` : undefined}
+          onCrear={(tipo) => crearProyecto.mutate(tipo)}
+          onCerrar={() => {
+            setNuevoAbierto(false)
+            crearProyecto.reset()
+          }}
+        />
+      )}
     </div>
   )
 }
