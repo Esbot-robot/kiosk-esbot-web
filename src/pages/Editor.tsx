@@ -933,6 +933,38 @@ export function Editor() {
                   </span>
                 </>
               )}
+              {/* Contador al pausar (MainActivity.estilizarContador), por encima de los botones como en el robot.
+                  Clásico: texto suelto abajo a la derecha. Feria: píldora oscura abajo al centro, o abajo a la
+                  derecha si hay alguna tarjeta (app 1.20) para no taparle el texto */}
+              {!banner && (
+                <span
+                  className="pointer-events-none absolute z-[5] whitespace-nowrap font-bold"
+                  style={{
+                    bottom: dp(40),
+                    fontSize: dp(36),
+                    ...(feria && !hayTarjeta
+                      ? { left: '50%', transform: 'translateX(-50%)' }
+                      : { right: dp(40) }),
+                    ...(feria
+                      ? {
+                          padding: `${dp(12)} ${dp(36)}`,
+                          borderRadius: dp(60),
+                          backgroundColor: 'rgba(17, 17, 17, 0.9)',
+                          color: '#ffffff',
+                          fontFamily: FUENTE_FERIA,
+                        }
+                      : { color: ini.color_contador || '#FFD700' }),
+                  }}
+                >
+                  {feria ? (
+                    <>
+                      Continuaré en <span style={{ color: ini.color_contador || '#FFD700' }}>15</span>
+                    </>
+                  ) : (
+                    'Continuaré en 15...'
+                  )}
+                </span>
+              )}
             </div>
           ) : (
             <div
