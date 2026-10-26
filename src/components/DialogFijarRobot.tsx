@@ -6,7 +6,7 @@ import { eliminarConfigRobot, publicarConfigRobot } from '../lib/storage'
 import { archivosDeConfig, comprobarArchivos } from '../lib/archivosProyecto'
 import { useArchivosFaltantes } from '../lib/useArchivosFaltantes'
 import { describirError } from '../lib/errores'
-import type { Project } from '../types/config'
+import { tipoDe, type Project } from '../types/config'
 import { Advertencia } from './Advertencia'
 
 interface DialogFijarRobotProps {
@@ -21,6 +21,9 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
   const queryClient = useQueryClient()
   // Archivos del proyecto que ya no están en el almacenamiento: si falta alguno, no se fija
   const { faltantes, comprobando } = useArchivosFaltantes(proyecto.config)
+  // La app de los robots todavía no tiene el modo Retail (llega en una versión
+  // nueva): un robot fijado a un proyecto Retail mostraría una pantalla de evento vacía
+  const retailSinSoporte = tipoDe(proyecto.config) === 'retail'
 
   // Robots que ya tienen fijado ESTE proyecto
   const { data: robotsFijados } = useQuery({
@@ -152,7 +155,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
         </div>
         <button
           onClick={() => fijar.mutate()}
-          disabled={!serialValido || fijar.isPending || comprobando || faltantes.length > 0}
+          disabled={!serialValido || fijar.isPending || comprobando || faltantes.length > 0 || retailSinSoporte}
           className="rounded-lg bg-indigo-600 px-6 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
         >
           {fijar.isPending ? 'Fijando...' : comprobando ? 'Comprobando...' : 'Fijar'}
@@ -164,6 +167,11 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
         </Advertencia>
       )}
 
+      {retailSinSoporte && (
+        <Advertencia className="mt-4">
+          Los proyectos Retail todavía no se pueden fijar a un robot: la app de los robots aún no tiene el modo Retail.
+        </Advertencia>
+      )}
       {faltantes.length > 0 && (
         <div className="mt-4">
           <Advertencia>
