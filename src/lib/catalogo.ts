@@ -52,7 +52,7 @@ const COLUMNAS: Record<string, string[]> = {
 const OBLIGATORIAS = ['nombre', 'precio', 'url_imagen']
 
 /** Sin mayúsculas, tildes ni espacios sobrantes; los espacios internos pasan a "_" */
-function claveTexto(texto: string): string {
+export function claveTexto(texto: string): string {
   return texto
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -168,7 +168,7 @@ function limpiarTexto(valor: string | undefined): string {
 }
 
 /** Enlaces de "compartir" de Drive o Dropbox: abren una página, no la imagen */
-function esEnlaceDeCompartir(url: string): boolean {
+export function esEnlaceDeCompartir(url: string): boolean {
   return /drive\.google\.com|dropbox\.com\/s\/|dropbox\.com\/scl\/|onedrive\.live\.com|1drv\.ms/i.test(url)
 }
 

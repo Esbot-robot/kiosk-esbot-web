@@ -7,7 +7,7 @@ import { useArchivosFaltantes } from '../lib/useArchivosFaltantes'
 import { AvisoArchivosFaltantes } from '../components/ArchivosFaltantes'
 import { avisoError, avisoGuardado } from '../lib/alertas'
 import { Modal } from '../components/Modal'
-import { botonCatalogoVacio, botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonCatalogo, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo, tipoDe } from '../types/config'
+import { botonCatalogoVacio, botonesAdicionalesVacios, botonFotoVacio, botonRegistroVacio, type BotonCatalogo, type BotonRegistro, colorLibreRuleta, PALETA_RULETA, COLORES_OPCIONES_DEFAULT, COLOR_TEXTO_OPCION_DEFAULT, LIMITES, type BotonAdicionalInicial, type BotonFoto, type EventConfig, type Pregunta, type Project, type TextoEstilo, retailVacio, tipoDe } from '../types/config'
 import { DialogBoton, DialogColor, DialogColoresOpciones, DialogTexto, DialogTts, DialogTextoSimple } from '../components/editor/DialogTexto'
 import { DialogPregunta } from '../components/editor/DialogPregunta'
 import { DialogArchivo } from '../components/editor/DialogArchivo'
@@ -23,6 +23,7 @@ import { Advertencia } from '../components/Advertencia'
 import { SelectorDiseno } from '../components/editor/SelectorDiseno'
 import { BANNER, colorContraste, DisenoContext, disenoDe, FERIA, FUENTE_FERIA, FUENTE_ROBOT } from '../lib/disenos'
 import { TarjetaFeria } from '../components/editor/TarjetaFeria'
+import { EditorRetail } from '../components/retail/EditorRetail'
 import { TextoAjustado } from '../components/editor/TextoAjustado'
 import { ANCHO_VISTA_REM, dp } from '../lib/pantallaRobot'
 
@@ -361,6 +362,10 @@ export function Editor() {
             productos: catalogoGuardado.productos ?? [],
           }
         : catalogoBase
+      // Retail: completa lo que falte del bloque (proyectos creados antes de algún campo nuevo)
+      if (tipoDe(cfg) === 'retail') {
+        cfg.retail = { ...retailVacio(), ...cfg.retail, cupones: cfg.retail?.cupones ?? [] }
+      }
       setConfig(cfg)
       setGuardadoJson(JSON.stringify({ nombre: proyecto.nombre, config: cfg }))
     }
@@ -488,36 +493,25 @@ export function Editor() {
     return <Cargando texto="Cargando proyecto…" className="py-24" />
   }
 
-  // Retail: su editor llega en el paso 5 del plan. Mientras tanto no se muestra
-  // el de eventos, que editaría campos que un proyecto Retail no usa
-  if (tipoDe(config) === 'retail') {
-    return (
-      <div className="px-4 py-10 sm:px-8 md:px-12">
-        <div className="mx-auto max-w-xl rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-[#1d293d]">RETAIL</span>
-          <h2 className="mt-4 text-2xl font-bold text-slate-900">{nombre}</h2>
-          <p className="mt-3 text-slate-600">
-            El editor de proyectos Retail está en construcción. Este proyecto ya quedó creado con su tipo y podrá
-            configurarse cuando el editor esté disponible.
-          </p>
-          <div className="mt-6 flex justify-center gap-3">
-            <button
-              onClick={() => navigate('/proyectos')}
-              className="bg-[#1d293d] px-6 py-3 font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              Volver a proyectos
-            </button>
-            {!soloLectura && (
-              <button
-                onClick={() => setConfirmarBorrar(true)}
-                disabled={borrar.isPending}
-                className="px-6 py-3 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-              >
-                Eliminar
-              </button>
-            )}
-          </div>
-        </div>
+  // Diálogos de los dos editores (evento y retail): salir con cambios sin guardar y eliminar
+  const dialogosComunes = (
+    <>
+        {/* ─── Salir con cambios sin guardar ─── */}
+        {salida.state === 'blocked' && (
+          <Modal
+            titulo="Hay cambios sin guardar"
+            textoAceptar="Salir sin guardar"
+            onCancelar={() => salida.reset()}
+            onAceptar={() => salida.proceed()}
+          >
+            <p className="text-slate-700">
+              Si sale ahora, se perderán los cambios realizados en este proyecto. Para conservarlos, pulse
+              <span className="font-semibold"> Cancelar</span> y luego <span className="font-semibold">Guardar</span>.
+            </p>
+          </Modal>
+        )}
+
+        {/* ─── Confirmar eliminación ─── */}
         {confirmarBorrar && (
           <Modal
             titulo="Eliminar proyecto"
@@ -527,11 +521,61 @@ export function Editor() {
             onAceptar={() => borrar.mutate()}
           >
             <p className="text-slate-700">
-              Vas a eliminar el proyecto <span className="font-semibold">"{nombre}"</span>. Esta acción no se puede deshacer.
+              Se eliminará el proyecto <span className="font-semibold">«{nombre}»</span>. Esta acción
+              no se puede deshacer y se borrarán también sus imágenes y videos (excepto los que use otro proyecto, como una copia duplicada).
             </p>
+
+            {(robotsFijados?.length ?? 0) > 0 ? (
+              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <p className="font-semibold">Este proyecto está asignado a los siguientes robots:</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {robotsFijados!.map((s) => (
+                    <li key={s} className="font-mono">
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2">
+                  Al eliminarlo, esos robots quedarán <span className="font-semibold">sin proyecto</span>{' '}
+                  y volverán a su configuración por defecto en el próximo reinicio.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                Este proyecto no está fijado a ningún robot.
+              </p>
+            )}
+
+            {borrar.isError && (
+              <Advertencia className="mt-3">No se pudo eliminar. {describirError(borrar.error)}</Advertencia>
+            )}
           </Modal>
         )}
-      </div>
+    </>
+  )
+
+  // Retail: su propio editor (cupones desde la plantilla y el recorrido)
+  if (tipoDe(config) === 'retail') {
+    return (
+      <>
+        <EditorRetail
+          nombre={nombre}
+          onNombre={setNombre}
+          version={config.version}
+          retail={config.retail ?? retailVacio()}
+          onRetail={(retail) => setConfig((c) => c && { ...c, retail })}
+          projectId={projectId!}
+          soloLectura={soloLectura}
+          hayCambios={hayCambios}
+          archivosFaltantes={archivosFaltantes}
+          guardando={guardar.isPending}
+          guardadoOk={guardadoOk}
+          errorGuardar={guardar.error ? `No se pudo guardar. ${describirError(guardar.error)}` : undefined}
+          onGuardar={() => guardar.mutate()}
+          onEliminar={() => setConfirmarBorrar(true)}
+        />
+        {dialogosComunes}
+      </>
     )
   }
 
@@ -1472,61 +1516,7 @@ export function Editor() {
         </div>
       )}
 
-      {/* ─── Salir con cambios sin guardar ─── */}
-      {salida.state === 'blocked' && (
-        <Modal
-          titulo="Hay cambios sin guardar"
-          textoAceptar="Salir sin guardar"
-          onCancelar={() => salida.reset()}
-          onAceptar={() => salida.proceed()}
-        >
-          <p className="text-slate-700">
-            Si sales ahora, se perderán los cambios que hiciste en este proyecto. Para conservarlos,
-            cancela y dale <span className="font-semibold">Guardar</span>.
-          </p>
-        </Modal>
-      )}
-
-      {/* ─── Confirmar eliminación ─── */}
-      {confirmarBorrar && (
-        <Modal
-          titulo="Eliminar proyecto"
-          textoAceptar={borrar.isPending ? 'Eliminando...' : 'Sí, eliminar'}
-          aceptarDeshabilitado={borrar.isPending}
-          onCancelar={() => setConfirmarBorrar(false)}
-          onAceptar={() => borrar.mutate()}
-        >
-          <p className="text-slate-700">
-            Vas a eliminar el proyecto <span className="font-semibold">"{nombre}"</span>. Esta acción
-            no se puede deshacer y se borrarán también sus imágenes y videos (excepto los que use otro proyecto, como una copia duplicada).
-          </p>
-
-          {(robotsFijados?.length ?? 0) > 0 ? (
-            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <p className="font-semibold">Este proyecto está asignado a los siguientes robots:</p>
-              <ul className="mt-1 list-disc pl-5">
-                {robotsFijados!.map((s) => (
-                  <li key={s} className="font-mono">
-                    {s}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2">
-                Al eliminarlo, esos robots quedarán <span className="font-semibold">sin proyecto</span>{' '}
-                y volverán a su configuración por defecto en el próximo reinicio.
-              </p>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-slate-500">
-              Este proyecto no está fijado a ningún robot.
-            </p>
-          )}
-
-          {borrar.isError && (
-            <Advertencia className="mt-3">No se pudo eliminar. {describirError(borrar.error)}</Advertencia>
-          )}
-        </Modal>
-      )}
+      {dialogosComunes}
 
       {/* ─── Diálogos ─── */}
       {dialogo?.tipo === 'titulo' && (
