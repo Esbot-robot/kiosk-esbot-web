@@ -1,5 +1,5 @@
 import { LIMITES, type CuponRetail } from '../types/config'
-import { claveTexto, decodificarArchivo, esEnlaceDeCompartir, parsearCsv } from './catalogo'
+import { claveTexto, decodificarArchivo, enlaceDirecto, esEnlaceDeCompartir, parsearCsv } from './catalogo'
 import { fechaValida } from './retail'
 
 /**
@@ -31,7 +31,7 @@ export interface ResultadoPlantilla {
 }
 
 /** Columnas de la plantilla y los nombres que se reconocen para cada una (sin tildes ni mayúsculas) */
-const COLUMNAS: Record<keyof Omit<CuponRetail, 'id'>, string[]> = {
+const COLUMNAS: Record<keyof Omit<CuponRetail, 'id' | 'imagen_archivo'>, string[]> = {
   zona: ['zona_de_la_tienda', 'zona'],
   producto: ['producto'],
   frase_detectar: ['frase_al_detectar', 'frase_detectar'],
@@ -39,7 +39,7 @@ const COLUMNAS: Record<keyof Omit<CuponRetail, 'id'>, string[]> = {
   frase_despedida: ['frase_de_despedida', 'frase_despedida', 'despedida'],
   vigencia_desde: ['vigencia_desde', 'desde'],
   vigencia_hasta: ['vigencia_hasta', 'hasta'],
-  imagen_url: ['url_de_la_imagen_del_cupon', 'url_de_la_imagen', 'cupon:_url_de_la_imagen', 'url_imagen', 'imagen'],
+  imagen_url: ['imagen_del_cupon', 'url_de_la_imagen_del_cupon', 'url_de_la_imagen', 'cupon:_url_de_la_imagen', 'url_imagen', 'imagen'],
 }
 
 /** Nombres que se muestran al pedir una columna que falta (los de la plantilla) */
@@ -51,7 +51,7 @@ const NOMBRE_COLUMNA: Record<keyof typeof COLUMNAS, string> = {
   frase_despedida: 'Frase de despedida',
   vigencia_desde: 'Vigencia desde',
   vigencia_hasta: 'Vigencia hasta',
-  imagen_url: 'URL de la imagen del cupón',
+  imagen_url: 'Imagen del cupón',
 }
 
 const dos = (n: number) => String(n).padStart(2, '0')
@@ -155,9 +155,22 @@ export function analizarFilasPlantilla(todas: unknown[][]): ResultadoPlantilla {
     if (!fechaValida(hasta)) return omitir('la fecha «Vigencia hasta» no es válida (formato esperado: 2026-11-30 o 30/11/2026).')
     if (hasta < desde) return omitir('la fecha «Vigencia hasta» es anterior a «Vigencia desde».')
 
-    const imagen = texto(valor(fila, 'imagen_url'))
-    if (!/^https?:\/\//i.test(imagen)) return omitir('la URL de la imagen está vacía o no comienza por https://.')
-    if (esEnlaceDeCompartir(imagen)) return omitir('la URL corresponde a un enlace para compartir (Drive, Dropbox) y no a la imagen.')
+    // La imagen es una URL (la del cliente, o Drive/Dropbox convertidos a la imagen
+    // directa) o el nombre de un archivo que se sube al panel y se asocia por nombre
+    const valorImagen = texto(valor(fila, 'imagen_url'))
+    if (!valorImagen) return omitir('falta la imagen del cupón (una URL o el nombre del archivo).')
+    let imagen = ''
+    let archivo: string | undefined
+    if (/^https?:\/\//i.test(valorImagen)) {
+      imagen = enlaceDirecto(valorImagen) ?? valorImagen
+      if (imagen === valorImagen && esEnlaceDeCompartir(valorImagen)) {
+        return omitir('la URL corresponde a un enlace para compartir (OneDrive u otro) y no a la imagen.')
+      }
+    } else if (/[\\/]/.test(valorImagen)) {
+      return omitir('el nombre de la imagen no debe incluir carpetas: escriba solo el nombre del archivo.')
+    } else {
+      archivo = valorImagen
+    }
 
     if (cupones.length >= MAX_CUPONES) return omitir(`se alcanzó el máximo de ${MAX_CUPONES} cupones por proyecto.`)
     numeros.push(numero)
@@ -169,6 +182,7 @@ export function analizarFilasPlantilla(todas: unknown[][]): ResultadoPlantilla {
       vigencia_desde: desde,
       vigencia_hasta: hasta,
       imagen_url: imagen,
+      ...(archivo ? { imagen_archivo: archivo } : {}),
     })
   })
 
@@ -228,21 +242,52 @@ export async function comprobarImagenes(urls: string[], onAvance?: (hechas: numb
   return fallidas
 }
 
+const ENCABEZADO = 'Zona de la tienda;Producto;Frase al detectar;Frase al mostrar el cupón;Frase de despedida;Vigencia desde;Vigencia hasta;Imagen del cupón'
+
 /** Plantilla descargable: separador ";" y BOM para que Excel en español la abra bien */
 export function plantillaCuponesCsv(): string {
   const filas = [
-    'Zona de la tienda;Producto;Frase al detectar;Frase al mostrar el cupón;Frase de despedida;Vigencia desde;Vigencia hasta;URL de la imagen del cupón',
+    ENCABEZADO,
     'Bebidas;Gaseosas de 400 ml;¡Hola! Hoy las gaseosas de 400 ml están 2x1 en esta zona.;¡Aquí está tu cupón! Muéstralo en caja.;¡Gracias por elegirnos!;2026-11-01;2026-11-30;https://ejemplo.com/cupones/bebidas.png',
-    'Lácteos;Yogur griego;¿Ya probaste nuestro yogur griego? Hoy tiene descuento.;Este es tu cupón, preséntalo al pagar.;¡Que disfrutes tu compra!;2026-11-01;2026-11-15;https://ejemplo.com/cupones/yogur.png',
+    'Lácteos;Yogur griego;¿Ya probaste nuestro yogur griego? Hoy tiene descuento.;Este es tu cupón, preséntalo al pagar.;¡Que disfrutes tu compra!;2026-11-01;2026-11-15;cupon_yogur.png',
+    // zona «General»: se ofrece en los pasillos y en las zonas sin cupones activos
+    'General;Envío gratis;¡Hola! Hoy tenemos envío gratis en tus compras.;Aquí está tu cupón, muéstralo en caja.;¡Gracias por visitarnos!;2026-11-01;2026-11-30;https://ejemplo.com/cupones/envio.png',
   ]
   return '﻿' + filas.join('\r\n') + '\r\n'
 }
 
-export function descargarPlantillaCupones() {
-  const blob = new Blob([plantillaCuponesCsv()], { type: 'text/csv;charset=utf-8' })
+function descargarCsv(contenido: string, nombre: string) {
+  const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8' })
   const enlace = document.createElement('a')
   enlace.href = URL.createObjectURL(blob)
-  enlace.download = 'plantilla_cupones.csv'
+  enlace.download = nombre
+  enlace.click()
+  URL.revokeObjectURL(enlace.href)
+}
+
+export function descargarPlantillaCupones() {
+  descargarCsv(plantillaCuponesCsv(), 'plantilla_cupones.csv')
+}
+
+/**
+ * Descarga los cupones actuales como Excel (.xlsx), con el nombre del archivo
+ * cargado. El Excel se arma solo al pedirlo: su código no pesa en el resto del panel.
+ */
+export async function descargarCuponesActuales(cupones: CuponRetail[], archivoNombre: string) {
+  const { crearXlsx } = await import('./excel')
+  const filas = cupones.map((c) => [
+    c.zona,
+    c.producto,
+    c.frase_detectar,
+    c.frase_mostrar,
+    c.frase_despedida,
+    c.vigencia_desde,
+    c.vigencia_hasta,
+    c.imagen_archivo ?? c.imagen_url,
+  ])
+  const enlace = document.createElement('a')
+  enlace.href = URL.createObjectURL(crearXlsx(ENCABEZADO.split(';'), filas, 'Cupones'))
+  enlace.download = archivoNombre.replace(/\.(xlsx|xls|csv)$/i, '') + '.xlsx'
   enlace.click()
   URL.revokeObjectURL(enlace.href)
 }

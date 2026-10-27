@@ -44,3 +44,36 @@ export function estadoCupon(cupon: Pick<CuponRetail, 'vigencia_desde' | 'vigenci
   if (hoy > cupon.vigencia_hasta) return { estado: 'vencido', dias: diasEntre(cupon.vigencia_hasta, hoy) }
   return { estado: 'activo', dias: diasEntre(hoy, cupon.vigencia_hasta) }
 }
+
+/**
+ * Zona de la plantilla para los cupones generales: el robot los ofrece fuera de
+ * las zonas (pasillos) y en las zonas sin cupones activos hoy. Igual que la app
+ * (EventConfig.Retail.ZONA_GENERAL).
+ */
+export const ZONA_GENERAL = 'General'
+
+export function esZonaGeneral(zona: string): boolean {
+  return zona.trim().toLowerCase() === ZONA_GENERAL.toLowerCase()
+}
+
+/**
+ * Avisos sobre dónde saludará el robot hoy: zonas sin cupones activos (ahí ofrece
+ * los generales, si hay) y cupones generales que existen pero no están activos.
+ */
+export function avisosZonas(cupones: Pick<CuponRetail, 'zona' | 'vigencia_desde' | 'vigencia_hasta'>[], hoy = hoyColombia()): string[] {
+  const activo = cupones.map((c) => estadoCupon(c, hoy).estado === 'activo')
+  const generales = cupones.filter((c) => esZonaGeneral(c.zona))
+  const generalesActivos = cupones.some((c, i) => esZonaGeneral(c.zona) && activo[i])
+  const zonas = [...new Set(cupones.map((c) => c.zona.trim()).filter((z) => !esZonaGeneral(z)))]
+  const avisos = zonas
+    .filter((z) => !cupones.some((c, i) => c.zona.trim() === z && activo[i]))
+    .map((z) =>
+      generalesActivos
+        ? `Zona «${z}» no tiene cupones activos hoy: el robot ofrecerá los cupones generales.`
+        : `Zona «${z}» no tiene cupones activos hoy: el robot no saludará en esa zona.`
+    )
+  if (generales.length > 0 && !generalesActivos) {
+    avisos.push('Ningún cupón general está activo hoy: fuera de las zonas el robot no saludará.')
+  }
+  return avisos
+}
