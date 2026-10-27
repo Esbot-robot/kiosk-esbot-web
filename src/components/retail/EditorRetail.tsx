@@ -3,9 +3,11 @@ import { Advertencia } from '../Advertencia'
 import { AvisoArchivosFaltantes } from '../ArchivosFaltantes'
 import { DialogArchivo } from '../editor/DialogArchivo'
 import { IconoGuardar, IconoPlay } from '../iconos'
-import { estadoCupon, hoyColombia, type EstadoCupon } from '../../lib/retail'
-import { analizarPlantilla, comprobarImagenes, descargarPlantillaCupones, type FilaOmitida } from '../../lib/retailPlantilla'
+import { avisosZonas, estadoCupon, hoyColombia, type EstadoCupon } from '../../lib/retail'
+import { analizarPlantilla, comprobarImagenes, descargarCuponesActuales, descargarPlantillaCupones, type FilaOmitida } from '../../lib/retailPlantilla'
 import { describirError } from '../../lib/errores'
+import { rutaMedia, subirArchivo } from '../../lib/storage'
+import { cuponesSinImagen, MAX_MB_IMAGEN, resolverCupones, resolverImagen, TIPOS_IMAGEN } from '../../lib/retailImagenes'
 import { Modal } from '../Modal'
 import { RevisionPlantilla } from './RevisionPlantilla'
 import type { ResultadoArchivo } from '../../lib/archivosProyecto'
@@ -14,13 +16,14 @@ import {
   SEGUNDOS_CUPON_MIN,
   type ConfigRetail,
   type CuponRetail,
+  type ImagenRetail,
 } from '../../types/config'
 
 /** Avance de la carga de la plantilla */
 type Carga =
   | { fase: 'leyendo' }
   | { fase: 'imagenes'; hechas: number; total: number }
-  | { fase: 'revision'; archivo: string; cupones: CuponRetail[]; omitidas: FilaOmitida[] }
+  | { fase: 'revision'; archivo: string; cupones: CuponRetail[]; omitidas: FilaOmitida[]; pendientes: FilaOmitida[] }
   | { fase: 'error'; mensaje: string }
 
 /** «vence en 4 días», «se activa mañana», «venció hace 2 días» */
@@ -55,10 +58,13 @@ function FilaCupon({
   abierto,
   seleccionado,
   soloLectura,
+  faltaImagen,
   onAbrir,
   onSeleccionar,
 }: {
   cupon: CuponRetail
+  /** por qué el cupón no tiene imagen todavía (el robot no lo ofrece hasta tenerla) */
+  faltaImagen?: string
   /** posición en la plantilla: es el orden de la rotación, aunque haya un filtro */
   numero: number
   hoy: string
@@ -87,6 +93,7 @@ function FilaCupon({
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-slate-800">{cupon.producto || 'Sin producto'}</span>
             <span className="block truncate text-sm text-slate-500">Zona: {cupon.zona}</span>
+            {faltaImagen && <span className="block truncate text-sm font-medium text-rose-600">Sin imagen: {faltaImagen}</span>}
           </span>
           <span className={`shrink-0 text-sm font-semibold ${COLOR_ESTADO[estado.estado]}`}>
             {textoEstado(estado)}
@@ -165,6 +172,44 @@ export function EditorRetail({
   const [filtroZona, setFiltroZona] = useState('')
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
   const entradaArchivo = useRef<HTMLInputElement>(null)
+  const entradaImagenes = useRef<HTMLInputElement>(null)
+  const [subida, setSubida] = useState<{ hechas: number; total: number } | null>(null)
+  const [resultadoSubida, setResultadoSubida] = useState<{ subidas: number; rechazadas: string[] } | null>(null)
+  const imagenes = retail.imagenes ?? []
+
+  /**
+   * Sube las imágenes elegidas al almacenamiento del proyecto y asocia por nombre
+   * exacto los cupones que las esperan. Una imagen con el mismo nombre que otra ya
+   * subida la reemplaza (queda una dirección nueva: los robots bajan la nueva).
+   */
+  async function subirImagenes(archivos: File[]) {
+    const nuevas: ImagenRetail[] = [...imagenes]
+    const rechazadas: string[] = []
+    let subidas = 0
+    setResultadoSubida(null)
+    setSubida({ hechas: 0, total: archivos.length })
+    for (const [i, archivo] of archivos.entries()) {
+      if (!TIPOS_IMAGEN.includes(archivo.type)) {
+        rechazadas.push(`«${archivo.name}»: debe ser PNG, JPG o WEBP.`)
+      } else if (archivo.size > MAX_MB_IMAGEN * 1024 * 1024) {
+        rechazadas.push(`«${archivo.name}»: pesa más de ${MAX_MB_IMAGEN} MB.`)
+      } else {
+        try {
+          const url = await subirArchivo('media', rutaMedia(projectId, `cupon_${archivo.name}`), archivo, { contentType: archivo.type })
+          const previa = nuevas.findIndex((x) => x.nombre === archivo.name)
+          if (previa >= 0) nuevas[previa] = { nombre: archivo.name, url }
+          else nuevas.push({ nombre: archivo.name, url })
+          subidas++
+        } catch (e) {
+          rechazadas.push(`«${archivo.name}»: no se pudo subir. ${describirError(e)}`)
+        }
+      }
+      setSubida({ hechas: i + 1, total: archivos.length })
+    }
+    onRetail({ ...retail, imagenes: nuevas, cupones: resolverCupones(retail.cupones, nuevas) })
+    setSubida(null)
+    setResultadoSubida({ subidas, rechazadas })
+  }
 
   /** Lee la plantilla, comprueba que cada imagen cargue y muestra la revisión antes de usarla */
   async function cargarPlantilla(archivo: File) {
@@ -175,20 +220,35 @@ export function EditorRetail({
         setCarga({ fase: 'error', mensaje: resultado.errorGeneral })
         return
       }
-      setCarga({ fase: 'imagenes', hechas: 0, total: resultado.cupones.length })
+      // Los que nombran un archivo se asocian con las imágenes ya subidas al panel
+      const cupones = resolverCupones(resultado.cupones, imagenes)
+      const conUrl = cupones.filter((c) => c.imagen_url)
+      setCarga({ fase: 'imagenes', hechas: 0, total: conUrl.length })
       const fallidas = await comprobarImagenes(
-        resultado.cupones.map((c) => c.imagen_url),
+        conUrl.map((c) => c.imagen_url),
         (hechas, total) => setCarga({ fase: 'imagenes', hechas, total })
       )
       // Un cupón cuya imagen no carga no se puede mostrar: queda fuera, con su fila
       const omitidas = [...resultado.omitidas]
-      const cuponesOk = resultado.cupones.filter((c, i) => {
+      const pendientes: FilaOmitida[] = []
+      const cuponesOk = cupones.filter((c, i) => {
+        if (!c.imagen_url) {
+          // Espera su imagen: entra igual y se completa con «Subir imágenes»
+          pendientes.push({ fila: resultado.filas[i], nombre: c.producto, motivo: resolverImagen(c.imagen_archivo ?? '', imagenes).problema ?? '' })
+          return true
+        }
         if (!fallidas.has(c.imagen_url)) return true
-        omitidas.push({ fila: resultado.filas[i], nombre: c.producto, motivo: 'la imagen no se pudo cargar. Verifique que la URL abra directamente la imagen.' })
+        omitidas.push({
+          fila: resultado.filas[i],
+          nombre: c.producto,
+          motivo: c.imagen_url.startsWith('https://drive.google.com/')
+            ? 'la imagen de Drive no se pudo cargar. Verifique que esté compartida como «Cualquier persona con el enlace».'
+            : 'la imagen no se pudo cargar. Verifique que la URL abra directamente la imagen.',
+        })
         return false
       })
       omitidas.sort((a, b) => a.fila - b.fila)
-      setCarga({ fase: 'revision', archivo: archivo.name, cupones: cuponesOk, omitidas })
+      setCarga({ fase: 'revision', archivo: archivo.name, cupones: cuponesOk, omitidas, pendientes })
     } catch (e) {
       setCarga({ fase: 'error', mensaje: `No fue posible leer el archivo. ${describirError(e)}` })
     }
@@ -197,11 +257,11 @@ export function EditorRetail({
   const cupones = retail.cupones
   const estados = cupones.map((c) => estadoCupon(c, hoy).estado)
 
-  // Zonas sin ningún cupón activo hoy: ahí el robot no saluda
   const zonas = [...new Set(cupones.map((c) => c.zona.trim()))]
-  const zonasSinActivos = zonas.filter(
-    (z) => !cupones.some((c, i) => c.zona.trim() === z && estados[i] === 'activo')
-  )
+  // Dónde saludará el robot hoy (zonas sin cupones activos, cupones generales). Un
+  // cupón sin imagen no cuenta: el robot no lo ofrece hasta tenerla
+  const avisos = avisosZonas(cupones.filter((c) => c.imagen_url), hoy)
+  const sinImagen = new Map(cuponesSinImagen(cupones, imagenes).map((x) => [x.cupon.id, x.problema]))
 
   // Si se quitaron todos los cupones de la zona filtrada, el filtro vuelve a «Todas»
   const zonaFiltrada = zonas.includes(filtroZona) ? filtroZona : ''
@@ -272,6 +332,26 @@ export function EditorRetail({
                 </button>
                 <button
                   type="button"
+                  onClick={() => entradaImagenes.current?.click()}
+                  disabled={subida !== null}
+                  className="px-4 py-2.5 font-semibold text-[#1d293d] transition-colors hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Subir imágenes
+                </button>
+                <input
+                  ref={entradaImagenes}
+                  type="file"
+                  multiple
+                  accept={TIPOS_IMAGEN.join(',')}
+                  className="hidden"
+                  onChange={(e) => {
+                    const archivos = [...(e.target.files ?? [])]
+                    e.target.value = ''
+                    if (archivos.length > 0) void subirImagenes(archivos)
+                  }}
+                />
+                <button
+                  type="button"
                   onClick={() => entradaArchivo.current?.click()}
                   disabled={carga?.fase === 'leyendo' || carga?.fase === 'imagenes'}
                   className="border border-[#1d293d] px-5 py-2.5 font-semibold text-[#1d293d] transition-colors hover:bg-slate-50 disabled:opacity-40"
@@ -293,8 +373,46 @@ export function EditorRetail({
             )}
           </div>
 
-          {retail.archivo_nombre && cupones.length > 0 && (
-            <p className="mt-2 truncate text-sm text-slate-500">Plantilla: {retail.archivo_nombre}</p>
+          {(retail.archivo_nombre || imagenes.length > 0) && (
+            <p className="mt-2 truncate text-sm text-slate-500">
+              {retail.archivo_nombre && cupones.length > 0 && (
+                <>
+                  Plantilla:{' '}
+                  <button
+                    type="button"
+                    onClick={() => void descargarCuponesActuales(cupones, retail.archivo_nombre!)}
+                    title="Descargar la plantilla con los cupones actuales"
+                    className="font-medium text-[#3352F5] underline-offset-2 hover:underline"
+                  >
+                    {retail.archivo_nombre}
+                  </button>
+                </>
+              )}
+              {retail.archivo_nombre && cupones.length > 0 && imagenes.length > 0 && ' · '}
+              {imagenes.length > 0 && `${imagenes.length} ${imagenes.length === 1 ? 'imagen subida' : 'imágenes subidas'}`}
+            </p>
+          )}
+          {subida && (
+            <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Subiendo imágenes: {subida.hechas} de {subida.total}…
+            </p>
+          )}
+          {resultadoSubida && (
+            <div className="mt-4 space-y-1">
+              <p className="text-sm text-slate-600">
+                {resultadoSubida.subidas === 1 ? '1 imagen subida.' : `${resultadoSubida.subidas} imágenes subidas.`} Los cambios se
+                aplicarán al pulsar «Guardar».
+              </p>
+              {resultadoSubida.rechazadas.map((r) => (
+                <Advertencia key={r}>{r}</Advertencia>
+              ))}
+            </div>
+          )}
+          {sinImagen.size > 0 && (
+            <Advertencia className="mt-4">
+              {sinImagen.size === 1 ? '1 cupón espera su imagen' : `${sinImagen.size} cupones esperan su imagen`}: el robot no
+              los ofrecerá hasta subirla con «Subir imágenes».
+            </Advertencia>
           )}
           {(carga?.fase === 'leyendo' || carga?.fase === 'imagenes') && (
             <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -304,10 +422,10 @@ export function EditorRetail({
             </p>
           )}
 
-          {zonasSinActivos.length > 0 && (
+          {avisos.length > 0 && (
             <div className="mt-4 space-y-1">
-              {zonasSinActivos.map((z) => (
-                <Advertencia key={z}>Zona «{z}» no tiene cupones activos hoy: el robot no saludará en esa zona.</Advertencia>
+              {avisos.map((aviso) => (
+                <Advertencia key={aviso}>{aviso}</Advertencia>
               ))}
             </div>
           )}
@@ -436,6 +554,7 @@ export function EditorRetail({
                       abierto={abierto === c.id}
                       seleccionado={seleccion.has(c.id)}
                       soloLectura={soloLectura}
+                      faltaImagen={sinImagen.get(c.id)}
                       onAbrir={() => setAbierto(abierto === c.id ? null : c.id)}
                       onSeleccionar={(marcado) => marcar(c.id, marcado)}
                     />
@@ -562,6 +681,7 @@ export function EditorRetail({
           archivo={carga.archivo}
           cupones={carga.cupones}
           omitidas={carga.omitidas}
+          pendientes={carga.pendientes}
           cuponesActuales={cupones.length}
           onCancelar={() => setCarga(null)}
           onAceptar={() => {

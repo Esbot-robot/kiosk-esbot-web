@@ -1,6 +1,6 @@
 import { Modal } from '../Modal'
 import { Advertencia } from '../Advertencia'
-import { estadoCupon, hoyColombia } from '../../lib/retail'
+import { avisosZonas, estadoCupon, hoyColombia } from '../../lib/retail'
 import type { FilaOmitida } from '../../lib/retailPlantilla'
 import type { CuponRetail } from '../../types/config'
 
@@ -14,6 +14,7 @@ export function RevisionPlantilla({
   archivo,
   cupones,
   omitidas,
+  pendientes,
   cuponesActuales,
   onAceptar,
   onCancelar,
@@ -21,6 +22,8 @@ export function RevisionPlantilla({
   archivo: string
   cupones: CuponRetail[]
   omitidas: FilaOmitida[]
+  /** cupones que nombran una imagen aún no subida al panel: entran, pero el robot no los ofrece hasta tenerla */
+  pendientes: FilaOmitida[]
   cuponesActuales: number
   onAceptar: () => void
   onCancelar: () => void
@@ -30,8 +33,7 @@ export function RevisionPlantilla({
   const activos = estados.filter((e) => e === 'activo').length
   const proximos = estados.filter((e) => e === 'por_activar').length
   const vencidos = estados.filter((e) => e === 'vencido').length
-  const zonas = [...new Set(cupones.map((c) => c.zona.trim()))]
-  const zonasSinActivos = zonas.filter((z) => !cupones.some((c, i) => c.zona.trim() === z && estados[i] === 'activo'))
+  const avisos = avisosZonas(cupones.filter((c) => c.imagen_url), hoy)
 
   return (
     <Modal
@@ -63,11 +65,33 @@ export function RevisionPlantilla({
         <Advertencia className="mt-4">Ninguna fila de la plantilla es válida. Revise los motivos a continuación.</Advertencia>
       )}
 
-      {zonasSinActivos.length > 0 && (
+      {avisos.length > 0 && (
         <div className="mt-4 space-y-1">
-          {zonasSinActivos.map((z) => (
-            <Advertencia key={z}>Zona «{z}» no tiene cupones activos hoy: el robot no saludará en esa zona.</Advertencia>
+          {avisos.map((aviso) => (
+            <Advertencia key={aviso}>{aviso}</Advertencia>
           ))}
+        </div>
+      )}
+
+      {pendientes.length > 0 && (
+        <div className="mt-5">
+          <p className="font-semibold text-slate-800">
+            {pendientes.length === 1 ? '1 cupón espera su imagen' : `${pendientes.length} cupones esperan su imagen`}
+          </p>
+          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg bg-amber-50 px-4 py-3 text-sm text-slate-700">
+            {pendientes.map((o) => (
+              <li key={`${o.fila}-${o.motivo}`}>
+                <span className="font-semibold">
+                  Fila {o.fila}
+                  {o.nombre && ` (${o.nombre})`}:
+                </span>{' '}
+                {o.motivo}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-slate-500">
+            Se cargan igual: súbalas después con «Subir imágenes». Mientras tanto, el robot no ofrecerá esos cupones.
+          </p>
         </div>
       )}
 

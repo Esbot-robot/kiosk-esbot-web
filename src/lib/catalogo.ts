@@ -167,6 +167,25 @@ function limpiarTexto(valor: string | undefined): string {
   return (valor ?? '').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Dirección directa de la imagen a partir de un enlace de «compartir» de Drive o
+ * Dropbox (esos abren una página, no la imagen). null si no es de esos servicios.
+ *
+ * Drive usa su dirección de miniaturas (sz=w2000: hasta 2000 px de ancho), que
+ * sirve la imagen sola. No es una dirección garantizada por Google, pero el robot
+ * guarda una copia de cada imagen al recibir la configuración. El archivo debe
+ * estar compartido como «Cualquier persona con el enlace».
+ */
+export function enlaceDirecto(url: string): string | null {
+  const drive = /drive\.google\.com\/(?:file\/d\/|open\?(?:.*&)?id=|uc\?(?:.*&)?id=|thumbnail\?(?:.*&)?id=)([-\w]{20,})/i.exec(url)
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w2000`
+  if (/dropbox\.com\/(?:s|scl)\//i.test(url)) {
+    const sinDl = url.replace(/([?&])dl=\d/i, '$1raw=1')
+    return /[?&]raw=1/i.test(sinDl) ? sinDl : `${sinDl}${sinDl.includes('?') ? '&' : '?'}raw=1`
+  }
+  return null
+}
+
 /** Enlaces de "compartir" de Drive o Dropbox: abren una página, no la imagen */
 export function esEnlaceDeCompartir(url: string): boolean {
   return /drive\.google\.com|dropbox\.com\/s\/|dropbox\.com\/scl\/|onedrive\.live\.com|1drv\.ms/i.test(url)
@@ -286,9 +305,12 @@ export function analizarFilas(todas: string[][]): ResultadoCsv {
       if (!/^https?:\/\//i.test(imagen)) {
         advertencias.push(`Fila ${numero} («${nombre}»): la URL de la imagen debe iniciar con http:// o https://; el producto se mostrará sin imagen.`)
         imagen = ''
+      } else if (enlaceDirecto(imagen)) {
+        // Drive o Dropbox: se usa la dirección directa de la imagen
+        imagen = enlaceDirecto(imagen)!
       } else if (esEnlaceDeCompartir(imagen)) {
         advertencias.push(
-          `Fila ${numero} («${nombre}»): la URL corresponde a un enlace para compartir (Drive, Dropbox u otro) y no a una imagen directa; es probable que el producto se muestre sin imagen.`
+          `Fila ${numero} («${nombre}»): la URL corresponde a un enlace para compartir (OneDrive u otro) y no a una imagen directa; es probable que el producto se muestre sin imagen.`
         )
       }
     }

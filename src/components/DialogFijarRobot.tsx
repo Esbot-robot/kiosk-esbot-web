@@ -15,15 +15,28 @@ interface DialogFijarRobotProps {
 }
 
 /** Fija el proyecto a uno o varios robots por su serial (cada robot, un proyecto) */
+/** versionCode de la app 1.21, la primera con el modo Retail */
+const VERSION_RETAIL = 23
+
+async function versionAppDe(serial: string): Promise<{ codigo: number | null; nombre: string | null }> {
+  const { data, error } = await supabase
+    .from('robot_status')
+    .select('app_version_code, app_version_name')
+    .eq('serial', serial)
+    .maybeSingle()
+  if (error) throw error
+  return { codigo: data?.app_version_code ?? null, nombre: data?.app_version_name ?? null }
+}
+
 export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) {
   const [serial, setSerial] = useState('')
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
   // Archivos del proyecto que ya no están en el almacenamiento: si falta alguno, no se fija
   const { faltantes, comprobando } = useArchivosFaltantes(proyecto.config)
-  // La app de los robots todavía no tiene el modo Retail (llega en una versión
-  // nueva): un robot fijado a un proyecto Retail mostraría una pantalla de evento vacía
-  const retailSinSoporte = tipoDe(proyecto.config) === 'retail'
+  // El modo Retail llegó con la app 1.21: un robot con una app anterior mostraría
+  // una pantalla de evento vacía. Se mira la versión que reporta el robot en su latido
+  const esRetail = tipoDe(proyecto.config) === 'retail'
 
   // Robots que ya tienen fijado ESTE proyecto
   const { data: robotsFijados } = useQuery({
@@ -48,9 +61,21 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
   const LARGO_SERIAL = 11
   const serialValido = serial.trim().length === LARGO_SERIAL
 
+  const { data: appRobot, isLoading: leyendoApp } = useQuery({
+    queryKey: ['app-robot', serial.trim()],
+    enabled: esRetail && serialValido,
+    queryFn: () => versionAppDe(serial.trim()),
+  })
+  const retailSinSoporte = esRetail && serialValido && !leyendoApp && (appRobot?.codigo ?? 0) < VERSION_RETAIL
+
   const fijar = useMutation({
     mutationFn: async () => {
       const s = serial.trim()
+
+      // Comprobación fresca: el robot pudo actualizarse (o no) desde que se abrió el diálogo
+      if (esRetail && ((await versionAppDe(s)).codigo ?? 0) < VERSION_RETAIL) {
+        throw new Error('El robot no tiene la versión de la app que necesita el modo Retail (1.21 o superior).')
+      }
 
       // Comprobación fresca justo antes de fijar (la de la pantalla puede tener unos minutos)
       const revision = await comprobarArchivos(archivosDeConfig(proyecto.config))
@@ -155,7 +180,7 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
         </div>
         <button
           onClick={() => fijar.mutate()}
-          disabled={!serialValido || fijar.isPending || comprobando || faltantes.length > 0 || retailSinSoporte}
+          disabled={!serialValido || fijar.isPending || comprobando || faltantes.length > 0 || retailSinSoporte || (esRetail && leyendoApp)}
           className="rounded-lg bg-indigo-600 px-6 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
         >
           {fijar.isPending ? 'Fijando...' : comprobando ? 'Comprobando...' : 'Fijar'}
@@ -169,7 +194,10 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
 
       {retailSinSoporte && (
         <Advertencia className="mt-4">
-          Los proyectos Retail todavía no se pueden fijar a un robot: la app de los robots aún no tiene el modo Retail.
+          {appRobot?.nombre
+            ? `El robot tiene la app ${appRobot.nombre}. `
+            : 'No se conoce la versión de la app de este robot. '}
+          Los proyectos Retail requieren la versión 1.21 o superior: actualícelo desde Robots.
         </Advertencia>
       )}
       {faltantes.length > 0 && (

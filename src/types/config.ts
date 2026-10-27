@@ -428,8 +428,20 @@ export interface CuponRetail {
   /** AAAA-MM-DD, días incluidos; se comparan con la fecha de Colombia */
   vigencia_desde: string
   vigencia_hasta: string
-  /** imagen del cupón en el servidor del cliente */
+  /**
+   * Dirección de la imagen del cupón: la del cliente (su web, Drive convertido) o
+   * la de una imagen subida al panel. Vacía = falta subir la imagen: el robot no
+   * ofrece ese cupón hasta que la tenga.
+   */
   imagen_url: string
+  /** nombre del archivo en la plantilla, cuando la imagen se sube al panel (se asocia por nombre exacto) */
+  imagen_archivo?: string
+}
+
+/** Imagen de cupón subida al panel: nombre original exacto y su dirección en el almacenamiento */
+export interface ImagenRetail {
+  nombre: string
+  url: string
 }
 
 export interface ConfigRetail {
@@ -440,6 +452,8 @@ export interface ConfigRetail {
   /** nombre del archivo importado, para mostrarlo en el editor */
   archivo_nombre: string
   cupones: CuponRetail[]
+  /** imágenes de cupones subidas al panel (el robot no las usa: cada cupón ya trae su dirección) */
+  imagenes?: ImagenRetail[]
 }
 
 export const SEGUNDOS_CUPON_MIN = 5
