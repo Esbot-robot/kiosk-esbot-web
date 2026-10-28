@@ -266,7 +266,7 @@ export interface BotonCatalogo {
   tts_cotizar: string
   /** al acabarse el tiempo sin tocar la pantalla del catálogo, justo antes de volver a la ruta */
   tts_despedida: string
-  /** nombre del archivo cargado (solo para mostrarlo en el panel) */
+  /** nombre del archivo cargado, o «Odoo · servidor» si viene de Odoo (solo para mostrarlo en el panel) */
   archivo_nombre: string
   productos: ProductoCatalogo[]
 }

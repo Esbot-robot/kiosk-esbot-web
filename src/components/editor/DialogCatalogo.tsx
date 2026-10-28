@@ -6,6 +6,7 @@ import { Interruptor } from '../Interruptor'
 import { AparienciaBoton } from './AparienciaBoton'
 import { CampoTexto } from './ConfigFormulario'
 import { DialogTts } from './DialogTexto'
+import { DialogOdoo } from './DialogOdoo'
 import { CampoColor } from '../CampoColor'
 import {
   IconoAvisoAmarillo,
@@ -110,6 +111,11 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
   const [errorArchivo, setErrorArchivo] = useState('')
   const [error, setError] = useState('')
   const [editorTts, setEditorTts] = useState<EditorTts | null>(null)
+  const [dialogoOdoo, setDialogoOdoo] = useState(false)
+  /** filtro elegido en la vista previa: «Todos» o el nombre de una categoría */
+  const [filtroVista, setFiltroVista] = useState('Todos')
+  /** los productos actuales vienen de una sincronización con Odoo aún sin guardar */
+  const [deOdoo, setDeOdoo] = useState(false)
   const entradaArchivo = useRef<HTMLInputElement>(null)
 
   const cambiar = (cambios: Partial<BotonCatalogo>) => setCatalogo((actual) => ({ ...actual, ...cambios }))
@@ -125,6 +131,7 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
         return
       }
       setResultado(analisis)
+      setDeOdoo(false)
       setCatalogo((actual) => ({ ...actual, productos: analisis.productos, archivo_nombre: archivo.name }))
     } catch {
       setErrorArchivo('No fue posible leer el archivo. Guárdelo como .xlsx o CSV UTF-8 e intente nuevamente.')
@@ -177,6 +184,9 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
   const categorias = resultado ? resultado.categorias : categoriasDe(catalogo.productos)
   const sinCategoria = resultado ? resultado.sinCategoria : catalogo.productos.filter((p) => !p.categoria).length
   const agotados = catalogo.productos.filter(estaAgotado).length
+  // Si la categoría elegida en la vista previa ya no existe (otro archivo), vuelve a «Todos»
+  const vista = categorias.some((c) => c.nombre === filtroVista) ? filtroVista : 'Todos'
+  const productosVista = vista === 'Todos' ? catalogo.productos : catalogo.productos.filter((p) => p.categoria === vista)
   const sinDescripcion = catalogo.productos.filter((p) => !p.descripcion.trim()).length
   // Con un color de marca, el botón Cotizar y el filtro seleccionado lo usan los dos; sin él, cada uno su color de siempre
   const fondoCotizar = catalogo.color_acento || COTIZAR_DEFECTO
@@ -277,7 +287,11 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
                     <p className="text-sm text-slate-500">
                       {catalogo.productos.length} {catalogo.productos.length === 1 ? 'producto' : 'productos'}
                       {agotados > 0 && ` • ${agotados} ${agotados === 1 ? 'se mostrará' : 'se mostrarán'} como Agotado`}
-                      {resultado && <span className="ml-2 font-medium text-emerald-700">· Archivo cargado; pendiente de guardar</span>}
+                      {(resultado || deOdoo) && (
+                        <span className="ml-2 font-medium text-emerald-700">
+                          · {deOdoo ? 'Productos de Odoo' : 'Archivo cargado'}; pendiente de guardar
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -302,6 +316,13 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
                   className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
                 >
                   Descargar plantilla
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDialogoOdoo(true)}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+                >
+                  {catalogo.archivo_nombre.startsWith('Odoo') ? 'Sincronizar con Odoo' : 'Conectar con Odoo'}
                 </button>
                 <button
                   type="button"
@@ -459,25 +480,29 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
                 <div>
                   <Titulo>Vista previa de productos</Titulo>
                   <div className="rounded-lg bg-slate-50 p-2">
+                    {/* Filtros como en el robot: se pueden tocar para ver cada categoría */}
                     {categorias.length > 0 && (
-                      <div className="mb-2 flex gap-1.5 overflow-hidden">
-                        {['Todos', ...categorias.slice(0, 3).map((c) => c.nombre)].map((nombre, i) => (
-                          <span
+                      <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+                        {['Todos', ...categorias.map((c) => c.nombre)].map((nombre) => (
+                          <button
                             key={nombre}
+                            type="button"
+                            onClick={() => setFiltroVista(nombre)}
+                            aria-pressed={nombre === vista}
                             className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold"
                             style={
-                              i === 0
+                              nombre === vista
                                 ? { backgroundColor: fondoChip, color: textoChip, borderColor: fondoChip }
                                 : { backgroundColor: '#fff', color: '#334155', borderColor: '#cbd5e1' }
                             }
                           >
                             {nombre}
-                          </span>
+                          </button>
                         ))}
                       </div>
                     )}
                     <div className="grid grid-cols-4 gap-2">
-                      {catalogo.productos.slice(0, 8).map((p, i) => (
+                      {productosVista.slice(0, 8).map((p, i) => (
                         <TarjetaMini
                           key={`${p.nombre}-${i}`}
                           producto={p}
@@ -492,6 +517,11 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
                         />
                       ))}
                     </div>
+                    {productosVista.length > 8 && (
+                      <p className="mt-2 text-center text-xs text-slate-500">
+                        Se muestran 8 de {productosVista.length} productos{vista === 'Todos' ? '' : ` de ${vista}`}.
+                      </p>
+                    )}
                   </div>
                 </div>
               </>
@@ -613,6 +643,20 @@ export function DialogCatalogo({ valor, projectId, onGuardar, onCerrar }: Dialog
           </div>
         )}
       </ModalPestanas>
+      {dialogoOdoo && (
+        <DialogOdoo
+          projectId={projectId}
+          onUsar={(productos, origen) => {
+            setCatalogo((actual) => ({ ...actual, productos, archivo_nombre: origen }))
+            setResultado(null)
+            setErrorArchivo('')
+            setDeOdoo(true)
+            setDialogoOdoo(false)
+          }}
+          onDesconectado={() => setDialogoOdoo(false)}
+          onCerrar={() => setDialogoOdoo(false)}
+        />
+      )}
 
       {/* Popup de una frase: va al lado del diálogo (no dentro) para quedar siempre encima */}
       {editorTts && tts && (
