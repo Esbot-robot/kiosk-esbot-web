@@ -86,7 +86,8 @@ export function FilaAppRobot({
           {instalada === null ? 'App sin versión reportada' : `App ${versionName || `código ${instalada}`}`}
         </span>
         {hayNueva && <span className="text-amber-700">· Disponible {ultima.version_name}</span>}
-        {esSuper && !!ultima && (
+        {/* Solo si hay algo que instalar: una versión más nueva, o el robot no reporta la suya */}
+        {esSuper && !!ultima && (hayNueva || instalada === null) && (
           <button type="button" onClick={() => setAbierto(true)} className="font-semibold text-[#1d293d] hover:underline">
             Actualizar app
           </button>
