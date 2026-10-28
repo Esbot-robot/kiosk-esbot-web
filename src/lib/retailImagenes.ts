@@ -43,7 +43,7 @@ export function resolverImagen(nombre: string, imagenes: ImagenRetail[]): Resolu
     if (conExtension.length > 1) {
       return {
         url: '',
-        problema: `hay varias imágenes llamadas «${nombre}» (${conExtension.map((i) => i.nombre).join(', ')}): escriba el nombre con su extensión.`,
+        problema: `existen varias imágenes con el nombre «${nombre}» (${conExtension.map((i) => i.nombre).join(', ')}). Indique el nombre con su extensión.`,
       }
     }
   }
@@ -53,7 +53,7 @@ export function resolverImagen(nombre: string, imagenes: ImagenRetail[]): Resolu
   const parecida = imagenes.find((i) => claveTexto(quitarExtension(i.nombre)) === clave)
   return {
     url: '',
-    problema: `falta subir la imagen «${nombre}».${parecida ? ` ¿Quiso decir «${parecida.nombre}»?` : ''}`,
+    problema: `no se encontró la imagen «${nombre}».${parecida ? ` ¿Quiso decir «${parecida.nombre}»?` : ''}`,
   }
 }
 

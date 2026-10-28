@@ -1,15 +1,15 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Advertencia } from '../Advertencia'
 import { AvisoArchivosFaltantes } from '../ArchivosFaltantes'
 import { DialogArchivo } from '../editor/DialogArchivo'
 import { IconoGuardar, IconoPlay } from '../iconos'
 import { avisosZonas, estadoCupon, hoyColombia, type EstadoCupon } from '../../lib/retail'
-import { analizarPlantilla, comprobarImagenes, descargarCuponesActuales, descargarPlantillaCupones, type FilaOmitida } from '../../lib/retailPlantilla'
+import { comprobarImagenes, descargarCuponesActuales, descargarPlantillaCupones, type FilaOmitida } from '../../lib/retailPlantilla'
 import { describirError } from '../../lib/errores'
-import { rutaMedia, subirArchivo } from '../../lib/storage'
-import { cuponesSinImagen, MAX_MB_IMAGEN, resolverCupones, resolverImagen, TIPOS_IMAGEN } from '../../lib/retailImagenes'
+import { cuponesSinImagen, resolverCupones, resolverImagen } from '../../lib/retailImagenes'
 import { Modal } from '../Modal'
 import { RevisionPlantilla } from './RevisionPlantilla'
+import { DialogCargaPlantilla, type PlantillaElegida } from './DialogCargaPlantilla'
 import type { ResultadoArchivo } from '../../lib/archivosProyecto'
 import {
   SEGUNDOS_CUPON_MAX,
@@ -21,9 +21,16 @@ import {
 
 /** Avance de la carga de la plantilla */
 type Carga =
-  | { fase: 'leyendo' }
   | { fase: 'imagenes'; hechas: number; total: number }
-  | { fase: 'revision'; archivo: string; cupones: CuponRetail[]; omitidas: FilaOmitida[]; pendientes: FilaOmitida[] }
+  | {
+      fase: 'revision'
+      archivo: string
+      cupones: CuponRetail[]
+      omitidas: FilaOmitida[]
+      pendientes: FilaOmitida[]
+      /** imágenes del proyecto si se acepta esta carga */
+      imagenes: ImagenRetail[]
+    }
   | { fase: 'error'; mensaje: string }
 
 /** «vence en 4 días», «se activa mañana», «venció hace 2 días» */
@@ -171,57 +178,15 @@ export function EditorRetail({
   const [filtroEstado, setFiltroEstado] = useState<'todos' | EstadoCupon['estado']>('todos')
   const [filtroZona, setFiltroZona] = useState('')
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
-  const entradaArchivo = useRef<HTMLInputElement>(null)
-  const entradaImagenes = useRef<HTMLInputElement>(null)
-  const [subida, setSubida] = useState<{ hechas: number; total: number } | null>(null)
-  const [resultadoSubida, setResultadoSubida] = useState<{ subidas: number; rechazadas: string[] } | null>(null)
+  const [dialogoCarga, setDialogoCarga] = useState(false)
   const imagenes = retail.imagenes ?? []
 
-  /**
-   * Sube las imágenes elegidas al almacenamiento del proyecto y asocia por nombre
-   * exacto los cupones que las esperan. Una imagen con el mismo nombre que otra ya
-   * subida la reemplaza (queda una dirección nueva: los robots bajan la nueva).
-   */
-  async function subirImagenes(archivos: File[]) {
-    const nuevas: ImagenRetail[] = [...imagenes]
-    const rechazadas: string[] = []
-    let subidas = 0
-    setResultadoSubida(null)
-    setSubida({ hechas: 0, total: archivos.length })
-    for (const [i, archivo] of archivos.entries()) {
-      if (!TIPOS_IMAGEN.includes(archivo.type)) {
-        rechazadas.push(`«${archivo.name}»: debe ser PNG, JPG o WEBP.`)
-      } else if (archivo.size > MAX_MB_IMAGEN * 1024 * 1024) {
-        rechazadas.push(`«${archivo.name}»: pesa más de ${MAX_MB_IMAGEN} MB.`)
-      } else {
-        try {
-          const url = await subirArchivo('media', rutaMedia(projectId, `cupon_${archivo.name}`), archivo, { contentType: archivo.type })
-          const previa = nuevas.findIndex((x) => x.nombre === archivo.name)
-          if (previa >= 0) nuevas[previa] = { nombre: archivo.name, url }
-          else nuevas.push({ nombre: archivo.name, url })
-          subidas++
-        } catch (e) {
-          rechazadas.push(`«${archivo.name}»: no se pudo subir. ${describirError(e)}`)
-        }
-      }
-      setSubida({ hechas: i + 1, total: archivos.length })
-    }
-    onRetail({ ...retail, imagenes: nuevas, cupones: resolverCupones(retail.cupones, nuevas) })
-    setSubida(null)
-    setResultadoSubida({ subidas, rechazadas })
-  }
-
-  /** Lee la plantilla, comprueba que cada imagen cargue y muestra la revisión antes de usarla */
-  async function cargarPlantilla(archivo: File) {
-    setCarga({ fase: 'leyendo' })
+  /** Con la plantilla ya leída: comprueba que cada imagen cargue y muestra la revisión antes de usarla */
+  async function revisarPlantilla({ archivo, resultado, imagenes: imagenesCarga }: PlantillaElegida) {
+    setDialogoCarga(false)
     try {
-      const resultado = await analizarPlantilla(archivo)
-      if (resultado.errorGeneral) {
-        setCarga({ fase: 'error', mensaje: resultado.errorGeneral })
-        return
-      }
-      // Los que nombran un archivo se asocian con las imágenes ya subidas al panel
-      const cupones = resolverCupones(resultado.cupones, imagenes)
+      // Los que nombran un archivo se asocian con las imágenes subidas al panel
+      const cupones = resolverCupones(resultado.cupones, imagenesCarga)
       const conUrl = cupones.filter((c) => c.imagen_url)
       setCarga({ fase: 'imagenes', hechas: 0, total: conUrl.length })
       const fallidas = await comprobarImagenes(
@@ -233,8 +198,8 @@ export function EditorRetail({
       const pendientes: FilaOmitida[] = []
       const cuponesOk = cupones.filter((c, i) => {
         if (!c.imagen_url) {
-          // Espera su imagen: entra igual y se completa con «Subir imágenes»
-          pendientes.push({ fila: resultado.filas[i], nombre: c.producto, motivo: resolverImagen(c.imagen_archivo ?? '', imagenes).problema ?? '' })
+          // Espera su imagen: entra igual y se completa cargando la plantilla con sus imágenes
+          pendientes.push({ fila: resultado.filas[i], nombre: c.producto, motivo: resolverImagen(c.imagen_archivo ?? '', imagenesCarga).problema ?? '' })
           return true
         }
         if (!fallidas.has(c.imagen_url)) return true
@@ -248,9 +213,9 @@ export function EditorRetail({
         return false
       })
       omitidas.sort((a, b) => a.fila - b.fila)
-      setCarga({ fase: 'revision', archivo: archivo.name, cupones: cuponesOk, omitidas, pendientes })
+      setCarga({ fase: 'revision', archivo, cupones: cuponesOk, omitidas, pendientes, imagenes: imagenesCarga })
     } catch (e) {
-      setCarga({ fase: 'error', mensaje: `No fue posible leer el archivo. ${describirError(e)}` })
+      setCarga({ fase: 'error', mensaje: `No fue posible revisar la plantilla. ${describirError(e)}` })
     }
   }
   const hoy = hoyColombia()
@@ -332,43 +297,12 @@ export function EditorRetail({
                 </button>
                 <button
                   type="button"
-                  onClick={() => entradaImagenes.current?.click()}
-                  disabled={subida !== null}
-                  className="px-4 py-2.5 font-semibold text-[#1d293d] transition-colors hover:bg-slate-100 disabled:opacity-40"
-                >
-                  Subir imágenes
-                </button>
-                <input
-                  ref={entradaImagenes}
-                  type="file"
-                  multiple
-                  accept={TIPOS_IMAGEN.join(',')}
-                  className="hidden"
-                  onChange={(e) => {
-                    const archivos = [...(e.target.files ?? [])]
-                    e.target.value = ''
-                    if (archivos.length > 0) void subirImagenes(archivos)
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => entradaArchivo.current?.click()}
-                  disabled={carga?.fase === 'leyendo' || carga?.fase === 'imagenes'}
+                  onClick={() => setDialogoCarga(true)}
+                  disabled={carga?.fase === 'imagenes'}
                   className="border border-[#1d293d] px-5 py-2.5 font-semibold text-[#1d293d] transition-colors hover:bg-slate-50 disabled:opacity-40"
                 >
                   {cupones.length > 0 ? 'Reemplazar plantilla' : 'Cargar plantilla'}
                 </button>
-                <input
-                  ref={entradaArchivo}
-                  type="file"
-                  accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(e) => {
-                    const archivo = e.target.files?.[0]
-                    e.target.value = '' // permite volver a elegir el mismo archivo
-                    if (archivo) void cargarPlantilla(archivo)
-                  }}
-                />
               </div>
             )}
           </div>
@@ -392,33 +326,16 @@ export function EditorRetail({
               {imagenes.length > 0 && `${imagenes.length} ${imagenes.length === 1 ? 'imagen subida' : 'imágenes subidas'}`}
             </p>
           )}
-          {subida && (
-            <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Subiendo imágenes: {subida.hechas} de {subida.total}…
-            </p>
-          )}
-          {resultadoSubida && (
-            <div className="mt-4 space-y-1">
-              <p className="text-sm text-slate-600">
-                {resultadoSubida.subidas === 1 ? '1 imagen subida.' : `${resultadoSubida.subidas} imágenes subidas.`} Los cambios se
-                aplicarán al pulsar «Guardar».
-              </p>
-              {resultadoSubida.rechazadas.map((r) => (
-                <Advertencia key={r}>{r}</Advertencia>
-              ))}
-            </div>
-          )}
           {sinImagen.size > 0 && (
             <Advertencia className="mt-4">
               {sinImagen.size === 1 ? '1 cupón espera su imagen' : `${sinImagen.size} cupones esperan su imagen`}: el robot no
-              los ofrecerá hasta subirla con «Subir imágenes».
+              los ofrecerá hasta que la cargue con «{cupones.length > 0 ? 'Reemplazar plantilla' : 'Cargar plantilla'}» › «Imágenes por
+              separado».
             </Advertencia>
           )}
-          {(carga?.fase === 'leyendo' || carga?.fase === 'imagenes') && (
+          {carga?.fase === 'imagenes' && (
             <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              {carga.fase === 'leyendo'
-                ? 'Leyendo la plantilla…'
-                : `Verificando las imágenes de los cupones: ${carga.hechas} de ${carga.total}…`}
+              Verificando las imágenes de los cupones: {carga.hechas} de {carga.total}…
             </p>
           )}
 
@@ -685,9 +602,17 @@ export function EditorRetail({
           cuponesActuales={cupones.length}
           onCancelar={() => setCarga(null)}
           onAceptar={() => {
-            onRetail({ ...retail, cupones: carga.cupones, archivo_nombre: carga.archivo })
+            onRetail({ ...retail, cupones: carga.cupones, archivo_nombre: carga.archivo, imagenes: carga.imagenes })
             setCarga(null)
           }}
+        />
+      )}
+      {dialogoCarga && (
+        <DialogCargaPlantilla
+          projectId={projectId}
+          imagenesActuales={imagenes}
+          onListo={(p) => void revisarPlantilla(p)}
+          onCerrar={() => setDialogoCarga(false)}
         />
       )}
       {carga?.fase === 'error' && (

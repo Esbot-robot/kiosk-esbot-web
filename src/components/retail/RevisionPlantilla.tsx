@@ -90,7 +90,7 @@ export function RevisionPlantilla({
             ))}
           </ul>
           <p className="mt-2 text-sm text-slate-500">
-            Se cargan igual: súbalas después con «Subir imágenes». Mientras tanto, el robot no ofrecerá esos cupones.
+            Se cargan igual, pero el robot no ofrecerá esos cupones hasta que cargue la plantilla de nuevo con sus imágenes.
           </p>
         </div>
       )}
