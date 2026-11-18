@@ -12,6 +12,9 @@ import { RevisionPlantilla } from './RevisionPlantilla'
 import { DialogCargaPlantilla, type PlantillaElegida } from './DialogCargaPlantilla'
 import type { ResultadoArchivo } from '../../lib/archivosProyecto'
 import {
+  DISTANCIA_DETECCION_DEFECTO,
+  DISTANCIA_DETECCION_MAX,
+  DISTANCIA_DETECCION_MIN,
   SEGUNDOS_CUPON_MAX,
   SEGUNDOS_CUPON_MIN,
   type ConfigRetail,
@@ -32,6 +35,12 @@ type Carga =
       imagenes: ImagenRetail[]
     }
   | { fase: 'error'; mensaje: string }
+
+/** 0,5 a 2,0 m de a 0,1: el rango que acepta el SDK de temi */
+const DISTANCIAS = Array.from(
+  { length: Math.round((DISTANCIA_DETECCION_MAX - DISTANCIA_DETECCION_MIN) * 10) + 1 },
+  (_, i) => Math.round((DISTANCIA_DETECCION_MIN + i * 0.1) * 10) / 10
+)
 
 /** «vence en 4 días», «se activa mañana», «venció hace 2 días» */
 function textoEstado(e: EstadoCupon): string {
@@ -522,6 +531,31 @@ export function EditorRetail({
                 className="mt-3 w-28 rounded-lg border border-slate-300 px-3 py-2 text-lg focus:border-[#1d293d] focus:outline-none"
               />
             </div>
+
+            {/* La define Esbot: el cliente lector no la ve */}
+            {!soloLectura && (
+              <div>
+                <label htmlFor="distancia-deteccion" className="font-semibold text-slate-800">
+                  Distancia de detección
+                </label>
+                <p className="mt-1 text-sm text-slate-500">
+                  A qué distancia el robot detecta a una persona y la saluda. Requiere la app 1.22 o superior; las
+                  versiones anteriores usan 1,5 m.
+                </p>
+                <select
+                  id="distancia-deteccion"
+                  value={(retail.distancia_deteccion_m ?? DISTANCIA_DETECCION_DEFECTO).toFixed(1)}
+                  onChange={(e) => onRetail({ ...retail, distancia_deteccion_m: Number(e.target.value) })}
+                  className="mt-3 w-36 rounded-lg border border-slate-300 bg-white px-3 py-2 text-lg focus:border-[#1d293d] focus:outline-none"
+                >
+                  {DISTANCIAS.map((m) => (
+                    <option key={m} value={m.toFixed(1)}>
+                      {m.toFixed(1).replace('.', ',')} m{m === DISTANCIA_DETECCION_DEFECTO ? ' (por defecto)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {!soloLectura && (

@@ -454,7 +454,17 @@ export interface ConfigRetail {
   cupones: CuponRetail[]
   /** imágenes de cupones subidas al panel (el robot no las usa: cada cupón ya trae su dirección) */
   imagenes?: ImagenRetail[]
+  /**
+   * a qué distancia (metros) el robot detecta a una persona; la elige Esbot, no el cliente.
+   * La lee la app 1.22 o superior; las anteriores usan 1,5 m fijos. Sin valor = 1,5 m
+   */
+  distancia_deteccion_m?: number
 }
+
+/** rango que acepta el SDK de temi para la detección, y el valor por defecto (igual que la app) */
+export const DISTANCIA_DETECCION_MIN = 0.5
+export const DISTANCIA_DETECCION_MAX = 2.0
+export const DISTANCIA_DETECCION_DEFECTO = 1.5
 
 export const SEGUNDOS_CUPON_MIN = 5
 export const SEGUNDOS_CUPON_MAX = 20
