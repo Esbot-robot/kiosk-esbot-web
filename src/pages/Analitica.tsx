@@ -31,6 +31,9 @@ const COLOR_FOTO = '#d6336c' // rosa — tomar foto
 const COLOR_SECUENCIA = '#0891b2' // cian — secuencia de temi
 const COLOR_REGISTRO = '#ca8a04' // ámbar — botón de registro
 const COLOR_CATALOGO = '#475569' // pizarra — botón de catálogo
+const COLOR_RETAIL_PERSONA = '#0f766e' // verde azulado — personas detectadas (Retail)
+const COLOR_RETAIL_INVITACION = '#7c3aed' // morado — invitaciones mostradas (Retail)
+const COLOR_RETAIL_CUPON = '#db2777' // fucsia — cupones vistos (Retail)
 const INK_MUTED = '#a3a3b5'
 const GRID = '#f1f1f4'
 
@@ -89,7 +92,35 @@ const TIPOS_EVENTO = [
   { tipo: 'boton_secuencia', nombre: 'Botón secuencia', color: COLOR_SECUENCIA, ayuda: 'Veces que se tocó un botón que reproduce una secuencia de Temi.' },
   { tipo: 'boton_registro', nombre: 'Botón registro', color: COLOR_REGISTRO, ayuda: 'Veces que se tocó el botón de registro.' },
   { tipo: 'boton_catalogo', nombre: 'Botón catálogo', color: COLOR_CATALOGO, ayuda: 'Veces que se abrió el catálogo.' },
+  // Retail (app 1.24+): en "pregunta" va la zona y en "respuesta" el producto del cupón
+  {
+    tipo: 'retail_persona',
+    nombre: 'Personas detectadas',
+    color: COLOR_RETAIL_PERSONA,
+    ayuda: 'Personas que el robot detectó en modo Retail, las haya saludado o no.',
+  },
+  {
+    tipo: 'retail_invitacion',
+    nombre: 'Invitaciones',
+    color: COLOR_RETAIL_INVITACION,
+    ayuda: 'Veces que el robot saludó a una persona y le mostró la invitación a ver un cupón.',
+  },
+  {
+    tipo: 'retail_cupon',
+    nombre: 'Cupones vistos',
+    color: COLOR_RETAIL_CUPON,
+    ayuda: 'Veces que una persona tocó la invitación y vio el cupón.',
+  },
 ] as const
+
+/** Los tipos de Retail solo se muestran si hay datos en el rango (los proyectos de evento no los tienen) */
+const TIPOS_RETAIL = new Set<string>(['retail_persona', 'retail_invitacion', 'retail_cupon'])
+
+interface FilaRetail {
+  tipo: string
+  pregunta: string | null
+  respuesta: string | null
+}
 
 const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
   TIPOS_EVENTO.map(({ tipo, nombre }) => [tipo, nombre])
@@ -204,7 +235,7 @@ export function Analitica() {
       }
 
       const limpiar = (t: string | null) => neutralizarFormula((t ?? '').replace(/;/g, ',').replace(/\r?\n/g, ' '))
-      const lineas = [`Evento;${verRobots ? 'Robot;' : ''}Proyecto;Fecha;Hora;Seg. del video;Pregunta;Respuesta`]
+      const lineas = [`Evento;${verRobots ? 'Robot;' : ''}Proyecto;Fecha;Hora;Seg. del video;Pregunta / Zona;Respuesta / Producto`]
       for (const e of filas) {
         lineas.push(
           [
@@ -285,6 +316,58 @@ export function Analitica() {
     },
   })
 
+  // Eventos de Retail con zona y producto, para las tarjetas por zona y por producto
+  const { data: filasRetail } = useQuery({
+    queryKey: ['retail', desde, hasta, robot, proyecto],
+    queryFn: async () => {
+      const filas: FilaRetail[] = []
+      for (let offset = 0; ; offset += 1000) {
+        let q = supabase
+          .from('events')
+          .select('tipo,pregunta,respuesta')
+          .in('tipo', [...TIPOS_RETAIL])
+          .gte('creado_at', `${desde}:00`)
+          .lte('creado_at', `${hasta}:59`)
+          .order('id', { ascending: true })
+          .range(offset, offset + 999)
+        if (robot !== 'todos') q = q.eq('serial', robot)
+        else q = q.like('serial', PATRON_SERIAL_REAL)
+        if (proyecto === 'sin') q = q.is('project_id', null)
+        else if (proyecto !== 'todos') q = q.eq('project_id', proyecto)
+        const { data, error } = await q
+        if (error) throw error
+        filas.push(...(data as FilaRetail[]))
+        if (!data || data.length < 1000) break
+      }
+      return filas
+    },
+  })
+
+  const retail = useMemo(() => {
+    const contar = (tipo: string, campo: 'pregunta' | 'respuesta') => {
+      const m = new Map<string, number>()
+      for (const f of filasRetail ?? []) {
+        if (f.tipo !== tipo) continue
+        const clave = (f[campo] ?? '').trim() || 'Sin dato'
+        m.set(clave, (m.get(clave) ?? 0) + 1)
+      }
+      return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([nombre, total]) => ({ clave: nombre, nombre, total }))
+    }
+    const cuenta = (tipo: string) => (filasRetail ?? []).filter((f) => f.tipo === tipo).length
+    const invitaciones = cuenta('retail_invitacion')
+    const cupones = cuenta('retail_cupon')
+    return {
+      hayDatos: (filasRetail ?? []).length > 0,
+      personas: cuenta('retail_persona'),
+      invitaciones,
+      cupones,
+      tasaToque: invitaciones > 0 ? Math.round((cupones / invitaciones) * 100) : null,
+      personasPorZona: contar('retail_persona', 'pregunta'),
+      cuponesPorZona: contar('retail_cupon', 'pregunta'),
+      cuponesPorProducto: contar('retail_cupon', 'respuesta'),
+    }
+  }, [filasRetail])
+
   const { buckets, series, totales, totalInteracciones, porRobot, porProyecto } = useMemo(() => {
     const buckets = generarBuckets(desde, hasta, granularidad)
     const idx = new Map(buckets.map((b, i) => [b, i]))
@@ -312,6 +395,11 @@ export function Analitica() {
       porProyecto: ordenar(proyectosCont),
     }
   }, [eventosRango, desde, hasta, granularidad])
+
+  /** Tipos con su índice en TIPOS_EVENTO: los de Retail solo si tienen datos en el rango */
+  const tiposVisibles = TIPOS_EVENTO.map((tipo, index) => ({ tipo, index })).filter(
+    ({ tipo, index }) => !TIPOS_RETAIL.has(tipo.tipo) || totales[index] > 0
+  )
 
   /** El reporte se desglosa en un solo nivel, según lo que esté en "Todos" */
   function armarGrupos(): GrupoDist[] {
@@ -346,7 +434,7 @@ export function Analitica() {
       desde,
       hasta,
       granularidad,
-      tipos: TIPOS_EVENTO.map((t, i) => ({ nombre: t.nombre, color: t.color, valor: totales[i], serie: series[i] })),
+      tipos: tiposVisibles.map(({ tipo: t, index: i }) => ({ nombre: t.nombre, color: t.color, valor: totales[i], serie: series[i] })),
       buckets,
       etiquetaBucket: (b) => etiquetaBucket(b, granularidad),
       grupos: armarGrupos(),
@@ -429,7 +517,7 @@ export function Analitica() {
           la casilla de cada cuadro muestra u oculta su línea */}
       <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:mt-8">
         <div className="flex flex-wrap">
-          {TIPOS_EVENTO.map((tipo, index) => {
+          {tiposVisibles.map(({ tipo, index }, posicion) => {
             const visible = !ocultas.has(tipo.tipo)
             return (
               <button
@@ -477,7 +565,7 @@ export function Analitica() {
                 <span
                   role="tooltip"
                   className={`pointer-events-none invisible absolute top-full z-20 mt-1 w-44 rounded-lg bg-slate-800 px-3 py-2 text-xs font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity peer-hover/ayuda:visible peer-hover/ayuda:opacity-100 sm:w-56 ${
-                    index === 0 ? 'left-2' : index % 2 === 0 ? 'left-2 sm:left-auto sm:right-2' : 'right-2'
+                    posicion === 0 ? 'left-2' : posicion % 2 === 0 ? 'left-2 sm:left-auto sm:right-2' : 'right-2'
                   }`}
                 >
                   {tipo.ayuda}
@@ -498,7 +586,7 @@ export function Analitica() {
             <GraficaLineas
               buckets={buckets}
               granularidad={granularidad}
-              series={TIPOS_EVENTO.flatMap((tipo, index) =>
+              series={tiposVisibles.flatMap(({ tipo, index }) =>
                 ocultas.has(tipo.tipo)
                   ? []
                   : [{ valores: series[index], color: tipo.color, nombre: tipo.nombre }]
@@ -547,6 +635,44 @@ export function Analitica() {
         </div>
       )}
 
+      {/* Retail: personas, invitaciones y cupones, con el desglose por zona y por producto */}
+      {retail.hayDatos && (
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+          <h3 className="font-semibold text-slate-900">Retail</h3>
+          <p className="text-sm text-slate-500">
+            Personas detectadas por el robot, invitaciones mostradas y cupones vistos, por zona y por producto.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { nombre: 'Personas detectadas', valor: retail.personas.toLocaleString('es-CO'), color: COLOR_RETAIL_PERSONA },
+              { nombre: 'Invitaciones', valor: retail.invitaciones.toLocaleString('es-CO'), color: COLOR_RETAIL_INVITACION },
+              { nombre: 'Cupones vistos', valor: retail.cupones.toLocaleString('es-CO'), color: COLOR_RETAIL_CUPON },
+              {
+                nombre: 'Tasa de toque',
+                valor: retail.tasaToque === null ? '—' : `${retail.tasaToque} %`,
+                color: '#334155',
+                ayuda: 'Cupones vistos sobre invitaciones mostradas.',
+              },
+            ].map((k) => (
+              <div key={k.nombre} className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3" title={k.ayuda}>
+                <p className="flex items-center gap-2 text-sm text-slate-500">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: k.color }} />
+                  {k.nombre}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {k.valor}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <TarjetaBarras titulo="Personas por zona" color={COLOR_RETAIL_PERSONA} filas={retail.personasPorZona} />
+            <TarjetaBarras titulo="Cupones vistos por zona" color={COLOR_RETAIL_CUPON} filas={retail.cuponesPorZona} />
+            <TarjetaBarras titulo="Cupones vistos por producto" color={COLOR_RETAIL_INVITACION} filas={retail.cuponesPorProducto} />
+          </div>
+        </div>
+      )}
+
       {/* Detalle de cada evento individual */}
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <h3 className="font-semibold text-slate-900">
@@ -568,8 +694,8 @@ export function Analitica() {
                 <th className="px-4 py-2 font-medium">Fecha</th>
                 <th className="px-4 py-2 font-medium">Hora</th>
                 <th className="px-4 py-2 font-medium">Seg. del video</th>
-                <th className="px-4 py-2 font-medium">Pregunta</th>
-                <th className="px-4 py-2 font-medium">Respuesta</th>
+                <th className="px-4 py-2 font-medium">Pregunta / Zona</th>
+                <th className="px-4 py-2 font-medium">Respuesta / Producto</th>
               </tr>
             </thead>
             <tbody>
