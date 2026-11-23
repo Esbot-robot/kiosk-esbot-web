@@ -126,14 +126,50 @@ const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(
   TIPOS_EVENTO.map(({ tipo, nombre }) => [tipo, nombre])
 )
 
+/**
+ * Filtros de Interacciones guardados en esta pestaña (como el filtro de estado de
+ * Robots): al cambiar de página y volver siguen iguales; una pestaña nueva arranca
+ * de cero. El fin del período solo se guarda si se cambió a mano: si no, siempre
+ * es «ahora», para que al volver se vean los eventos nuevos.
+ */
+const CLAVE_FILTROS = 'kiosk.interacciones.filtros'
+
+interface FiltrosGuardados {
+  desde?: string
+  hasta?: string | null
+  robot?: string
+  proyecto?: string
+}
+
+function filtrosGuardados(): FiltrosGuardados {
+  try {
+    const v: unknown = JSON.parse(sessionStorage.getItem(CLAVE_FILTROS) || '{}')
+    return v && typeof v === 'object' ? (v as FiltrosGuardados) : {}
+  } catch {
+    return {} // sin almacenamiento o dato dañado: filtros por defecto
+  }
+}
+
 export function Analitica() {
   // El cliente lector ve solo los datos de sus proyectos: nada de robots (ni nombres ni desglose)
   const verRobots = esAdmin(usePerfil())
-  const [desde, setDesde] = useState(inicioDeMes())
-  const [hasta, setHasta] = useState(ahoraLocal())
-  const [robot, setRobot] = useState('todos')
+  const [guardados] = useState(filtrosGuardados)
+  const [desde, setDesde] = useState(guardados.desde || inicioDeMes())
+  // null = el fin no se ha cambiado a mano: es «ahora» al abrir la página
+  const [hastaFijo, setHastaFijo] = useState<string | null>(guardados.hasta || null)
+  const [hastaAhora] = useState(ahoraLocal)
+  const hasta = hastaFijo ?? hastaAhora
+  const [robot, setRobot] = useState(guardados.robot || 'todos')
   // 'todos' | 'sin' (eventos anteriores, sin proyecto) | id del proyecto
-  const [proyecto, setProyecto] = useState('todos')
+  const [proyecto, setProyecto] = useState(guardados.proyecto || 'todos')
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CLAVE_FILTROS, JSON.stringify({ desde, hasta: hastaFijo, robot, proyecto }))
+    } catch {
+      // sin almacenamiento: los filtros funcionan igual, solo que no se recuerdan
+    }
+  }, [desde, hastaFijo, robot, proyecto])
 
   const { data: robots } = useQuery({
     queryKey: ['robots-nombres'],
@@ -158,6 +194,18 @@ export function Analitica() {
       return data as { id: string; nombre: string }[]
     },
   })
+
+  // Un filtro guardado que ya no aplica (proyecto o robot eliminado, o un lector
+  // que no ve robots) vuelve a «Todos»
+  useEffect(() => {
+    if (proyectos && proyecto !== 'todos' && proyecto !== 'sin' && !proyectos.some((p) => p.id === proyecto)) {
+      setProyecto('todos')
+    }
+  }, [proyectos, proyecto])
+  useEffect(() => {
+    if (robot === 'todos') return
+    if (!verRobots || (robots && !robots.some((r) => r.serial === robot))) setRobot('todos')
+  }, [verRobots, robots, robot])
 
   const nombreRobot = (serial: string) => robots?.find((r) => r.serial === serial)?.nombre || serial
   const nombreProyecto = (id: string | null) =>
@@ -472,7 +520,7 @@ export function Analitica() {
                 type="datetime-local"
                 value={hasta}
                 min={desde}
-                onChange={(e) => setHasta(e.target.value)}
+                onChange={(e) => setHastaFijo(e.target.value || null)}
                 className="min-w-0 flex-1 bg-transparent text-slate-800 focus:outline-none max-sm:appearance-none"
               />
             </label>
