@@ -920,6 +920,9 @@ function GraficaLineas({
   // Tooltip sobre el punto más alto; si queda muy arriba, va debajo
   const yTooltip = hover === null ? 0 : y(Math.max(0, ...series.map((serie) => serie.valores[hover])))
   const tooltipAbajo = yTooltip < ALTO * 0.45
+  // Cerca de los bordes la tarjeta se abre hacia adentro: centrada se cortaba
+  const fraccionX = hover === null ? 0.5 : x(hover) / ANCHO
+  const desplazamientoX = fraccionX > 0.7 ? 'calc(-100% - 14px)' : fraccionX < 0.3 ? '14px' : '-50%'
 
   return (
     // En teléfono la gráfica mantiene un ancho mínimo legible y se desliza de
@@ -981,7 +984,15 @@ function GraficaLineas({
           {/* eje X */}
           {buckets.map((b, i) =>
             i % pasoX === 0 ? (
-              <text key={b} x={x(i)} y={ALTO - 10} textAnchor="middle" fontSize="12" fill={INK_MUTED}>
+              <text
+                key={b}
+                x={x(i)}
+                y={ALTO - 10}
+                // las fechas de las puntas se alinean hacia adentro para no cortarse
+                textAnchor={x(i) > ANCHO - 50 ? 'end' : x(i) < 50 ? 'start' : 'middle'}
+                fontSize="12"
+                fill={INK_MUTED}
+              >
                 {etiquetaBucket(b, granularidad)}
               </text>
             ) : null
@@ -1024,7 +1035,9 @@ function GraficaLineas({
             style={{
               left: `${(x(hover) / ANCHO) * 100}%`,
               top: `${(yTooltip / ALTO) * 100}%`,
-              transform: tooltipAbajo ? 'translate(-50%, 18px)' : 'translate(-50%, calc(-100% - 18px))',
+              transform: tooltipAbajo
+                ? `translate(${desplazamientoX}, 18px)`
+                : `translate(${desplazamientoX}, calc(-100% - 18px))`,
             }}
           >
             <p className="whitespace-nowrap text-[0.6875rem] text-slate-400">
