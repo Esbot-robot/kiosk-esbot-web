@@ -189,9 +189,9 @@ export function Analitica() {
   const { data: proyectos } = useQuery({
     queryKey: ['proyectos-nombres'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('projects').select('id, nombre').order('nombre')
+      const { data, error } = await supabase.from('projects').select('id, nombre, tipo:config->>tipo').order('nombre')
       if (error) throw error
-      return data as { id: string; nombre: string }[]
+      return data as { id: string; nombre: string; tipo: string | null }[]
     },
   })
 
@@ -444,9 +444,16 @@ export function Analitica() {
     }
   }, [eventosRango, desde, hasta, granularidad])
 
-  /** Tipos con su índice en TIPOS_EVENTO: los de Retail solo si tienen datos en el rango */
-  const tiposVisibles = TIPOS_EVENTO.map((tipo, index) => ({ tipo, index })).filter(
-    ({ tipo, index }) => !TIPOS_RETAIL.has(tipo.tipo) || totales[index] > 0
+  /** Filtrado un proyecto Retail: solo cuentan sus tres tipos (los botones de evento no existen ahí) */
+  const proyectoRetail = proyectos?.find((p) => p.id === proyecto)?.tipo === 'retail'
+
+  /**
+   * Tipos con su índice en TIPOS_EVENTO, para las tarjetas, la gráfica y el PDF:
+   * en un proyecto Retail solo los de Retail; si no, los de evento y los de Retail
+   * que tengan datos en el rango
+   */
+  const tiposVisibles = TIPOS_EVENTO.map((tipo, index) => ({ tipo, index })).filter(({ tipo, index }) =>
+    proyectoRetail ? TIPOS_RETAIL.has(tipo.tipo) : !TIPOS_RETAIL.has(tipo.tipo) || totales[index] > 0
   )
 
   /** El reporte se desglosa en un solo nivel, según lo que esté en "Todos" */
