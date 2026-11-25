@@ -14,6 +14,20 @@ import { claveTexto } from './catalogo'
 export const MAX_MB_IMAGEN = 2
 export const TIPOS_IMAGEN = ['image/png', 'image/jpeg', 'image/webp']
 
+/**
+ * El cupón también puede ser un video (app 1.26+): se reproduce en bucle y SIN
+ * sonido, para que se escuche lo que dice el robot. Se reconoce por la extensión
+ * del archivo o de la URL; el robot lo guarda junto con la config.
+ */
+export const MAX_MB_VIDEO_CUPON = 50
+export const TIPOS_VIDEO = ['video/mp4', 'video/quicktime']
+const EXTENSION_VIDEO = /\.(mp4|mov|m4v)$/i
+
+/** ¿El valor de la columna (URL o nombre de archivo) es un video? */
+export function esVideoCupon(valor: string): boolean {
+  return EXTENSION_VIDEO.test(valor.trim().split(/[?#]/)[0])
+}
+
 const EXTENSION = /\.[a-z0-9]{2,5}$/i
 
 export function quitarExtension(nombre: string): string {

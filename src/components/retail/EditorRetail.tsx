@@ -57,12 +57,21 @@ const COLOR_ESTADO: Record<EstadoCupon['estado'], string> = {
   vencido: 'text-slate-500',
 }
 
-/** Miniatura del cupón: la imagen está en el servidor del cliente y puede no cargar */
-function Miniatura({ url }: { url: string }) {
+/** Miniatura del cupón (imagen o primer cuadro del video): puede estar en el servidor del cliente y no cargar */
+function Miniatura({ url, video }: { url: string; video?: boolean }) {
   const [fallo, setFallo] = useState(false)
   return (
-    <span className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-400">
-      {fallo ? 'Sin imagen' : <img src={url} alt="" className="h-full w-full object-cover" onError={() => setFallo(true)} />}
+    <span className="relative flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-400">
+      {fallo ? (
+        video ? 'Sin video' : 'Sin imagen'
+      ) : video ? (
+        <video src={url} muted preload="metadata" className="h-full w-full object-cover" onError={() => setFallo(true)} />
+      ) : (
+        <img src={url} alt="" className="h-full w-full object-cover" onError={() => setFallo(true)} />
+      )}
+      {video && !fallo && (
+        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[0.625rem] font-semibold text-white">VIDEO</span>
+      )}
     </span>
   )
 }
@@ -105,7 +114,8 @@ function FilaCupon({
         )}
         <button type="button" onClick={onAbrir} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-expanded={abierto}>
           <span className="w-6 shrink-0 text-center text-sm text-slate-400">{numero}</span>
-          <Miniatura url={cupon.imagen_url} />
+          {/* key: con otra imagen la miniatura vuelve a intentar (si no, seguía en «Sin imagen») */}
+          <Miniatura key={cupon.imagen_url} url={cupon.imagen_url} video={cupon.video} />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-slate-800">{cupon.producto || 'Sin producto'}</span>
             <span className="block truncate text-sm text-slate-500">Zona: {cupon.zona}</span>
@@ -118,10 +128,6 @@ function FilaCupon({
       </div>
       {abierto && (
         <dl className="grid gap-x-6 gap-y-3 border-t border-slate-100 px-4 py-4 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-slate-500">Al detectar</dt>
-            <dd className="text-slate-800">{cupon.frase_detectar}</dd>
-          </div>
           <div>
             <dt className="text-slate-500">Al mostrar el cupón</dt>
             <dd className="text-slate-800">{cupon.frase_mostrar}</dd>
