@@ -418,11 +418,11 @@ export interface CuponRetail {
   id: string
   /** nombre de la zona en el mapa del temi: debe escribirse igual que allá */
   zona: string
-  /** nombra el cupón en el editor y en la analítica (y en la pantalla del cupón si no carga la imagen) */
+  /** nombra el cupón en el editor y en la analítica, y va en la invitación a tocar */
   producto: string
-  /** true = el cupón es un video (sin sonido, en bucle) y no una imagen; app 1.26+ */
-  video?: boolean
-  /** lo que dice al mostrar el cupón, apenas detecta a la persona (también se lee debajo de la imagen) */
+  /** lo que dice el robot al detectar a la persona */
+  frase_detectar: string
+  /** lo que dice al mostrar el cupón (también se lee debajo de la imagen) */
   frase_mostrar: string
   frase_despedida: string
   /** AAAA-MM-DD, días incluidos; se comparan con la fecha de Colombia */

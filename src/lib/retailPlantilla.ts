@@ -1,7 +1,6 @@
 import { LIMITES, type CuponRetail } from '../types/config'
 import { claveTexto, decodificarArchivo, enlaceDirecto, esEnlaceDeCompartir, parsearCsv } from './catalogo'
 import { fechaValida } from './retail'
-import { esVideoCupon } from './retailImagenes'
 
 /**
  * Lectura y validación de la plantilla de cupones del Retail (CSV o Excel).
@@ -32,25 +31,27 @@ export interface ResultadoPlantilla {
 }
 
 /** Columnas de la plantilla y los nombres que se reconocen para cada una (sin tildes ni mayúsculas) */
-const COLUMNAS: Record<keyof Omit<CuponRetail, 'id' | 'imagen_archivo' | 'video'>, string[]> = {
+const COLUMNAS: Record<keyof Omit<CuponRetail, 'id' | 'imagen_archivo'>, string[]> = {
   zona: ['zona_de_la_tienda', 'zona'],
   producto: ['producto'],
+  frase_detectar: ['frase_al_detectar', 'frase_detectar'],
   frase_mostrar: ['frase_al_mostrar_el_cupon', 'frase_al_mostrar', 'frase_mostrar'],
   frase_despedida: ['frase_de_despedida', 'frase_despedida', 'despedida'],
   vigencia_desde: ['vigencia_desde', 'desde'],
   vigencia_hasta: ['vigencia_hasta', 'hasta'],
-  imagen_url: ['imagen_o_video_del_cupon', 'video_del_cupon', 'imagen_del_cupon', 'url_de_la_imagen_del_cupon', 'url_de_la_imagen', 'cupon:_url_de_la_imagen', 'url_imagen', 'imagen'],
+  imagen_url: ['imagen_del_cupon', 'url_de_la_imagen_del_cupon', 'url_de_la_imagen', 'cupon:_url_de_la_imagen', 'url_imagen', 'imagen'],
 }
 
 /** Nombres que se muestran al pedir una columna que falta (los de la plantilla) */
 const NOMBRE_COLUMNA: Record<keyof typeof COLUMNAS, string> = {
   zona: 'Zona de la tienda',
   producto: 'Producto',
+  frase_detectar: 'Frase al detectar',
   frase_mostrar: 'Frase al mostrar el cupón',
   frase_despedida: 'Frase de despedida',
   vigencia_desde: 'Vigencia desde',
   vigencia_hasta: 'Vigencia hasta',
-  imagen_url: 'Imagen o video del cupón',
+  imagen_url: 'Imagen del cupón',
 }
 
 const dos = (n: number) => String(n).padStart(2, '0')
@@ -138,9 +139,11 @@ export function analizarFilasPlantilla(todas: unknown[][]): ResultadoPlantilla {
     if (!zona) return omitir('falta la zona.')
     if (!producto) return omitir('falta el producto.')
     const frases = {
+      frase_detectar: texto(valor(fila, 'frase_detectar')),
       frase_mostrar: texto(valor(fila, 'frase_mostrar')),
       frase_despedida: texto(valor(fila, 'frase_despedida')),
     }
+    if (!frases.frase_detectar) return omitir('falta la frase al detectar.')
     if (!frases.frase_mostrar) return omitir('falta la frase al mostrar el cupón.')
     if (!frases.frase_despedida) return omitir('falta la frase de despedida.')
     const larga = Object.values(frases).find((f) => f.length > LIMITES.TTS_MAX)
@@ -180,7 +183,6 @@ export function analizarFilasPlantilla(todas: unknown[][]): ResultadoPlantilla {
       vigencia_hasta: hasta,
       imagen_url: imagen,
       ...(archivo ? { imagen_archivo: archivo } : {}),
-      ...(esVideoCupon(valorImagen) ? { video: true } : {}),
     })
   })
 
@@ -207,31 +209,15 @@ export async function analizarPlantilla(archivo: File): Promise<ResultadoPlantil
 }
 
 /**
- * Comprueba que cada imagen (o video) cargue de verdad, como la verá el robot. Va
- * de a pocas a la vez y espera hasta 15 s por archivo. Devuelve las URL que fallaron.
+ * Comprueba que cada imagen cargue de verdad, como la verá el robot. Va de a
+ * pocas a la vez y espera hasta 15 s por imagen. Devuelve las URL que fallaron.
  */
 export async function comprobarImagenes(urls: string[], onAvance?: (hechas: number, total: number) => void): Promise<Set<string>> {
   const unicas = [...new Set(urls)]
   const fallidas = new Set<string>()
   let hechas = 0
-  const cargaVideo = (url: string) =>
-    new Promise<boolean>((resolver) => {
-      const video = document.createElement('video')
-      const limite = setTimeout(() => resolver(false), 15_000)
-      video.preload = 'metadata'
-      video.muted = true
-      video.onloadedmetadata = () => {
-        clearTimeout(limite)
-        resolver(video.videoWidth > 0)
-      }
-      video.onerror = () => {
-        clearTimeout(limite)
-        resolver(false)
-      }
-      video.src = url
-    })
   const carga = (url: string) =>
-    esVideoCupon(url) ? cargaVideo(url) : new Promise<boolean>((resolver) => {
+    new Promise<boolean>((resolver) => {
       const img = new Image()
       const limite = setTimeout(() => resolver(false), 15_000)
       img.onload = () => {
@@ -256,19 +242,16 @@ export async function comprobarImagenes(urls: string[], onAvance?: (hechas: numb
   return fallidas
 }
 
-// Desde la app 1.26 el cupón sale apenas el robot detecta a la persona: ya no hay
-// «Frase al detectar». Un Excel viejo que la traiga se acepta igual (la columna se ignora)
-const ENCABEZADO = 'Zona de la tienda;Producto;Frase al mostrar el cupón;Frase de despedida;Vigencia desde;Vigencia hasta;Imagen o video del cupón'
+const ENCABEZADO = 'Zona de la tienda;Producto;Frase al detectar;Frase al mostrar el cupón;Frase de despedida;Vigencia desde;Vigencia hasta;Imagen del cupón'
 
 /** Plantilla descargable: separador ";" y BOM para que Excel en español la abra bien */
 export function plantillaCuponesCsv(): string {
   const filas = [
     ENCABEZADO,
-    'Bebidas;Gaseosas de 400 ml;¡Hola! Hoy las gaseosas de 400 ml están 2x1: aquí está tu cupón, muéstralo en caja.;¡Gracias por elegirnos!;2026-11-01;2026-11-30;https://ejemplo.com/cupones/bebidas.png',
-    'Lácteos;Yogur griego;¿Ya probaste nuestro yogur griego? Hoy tiene descuento: preséntalo al pagar.;¡Que disfrutes tu compra!;2026-11-01;2026-11-15;cupon_yogur.png',
-    'Snacks;Papas fritas;¡Hola! Mira la promo de papas: muestra este video en caja.;¡Buen provecho!;2026-11-01;2026-11-30;cupon_papas.mp4',
+    'Bebidas;Gaseosas de 400 ml;¡Hola! Hoy las gaseosas de 400 ml están 2x1 en esta zona.;¡Aquí está tu cupón! Muéstralo en caja.;¡Gracias por elegirnos!;2026-11-01;2026-11-30;https://ejemplo.com/cupones/bebidas.png',
+    'Lácteos;Yogur griego;¿Ya probaste nuestro yogur griego? Hoy tiene descuento.;Este es tu cupón, preséntalo al pagar.;¡Que disfrutes tu compra!;2026-11-01;2026-11-15;cupon_yogur.png',
     // zona «General»: se ofrece en los pasillos y en las zonas sin cupones activos
-    'General;Envío gratis;¡Hola! Hoy tenemos envío gratis: muestra este cupón en caja.;¡Gracias por visitarnos!;2026-11-01;2026-11-30;https://ejemplo.com/cupones/envio.png',
+    'General;Envío gratis;¡Hola! Hoy tenemos envío gratis en tus compras.;Aquí está tu cupón, muéstralo en caja.;¡Gracias por visitarnos!;2026-11-01;2026-11-30;https://ejemplo.com/cupones/envio.png',
   ]
   return '﻿' + filas.join('\r\n') + '\r\n'
 }
@@ -295,6 +278,7 @@ export async function descargarCuponesActuales(cupones: CuponRetail[], archivoNo
   const filas = cupones.map((c) => [
     c.zona,
     c.producto,
+    c.frase_detectar,
     c.frase_mostrar,
     c.frase_despedida,
     c.vigencia_desde,
