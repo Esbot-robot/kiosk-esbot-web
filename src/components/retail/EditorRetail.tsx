@@ -114,7 +114,8 @@ function FilaCupon({
         )}
         <button type="button" onClick={onAbrir} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-expanded={abierto}>
           <span className="w-6 shrink-0 text-center text-sm text-slate-400">{numero}</span>
-          <Miniatura url={cupon.imagen_url} video={cupon.video} />
+          {/* key: con otra imagen la miniatura vuelve a intentar (si no, seguía en «Sin imagen») */}
+          <Miniatura key={cupon.imagen_url} url={cupon.imagen_url} video={cupon.video} />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-slate-800">{cupon.producto || 'Sin producto'}</span>
             <span className="block truncate text-sm text-slate-500">Zona: {cupon.zona}</span>
