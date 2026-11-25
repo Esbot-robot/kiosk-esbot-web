@@ -4,7 +4,7 @@ import { Modal } from '../Modal'
 import { describirError } from '../../lib/errores'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { analizarPlantilla, type ResultadoPlantilla } from '../../lib/retailPlantilla'
-import { MAX_MB_IMAGEN, resolverImagen, TIPOS_IMAGEN } from '../../lib/retailImagenes'
+import { MAX_MB_IMAGEN, MAX_MB_VIDEO_CUPON, resolverImagen, TIPOS_IMAGEN, TIPOS_VIDEO } from '../../lib/retailImagenes'
 import type { ImagenRetail } from '../../types/config'
 
 type Forma = 'url' | 'separado'
@@ -23,7 +23,7 @@ const FORMAS: { id: Forma; nombre: string; icono: React.ReactNode }[] = [
   },
   {
     id: 'separado',
-    nombre: 'Imágenes por separado',
+    nombre: 'Imágenes o videos por separado',
     icono: (
       // imagen
       <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -152,8 +152,10 @@ export function DialogCargaPlantilla({
     const malas: string[] = []
     const nuevas = [...elegidas]
     for (const a of archivos) {
-      if (!TIPOS_IMAGEN.includes(a.type)) malas.push(`«${a.name}» no se cargó: el formato debe ser PNG, JPG o WEBP.`)
-      else if (a.size > MAX_MB_IMAGEN * 1024 * 1024) malas.push(`«${a.name}» no se cargó: supera el tamaño máximo de ${MAX_MB_IMAGEN} MB.`)
+      const esVideo = TIPOS_VIDEO.includes(a.type)
+      const maxMb = esVideo ? MAX_MB_VIDEO_CUPON : MAX_MB_IMAGEN
+      if (!esVideo && !TIPOS_IMAGEN.includes(a.type)) malas.push(`«${a.name}» no se cargó: el formato debe ser PNG, JPG, WEBP, MP4 o MOV.`)
+      else if (a.size > maxMb * 1024 * 1024) malas.push(`«${a.name}» no se cargó: supera el tamaño máximo de ${maxMb} MB.`)
       else {
         const previa = nuevas.findIndex((x) => x.name === a.name)
         if (previa >= 0) nuevas[previa] = a
@@ -214,7 +216,7 @@ export function DialogCargaPlantilla({
         ref={entradaImagenes}
         type="file"
         multiple
-        accept={TIPOS_IMAGEN.join(',')}
+        accept={[...TIPOS_IMAGEN, ...TIPOS_VIDEO].join(',')}
         className="hidden"
         onChange={(e) => {
           const archivos = [...(e.target.files ?? [])]
@@ -306,8 +308,8 @@ export function DialogCargaPlantilla({
           onClick={() => entradaPlantilla.current?.click()}
         />
         <BotonCarga
-          texto="Seleccionar imágenes"
-          detalle={elegidas.length > 0 ? `${elegidas.length} ${elegidas.length === 1 ? 'imagen' : 'imágenes'}` : undefined}
+          texto="Seleccionar imágenes o videos"
+          detalle={elegidas.length > 0 ? `${elegidas.length} ${elegidas.length === 1 ? 'archivo' : 'archivos'}` : undefined}
           hecho={elegidas.length > 0}
           deshabilitado={!!subida}
           onClick={() => entradaImagenes.current?.click()}
