@@ -33,7 +33,7 @@ const COLOR_REGISTRO = '#ca8a04' // ámbar — botón de registro
 const COLOR_CATALOGO = '#475569' // pizarra — botón de catálogo
 const COLOR_RETAIL_PERSONA = '#0f766e' // verde azulado — personas detectadas (Retail)
 const COLOR_RETAIL_INVITACION = '#7c3aed' // morado — invitaciones mostradas (Retail)
-const COLOR_RETAIL_CUPON = '#db2777' // fucsia — cupones vistos (Retail)
+const COLOR_RETAIL_CUPON = '#db2777' // fucsia — cupones mostrados (Retail)
 const INK_MUTED = '#a3a3b5'
 const GRID = '#f1f1f4'
 
@@ -103,13 +103,13 @@ const TIPOS_EVENTO = [
     tipo: 'retail_invitacion',
     nombre: 'Invitaciones',
     color: COLOR_RETAIL_INVITACION,
-    ayuda: 'Veces que el robot saludó a una persona y le mostró la invitación a ver un cupón.',
+    ayuda: 'Veces que el robot mostró la invitación a ver un cupón (solo app 1.24 y 1.25; desde la 1.26 el cupón sale directo).',
   },
   {
     tipo: 'retail_cupon',
-    nombre: 'Cupones vistos',
+    nombre: 'Cupones mostrados',
     color: COLOR_RETAIL_CUPON,
-    ayuda: 'Veces que una persona tocó la invitación y vio el cupón.',
+    ayuda: 'Veces que el robot le mostró un cupón a una persona.',
   },
 ] as const
 
@@ -450,11 +450,12 @@ export function Analitica() {
   /**
    * Tipos con su índice en TIPOS_EVENTO, para las tarjetas, la gráfica y el PDF:
    * en un proyecto Retail solo los de Retail; si no, los de evento y los de Retail
-   * que tengan datos en el rango
+   * que tengan datos en el rango. Las invitaciones (app 1.24-1.25) solo con datos
    */
-  const tiposVisibles = TIPOS_EVENTO.map((tipo, index) => ({ tipo, index })).filter(({ tipo, index }) =>
-    proyectoRetail ? TIPOS_RETAIL.has(tipo.tipo) : !TIPOS_RETAIL.has(tipo.tipo) || totales[index] > 0
-  )
+  const tiposVisibles = TIPOS_EVENTO.map((tipo, index) => ({ tipo, index })).filter(({ tipo, index }) => {
+    if (tipo.tipo === 'retail_invitacion') return totales[index] > 0
+    return proyectoRetail ? TIPOS_RETAIL.has(tipo.tipo) : !TIPOS_RETAIL.has(tipo.tipo) || totales[index] > 0
+  })
 
   /** El reporte se desglosa en un solo nivel, según lo que esté en "Todos" */
   function armarGrupos(): GrupoDist[] {
@@ -695,20 +696,25 @@ export function Analitica() {
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
           <h3 className="font-semibold text-slate-900">Retail</h3>
           <p className="text-sm text-slate-500">
-            Personas detectadas por el robot, invitaciones mostradas y cupones vistos, por zona y por producto.
+            Personas detectadas por el robot y cupones mostrados, por zona y por producto.
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className={`mt-4 grid grid-cols-2 gap-3 ${retail.invitaciones > 0 ? 'md:grid-cols-4' : 'md:grid-cols-2'}`}>
             {[
               { nombre: 'Personas detectadas', valor: retail.personas.toLocaleString('es-CO'), color: COLOR_RETAIL_PERSONA },
-              { nombre: 'Invitaciones', valor: retail.invitaciones.toLocaleString('es-CO'), color: COLOR_RETAIL_INVITACION },
-              { nombre: 'Cupones vistos', valor: retail.cupones.toLocaleString('es-CO'), color: COLOR_RETAIL_CUPON },
-              {
-                nombre: 'Tasa de toque',
-                valor: retail.tasaToque === null ? '—' : `${retail.tasaToque} %`,
-                color: '#334155',
-                ayuda: 'Cupones vistos sobre invitaciones mostradas.',
-              },
-            ].map((k) => (
+              { nombre: 'Cupones mostrados', valor: retail.cupones.toLocaleString('es-CO'), color: COLOR_RETAIL_CUPON },
+              // Invitación y tasa de toque solo existen con datos de la app 1.24-1.25
+              ...(retail.invitaciones > 0
+                ? [
+                    { nombre: 'Invitaciones', valor: retail.invitaciones.toLocaleString('es-CO'), color: COLOR_RETAIL_INVITACION },
+                    {
+                      nombre: 'Tasa de toque',
+                      valor: retail.tasaToque === null ? '—' : `${retail.tasaToque} %`,
+                      color: '#334155',
+                      ayuda: 'Cupones vistos sobre invitaciones mostradas (app 1.24 y 1.25).',
+                    },
+                  ]
+                : []),
+            ].map((k: { nombre: string; valor: string; color: string; ayuda?: string }) => (
               <div key={k.nombre} className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3" title={k.ayuda}>
                 <p className="flex items-center gap-2 text-sm text-slate-500">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: k.color }} />
@@ -722,8 +728,8 @@ export function Analitica() {
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <TarjetaBarras titulo="Personas por zona" color={COLOR_RETAIL_PERSONA} filas={retail.personasPorZona} />
-            <TarjetaBarras titulo="Cupones vistos por zona" color={COLOR_RETAIL_CUPON} filas={retail.cuponesPorZona} />
-            <TarjetaBarras titulo="Cupones vistos por producto" color={COLOR_RETAIL_INVITACION} filas={retail.cuponesPorProducto} />
+            <TarjetaBarras titulo="Cupones mostrados por zona" color={COLOR_RETAIL_CUPON} filas={retail.cuponesPorZona} />
+            <TarjetaBarras titulo="Cupones mostrados por producto" color={COLOR_RETAIL_INVITACION} filas={retail.cuponesPorProducto} />
           </div>
         </div>
       )}
