@@ -37,6 +37,10 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
   // El modo Retail llegó con la app 1.21: un robot con una app anterior mostraría
   // una pantalla de evento vacía. Se mira la versión que reporta el robot en su latido
   const esRetail = tipoDe(proyecto.config) === 'retail'
+  // El video del recorrido vive en un campo distinto según el tipo de proyecto
+  const videoRecorrido = esRetail
+    ? proyecto.config.retail?.video_url
+    : proyecto.config.pantalla_inicial.video_patrullaje_url
 
   // Robots que ya tienen fijado ESTE proyecto
   const { data: robotsFijados } = useQuery({
@@ -213,9 +217,11 @@ export function DialogFijarRobot({ proyecto, onCerrar }: DialogFijarRobotProps) 
           <p className="mt-1 pl-6 text-sm text-slate-500">Súbalos de nuevo en el editor, guarde el proyecto y vuelva aquí.</p>
         </div>
       )}
-      {!proyecto.config.pantalla_inicial.video_patrullaje_url && (
+      {!videoRecorrido && (
         <Advertencia className="mt-3">
-          Este proyecto no tiene video de patrullaje: el robot mostrará la pantalla sin video.
+          {esRetail
+            ? 'Este proyecto no tiene video del recorrido: el robot recorrerá la tienda sin video.'
+            : 'Este proyecto no tiene video de patrullaje: el robot mostrará la pantalla sin video.'}
         </Advertencia>
       )}
 
