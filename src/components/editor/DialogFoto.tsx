@@ -8,8 +8,8 @@ import { CargadorArchivo } from './CargadorArchivo'
 import { IconoCamara, IconoPaleta, IconoQr, IconoReloj } from '../iconosPopup'
 import { rutaMedia, subirArchivo } from '../../lib/storage'
 import { describirError } from '../../lib/errores'
-import { CampoTexto, ConfigFormulario } from './ConfigFormulario'
-import { limpiarFormulario, MAX_DESPEDIDA, validarFormulario } from '../../lib/formulario'
+import { CampoTexto, ConfigFormulario, DespedidaConNombre } from './ConfigFormulario'
+import { camposDe, limpiarFormulario, MAX_DESPEDIDA, validarFormulario } from '../../lib/formulario'
 import { Advertencia } from '../Advertencia'
 import {
   FRASE_PREPARACION_DEFECTO,
@@ -448,8 +448,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                 valor={foto.formulario}
                 onChange={(formulario) => setFoto((actual) => ({ ...actual, formulario }))}
               />
-              <CampoTexto
-                label="Mensaje de despedida con nombre"
+              <DespedidaConNombre
                 ayuda={
                   <>
                     Se reproduce si el visitante se registra antes de que finalice el tiempo en pantalla. Utilice{' '}
@@ -457,8 +456,7 @@ export function DialogFoto({ valor, projectId, galeriaToken, onGuardar, onCerrar
                   </>
                 }
                 valor={foto.despedida_nombre}
-                max={MAX_DESPEDIDA}
-                filas={2}
+                pideNombre={camposDe(foto.formulario).nombre}
                 onChange={(despedida_nombre) => setFoto((actual) => ({ ...actual, despedida_nombre }))}
               />
             </>

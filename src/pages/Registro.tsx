@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { colorTextoSobre, fondoBoton } from '../lib/colores'
-import { leerVistaPrevia } from '../lib/formulario'
+import { camposDe, leerVistaPrevia } from '../lib/formulario'
 import { Cargando } from '../components/Cargando'
 import { COLOR_FORMULARIO_DEFECTO, TEXTO_AUTORIZACION_DEFECTO, type FormularioRegistro } from '../types/config'
 
@@ -171,12 +171,15 @@ function Formulario({
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorEnvio, setErrorEnvio] = useState('')
   const [enviando, setEnviando] = useState(false)
+  // Solo se piden (y se validan) los campos que dejó el panel
+  const campos = camposDe(form)
+  const primerNombre = () => (campos.nombre ? nombre.trim().split(/\s+/)[0] : '')
 
   function validar(): Record<string, string> {
     const e: Record<string, string> = {}
-    if (nombre.trim().length < 2) e.nombre = 'Escribe tu nombre.'
-    if (!CORREO.test(correo.trim())) e.correo = 'Revisa el correo.'
-    if (!/^3\d{9}$/.test(celular)) e.celular = 'Debe tener 10 dígitos y empezar por 3.'
+    if (campos.nombre && nombre.trim().length < 2) e.nombre = 'Escribe tu nombre.'
+    if (campos.correo && !CORREO.test(correo.trim())) e.correo = 'Revisa el correo.'
+    if (campos.celular && !/^3\d{9}$/.test(celular)) e.celular = 'Debe tener 10 dígitos y empezar por 3.'
     if (!autoriza) e.autoriza = 'Debes aceptar para continuar.'
     return e
   }
@@ -194,15 +197,15 @@ function Formulario({
       // Simula el envío: valida igual, pero no guarda ni avisa al robot
       await new Promise((r) => setTimeout(r, 600))
       setEnviando(false)
-      onEnviado(nombre.trim().split(/\s+/)[0])
+      onEnviado(primerNombre())
       return
     }
     try {
       const { data, error } = await supabase.rpc('registrar_contacto', {
         p_clave: clave,
-        p_nombre: nombre,
-        p_correo: correo,
-        p_celular: celular,
+        p_nombre: campos.nombre ? nombre : '',
+        p_correo: campos.correo ? correo : '',
+        p_celular: campos.celular ? celular : '',
         p_autoriza: autoriza,
       })
       if (error) throw error
@@ -211,7 +214,7 @@ function Formulario({
         setErrorEnvio(respuesta.error ?? 'No se pudo enviar. Intenta de nuevo.')
         return
       }
-      onEnviado(nombre.trim().split(/\s+/)[0])
+      onEnviado(primerNombre())
     } catch {
       // Los datos escritos se quedan: basta con volver a tocar Enviar
       setErrorEnvio('Sin conexión. Revisa tu internet e intenta de nuevo.')
@@ -235,47 +238,53 @@ function Formulario({
       )}
 
       <div className="mt-6 space-y-4">
-        <Campo
-          id="nombre"
-          label="Nombre"
-          color={color}
-          valor={nombre}
-          error={errores.nombre}
-          placeholder="Escribe tu nombre"
-          autoComplete="name"
-          onChange={(v) => {
-            setNombre(v.slice(0, 60))
-            limpiarError('nombre')
-          }}
-        />
-        <Campo
-          id="correo"
-          label="Correo"
-          tipo="email"
-          color={color}
-          valor={correo}
-          error={errores.correo}
-          placeholder="Escribe tu correo"
-          autoComplete="email"
-          onChange={(v) => {
-            setCorreo(v.slice(0, 120))
-            limpiarError('correo')
-          }}
-        />
-        <Campo
-          id="celular"
-          label="Celular"
-          tipo="tel"
-          color={color}
-          valor={celular}
-          error={errores.celular}
-          placeholder="Escribe tu número de 10 dígitos"
-          autoComplete="tel-national"
-          onChange={(v) => {
-            setCelular(v.replace(/\D/g, '').slice(0, 10))
-            limpiarError('celular')
-          }}
-        />
+        {campos.nombre && (
+          <Campo
+            id="nombre"
+            label="Nombre"
+            color={color}
+            valor={nombre}
+            error={errores.nombre}
+            placeholder="Escribe tu nombre"
+            autoComplete="name"
+            onChange={(v) => {
+              setNombre(v.slice(0, 60))
+              limpiarError('nombre')
+            }}
+          />
+        )}
+        {campos.correo && (
+          <Campo
+            id="correo"
+            label="Correo"
+            tipo="email"
+            color={color}
+            valor={correo}
+            error={errores.correo}
+            placeholder="Escribe tu correo"
+            autoComplete="email"
+            onChange={(v) => {
+              setCorreo(v.slice(0, 120))
+              limpiarError('correo')
+            }}
+          />
+        )}
+        {campos.celular && (
+          <Campo
+            id="celular"
+            label="Celular"
+            tipo="tel"
+            color={color}
+            valor={celular}
+            error={errores.celular}
+            placeholder="Escribe tu número de 10 dígitos"
+            autoComplete="tel-national"
+            onChange={(v) => {
+              setCelular(v.replace(/\D/g, '').slice(0, 10))
+              limpiarError('celular')
+            }}
+          />
+        )}
 
         <div>
           <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-500">
@@ -400,7 +409,7 @@ function Exito({
           <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
-      <h1 className="mt-4 text-xl font-bold text-slate-800">¡Gracias, {nombre}!</h1>
+      <h1 className="mt-4 text-xl font-bold text-slate-800">{nombre ? `¡Gracias, ${nombre}!` : '¡Gracias!'}</h1>
 
       {info.origen === 'registro' && <p className="mt-2 text-sm text-slate-500">Tus datos quedaron registrados.</p>}
 

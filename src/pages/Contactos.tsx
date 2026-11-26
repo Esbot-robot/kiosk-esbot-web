@@ -444,7 +444,7 @@ export function Contactos() {
                           type="checkbox"
                           checked={todos || seleccion.has(c.id)}
                           onChange={(e) => marcarFila(c.id, e.target.checked)}
-                          aria-label={`Seleccionar a ${c.nombre}`}
+                          aria-label={`Seleccionar a ${c.nombre || c.correo || c.celular}`}
                           className="h-4 w-4 cursor-pointer rounded accent-[#1d293d]"
                         />
                       </td>
@@ -465,9 +465,9 @@ export function Contactos() {
                           )}
                         </td>
                       )}
-                      <td className="px-4 py-3 text-slate-800">{c.nombre}</td>
-                      <td className="px-4 py-3 text-slate-600">{c.correo}</td>
-                      <td className="px-4 py-3 text-slate-600">{c.celular}</td>
+                      <td className="px-4 py-3 text-slate-800">{c.nombre || <span className="text-slate-400">—</span>}</td>
+                      <td className="px-4 py-3 text-slate-600">{c.correo || <span className="text-slate-400">—</span>}</td>
+                      <td className="px-4 py-3 text-slate-600">{c.celular || <span className="text-slate-400">—</span>}</td>
                       {origen === 'foto' && <td className="px-4 py-3 font-mono text-xs text-slate-500">{c.serial}</td>}
                       <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fechaHora(c.creado_at)}</td>
                     </tr>
