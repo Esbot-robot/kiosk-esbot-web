@@ -136,7 +136,22 @@ export interface FormularioRegistro {
   texto_autorizacion: string
   /** enlace opcional a la política de datos del cliente */
   politica_url: string
+  /**
+   * Qué campos pide el formulario (al menos uno). Sin la propiedad, los tres:
+   * así quedan los proyectos guardados antes de que existiera.
+   */
+  campos?: CamposFormulario
 }
+
+export type CampoFormulario = 'nombre' | 'correo' | 'celular'
+export type CamposFormulario = Record<CampoFormulario, boolean>
+
+/** en este orden aparecen en el formulario */
+export const CAMPOS_FORMULARIO: { id: CampoFormulario; etiqueta: string }[] = [
+  { id: 'nombre', etiqueta: 'Nombre' },
+  { id: 'correo', etiqueta: 'Correo' },
+  { id: 'celular', etiqueta: 'Celular' },
+]
 
 export const COLOR_FORMULARIO_DEFECTO = '#8E24AA'
 export const TEXTO_AUTORIZACION_DEFECTO =
@@ -149,6 +164,7 @@ export function formularioVacio(titulo: string, subtitulo: string): FormularioRe
     color: COLOR_FORMULARIO_DEFECTO,
     texto_autorizacion: TEXTO_AUTORIZACION_DEFECTO,
     politica_url: '',
+    campos: { nombre: true, correo: true, celular: true },
   }
 }
 

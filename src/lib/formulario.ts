@@ -1,17 +1,33 @@
-import type { FormularioRegistro } from '../types/config'
+import type { CamposFormulario, FormularioRegistro } from '../types/config'
 
 /** largo máximo de las despedidas del robot */
 export const MAX_DESPEDIDA = 200
 
+/**
+ * Los campos que pide el formulario. Lo que falte cuenta como activo (proyectos
+ * guardados antes de poder quitarlos), y si quedaran todos apagados se piden
+ * los tres: un formulario sin campos no registra a nadie.
+ */
+export function camposDe(f: Partial<FormularioRegistro> | undefined): CamposFormulario {
+  const c = f?.campos
+  const campos = { nombre: c?.nombre !== false, correo: c?.correo !== false, celular: c?.celular !== false }
+  return campos.nombre || campos.correo || campos.celular ? campos : { nombre: true, correo: true, celular: true }
+}
+
 /** Error de validación del formulario, o '' si está completo */
 export function validarFormulario(f: FormularioRegistro, conNombre: string): string {
   if (!f.titulo.trim()) return 'Ingrese el título del formulario.'
+  const c = f.campos
+  if (c && !c.nombre && !c.correo && !c.celular) return 'El formulario debe pedir al menos un dato.'
   if (!f.texto_autorizacion.trim()) return 'Ingrese el texto de autorización de datos.'
   if (!/^#[0-9a-fA-F]{6}$/.test(f.color)) return 'Seleccione el color del formulario (6 dígitos hexadecimales).'
   if (f.politica_url.trim() && !/^https?:\/\/\S+$/.test(f.politica_url.trim())) {
     return 'La URL de la política debe iniciar con https://'
   }
-  if (!conNombre.includes('{nombre}')) return 'El mensaje de despedida con nombre debe incluir {nombre}.'
+  // Sin el campo Nombre el robot siempre usa la despedida sin nombre
+  if (camposDe(f).nombre && !conNombre.includes('{nombre}')) {
+    return 'El mensaje de despedida con nombre debe incluir {nombre}.'
+  }
   return ''
 }
 
@@ -22,6 +38,7 @@ export function limpiarFormulario(f: FormularioRegistro): FormularioRegistro {
     color: f.color,
     texto_autorizacion: f.texto_autorizacion.trim(),
     politica_url: f.politica_url.trim(),
+    campos: camposDe(f),
   }
 }
 

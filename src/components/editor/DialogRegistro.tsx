@@ -6,7 +6,7 @@ import { Interruptor } from '../Interruptor'
 import { AparienciaBoton } from './AparienciaBoton'
 import { CamposDespedida, CampoTexto, ConfigFormulario } from './ConfigFormulario'
 import { IconoDocumento, IconoMonitor, IconoPaleta } from '../iconosPopup'
-import { limpiarFormulario, validarFormulario } from '../../lib/formulario'
+import { camposDe, limpiarFormulario, validarFormulario } from '../../lib/formulario'
 import { SEGUNDOS_PANTALLA_MAX, SEGUNDOS_PANTALLA_MIN, type BotonRegistro } from '../../types/config'
 
 interface DialogRegistroProps {
@@ -152,6 +152,7 @@ export function DialogRegistro({ valor, projectId, onGuardar, onCerrar }: Dialog
           <CamposDespedida
             conNombre={registro.despedida_nombre}
             sinNombre={registro.despedida}
+            pideNombre={camposDe(registro.formulario).nombre}
             ayudaSinNombre="Se reproduce si el tiempo finaliza sin que el visitante se registre."
             onConNombre={(despedida_nombre) => cambiar({ despedida_nombre })}
             onSinNombre={(despedida) => cambiar({ despedida })}
