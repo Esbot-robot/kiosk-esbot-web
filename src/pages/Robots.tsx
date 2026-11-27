@@ -16,6 +16,7 @@ import robotBlanco from '../assets/icons/blanco_robot.webp'
 import robotNegro from '../assets/icons/negro_robot.webp'
 import { Cargando } from '../components/Cargando'
 import { Advertencia } from '../components/Advertencia'
+import { Interruptor } from '../components/Interruptor'
 
 /* El latido de la app llega cada 3s; si el último tiene más de 6s
    (2 latidos perdidos), el robot se muestra como "Sin reporte".
@@ -44,6 +45,10 @@ interface RobotStatus {
   /** número de la última orden de quieto y de la última que el robot aplicó */
   quieto_orden?: number | null
   quieto_orden_hecha?: number | null
+  /** «Detectar personas» (eventos, app 1.30+): la persona que se acerca cuenta como un toque */
+  detectar_personas?: boolean
+  /** distancia de detección en metros (0,5 a 2) */
+  detectar_distancia?: number | null
   /** versión de la config que el robot tiene aplicada; null en apps anteriores */
   version_config?: number | null
   /** ubicaciones del mapa del robot; null si su app aún no las envía */
@@ -227,6 +232,28 @@ export function Robots() {
     refetchInterval: 10_000,
   })
 
+  // Robots con un proyecto Retail fijado: ahí la detección la maneja el Retail
+  const { data: retailPorSerial } = useQuery({
+    queryKey: ['robots-retail'],
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<Record<string, boolean>> => {
+      const [asignados, proyectos] = await Promise.all([
+        supabase.from('robots').select('serial, project_id'),
+        supabase.from('projects').select('id, tipo:config->>tipo'),
+      ])
+      if (asignados.error) throw asignados.error
+      if (proyectos.error) throw proyectos.error
+      const retail = new Set(
+        (proyectos.data as { id: string; tipo: string | null }[]).filter((p) => p.tipo === 'retail').map((p) => p.id)
+      )
+      const resultado: Record<string, boolean> = {}
+      for (const { serial, project_id } of asignados.data as { serial: string; project_id: string | null }[]) {
+        resultado[serial] = !!project_id && retail.has(project_id)
+      }
+      return resultado
+    },
+  })
+
   // Archivos que faltan en el proyecto fijado de cada robot (se comprueba al abrir y cada 5 minutos, no con cada refresco)
   const { data: fijados } = useQuery({
     queryKey: ['robots-fijados-proyecto'],
@@ -399,6 +426,7 @@ export function Robots() {
               </div>
 
               <ControlRuta robot={r} enServicio={enServicio} />
+              {retailPorSerial && !retailPorSerial[r.serial] && <ControlDeteccion robot={r} enServicio={enServicio} />}
               <ControlComandos robot={r} enServicio={enServicio} ahora={ahora} versionProyecto={versiones?.[r.serial]} />
             </div>
           )
@@ -1005,6 +1033,89 @@ function ControlRuta({ robot, enServicio }: { robot: RobotStatus; enServicio: bo
             setEditandoFrase(false)
           }}
         />
+      )}
+    </div>
+  )
+}
+
+/** versionCode de la app 1.30, la primera que sabe detectar personas en eventos */
+const VERSION_APP_DETECTAR = 32
+const DISTANCIAS_DETECCION = [0.5, 0.8, 1, 1.2, 1.5, 1.8, 2]
+
+/**
+ * «Detectar personas» (solo proyectos de eventos). Con el recorrido o quieto con
+ * video, el robot reacciona a quien se acerca como si le hubieran tocado la
+ * pantalla. Viaja por el latido, como el modo quieto.
+ */
+function ControlDeteccion({ robot, enServicio }: { robot: RobotStatus; enServicio: boolean }) {
+  const queryClient = useQueryClient()
+  const activo = robot.detectar_personas ?? false
+  const distancia = robot.detectar_distancia ?? 1.5
+  const appVieja = robot.app_version_code != null && robot.app_version_code < VERSION_APP_DETECTAR
+
+  const cambiar = useMutation({
+    mutationFn: async (nuevo: { activo: boolean; distancia: number }) => {
+      const { error } = await supabase.rpc('fijar_deteccion', {
+        p_serial: robot.serial,
+        p_activo: nuevo.activo,
+        p_distancia: nuevo.distancia,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['robot-status'] }),
+    onError: (e) => void avisoError('No se pudo cambiar la detección de personas', describirError(e)),
+  })
+
+  const formato = (m: number) => `${m.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`
+
+  return (
+    <div className="border-t border-slate-100 px-5 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex min-w-0 items-center gap-2 text-sm">
+          <span className="font-semibold text-slate-900">Detectar personas</span>
+          <Ayuda>
+            Con el recorrido o detenido con video, cuando una persona se acerca a la distancia elegida el robot se detiene,
+            gira hacia ella y muestra los botones con la frase de «toca la pantalla», igual que si la hubieran tocado. En la analítica se
+            cuenta aparte, como «Persona detectada». Detenido «Sin video» no cambia: los botones ya están en
+            pantalla. Requiere la app 1.30 o superior.
+          </Ayuda>
+        </p>
+        <div className="flex items-center gap-3">
+          {activo && (
+            <label className="flex items-center gap-1.5 text-sm text-slate-500">
+              A
+              <select
+                value={String(distancia)}
+                disabled={cambiar.isPending}
+                onChange={(e) => cambiar.mutate({ activo: true, distancia: Number(e.target.value) })}
+                className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                aria-label="Distancia de detección"
+              >
+                {/* si la guardada no está en la lista, se muestra igual */}
+                {(DISTANCIAS_DETECCION.includes(distancia) ? DISTANCIAS_DETECCION : [...DISTANCIAS_DETECCION, distancia].sort((a, b) => a - b)).map((m) => (
+                  <option key={m} value={String(m)}>
+                    {formato(m)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Interruptor
+            activo={activo}
+            onChange={(nuevo) => {
+              if (!cambiar.isPending) cambiar.mutate({ activo: nuevo, distancia })
+            }}
+            etiqueta="Detectar personas"
+          />
+        </div>
+      </div>
+      {activo && appVieja && (
+        <p className="mt-2 text-xs text-amber-700">
+          Este robot tiene la app {robot.app_version_name ?? 'anterior'}: la detección funcionará cuando se actualice a la 1.30.
+        </p>
+      )}
+      {activo && !enServicio && !appVieja && (
+        <p className="mt-2 text-xs text-slate-500">Se aplicará cuando el robot vuelva a conectarse.</p>
       )}
     </div>
   )
