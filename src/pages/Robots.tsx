@@ -1075,8 +1075,8 @@ function ControlDeteccion({ robot, enServicio }: { robot: RobotStatus; enServici
           <span className="font-semibold text-slate-900">Detectar personas</span>
           <Ayuda>
             Con el recorrido o detenido con video, cuando una persona se acerca a la distancia elegida el robot se detiene,
-            gira hacia ella y muestra los botones con la frase de «toca la pantalla», igual que si la hubieran tocado. Se
-            cuenta como un toque de pantalla en la analítica. Detenido «Sin video» no cambia: los botones ya están en
+            gira hacia ella y muestra los botones con la frase de «toca la pantalla», igual que si la hubieran tocado. En la analítica se
+            cuenta aparte, como «Persona detectada». Detenido «Sin video» no cambia: los botones ya están en
             pantalla. Requiere la app 1.30 o superior.
           </Ayuda>
         </p>

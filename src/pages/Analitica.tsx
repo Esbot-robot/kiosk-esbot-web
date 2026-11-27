@@ -24,6 +24,7 @@ const PATRON_SERIAL_REAL = '_'.repeat(11)
 
 /* Paleta validada (dataviz): acciones directas y acciones configurables */
 const COLOR_TOQUE = '#2a78d6' // azul — toques de pantalla
+const COLOR_PERSONA_DETECTADA = '#4f46e5' // índigo — «Detectar personas» en eventos
 const COLOR_JUGAR = '#1baf7a' // aqua — botón jugar
 const COLOR_VIDEO = '#8b5cf6' // violeta — video configurado
 const COLOR_UBICACION = '#e57a28' // naranja — guía a ubicación
@@ -85,6 +86,13 @@ interface Evento {
 
 const TIPOS_EVENTO = [
   { tipo: 'toque_pantalla', nombre: 'Toque pantalla', color: COLOR_TOQUE, ayuda: 'Veces que alguien tocó la pantalla del robot.' },
+  // App 1.30+: el robot se detuvo porque vio a alguien («Detectar personas» de la tarjeta del robot)
+  {
+    tipo: 'persona_detectada',
+    nombre: 'Persona detectada',
+    color: COLOR_PERSONA_DETECTADA,
+    ayuda: 'Veces que el robot se detuvo y mostró los botones al detectar a una persona (interruptor «Detectar personas» de la tarjeta del robot).',
+  },
   { tipo: 'boton_jugar', nombre: 'Botón jugar', color: COLOR_JUGAR, ayuda: 'Veces que se tocó el botón para jugar el quiz.' },
   { tipo: 'boton_video', nombre: 'Botón video', color: COLOR_VIDEO, ayuda: 'Veces que se abrió un video configurado.' },
   { tipo: 'boton_ubicacion', nombre: 'Botón ubicación', color: COLOR_UBICACION, ayuda: 'Veces que el robot guió a alguien a una ubicación.' },
@@ -454,6 +462,8 @@ export function Analitica() {
    */
   const tiposVisibles = TIPOS_EVENTO.map((tipo, index) => ({ tipo, index })).filter(({ tipo, index }) => {
     if (tipo.tipo === 'retail_invitacion') return totales[index] > 0
+    // «Detectar personas» es opcional por robot y no existe en Retail: solo con datos
+    if (tipo.tipo === 'persona_detectada') return !proyectoRetail && totales[index] > 0
     return proyectoRetail ? TIPOS_RETAIL.has(tipo.tipo) : !TIPOS_RETAIL.has(tipo.tipo) || totales[index] > 0
   })
 
